@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "outDir": "./out",
+    "target": "es6",
+    "module": "commonjs",
+    "allowJs": true,
+    "sourceMap": false,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true
+  },
+  "include": [
+    "./src/**/*"
+  ]
+}
