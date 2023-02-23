@@ -1,7 +1,7 @@
 // telegram bot endpoint
 
 import { config } from "dotenv";
-import { Bot, BotError, Context, GrammyError, HttpError, InlineKeyboard, Keyboard } from "grammy";
+import { Bot, BotError, Context, GrammyError, HttpError, InlineKeyboard, Keyboard, webhookCallback } from "grammy";
 import { type InlineKeyboardButton } from "@grammyjs/types";
 import { CheckUpdates, ResObj } from "../api/UpdRelease"
 import { apiThrottler } from "@grammyjs/transformer-throttler";
@@ -36,15 +36,25 @@ export class UpdateHold {
     }
 }
 
-export async function botinit(updater:UpdateHold, authchat:number) {
+export const bot = new Bot<Context & ConversationFlavor>(`${process.env.BOT_TOKEN}`, {
+    botInfo:{
+        "id": 5951365847,
+        "is_bot": true,
+        "first_name": "Cunnime",
+        "username": "cunnime_bot",
+        "can_join_groups": true,
+        "can_read_all_group_messages": false,
+        "supports_inline_queries": false
+    }
+})
+
+export async function botinit(bot:Bot<Context & ConversationFlavor>, updater:UpdateHold, authchat:number, app) {
     config()
     //bot.api.setMyCommands([
     //    { command: "start", description: "Start the bot" },
     //    { command: "help", description: "Show help text" },
     //    { command: "settings", description: "Open settings" },
     //  ]);
-    type MyContext = Context & ConversationFlavor;
-    const bot = new Bot<MyContext>(process.env.BOT_TOKEN);
     const throttler = apiThrottler();
     bot.api.config.use(throttler);
     bot.use(session({ initial: () => ({}) }));
@@ -65,11 +75,9 @@ export async function botinit(updater:UpdateHold, authchat:number) {
         }
       });
     botcommands(bot, updater, authchat)
-    bot.start();
     console.log("*********************")
     console.log("Cunnime has started!")
     console.log("*********************")
-    return bot
 }
 
 function botcommands(bot:Bot<Context & ConversationFlavor>, updater:UpdateHold, authchat:number) {
@@ -405,4 +413,4 @@ export async function syncresponser(bot:Bot, authchat:number, updater:UpdateHold
     }
 }
 
-module.exports = { UpdateHold, botinit, syncresponser }
+module.exports = { bot, UpdateHold, botinit, syncresponser }
