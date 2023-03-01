@@ -2,8 +2,7 @@
 
 import axios, { AxiosResponse } from 'axios';
 import { xml2js } from 'xml-js';
-import { imageget } from "../api/mal_api";
-import { SPSearch, getxdcc } from "../api/subsplease-xdcc";
+import { imageget } from "./anilist_api";
 import { MongoClient } from 'mongodb';
 import { GetAnimeList, GetWatchedList, GetSearchQueries } from '../database/dbupdater';
 import { writeJson } from "fs-extra";
@@ -19,14 +18,16 @@ export interface ResObj {
         epname: string
     }[],
     links: string[],
-    xdcclink: SPSearch[],
+    notwatchedepnames: string[],
     torrentlink: string[],
     imagelink: string,
 }
 
 export async function CheckUpdates(client:MongoClient) {
     console.log("Fetching data...")
+    const mainstarttime = (new Date()).getTime();
     const searchqueries = await GetSearchQueries(client)
+    console.log(`Mongo Query1: ${(new Date()).getTime() - mainstarttime} ms`) // TIME LOGGER
     let filelist = await GetAnimeList(client)
     const baseurl = "https://nyaa.si/?page=rss"
     let urls = []
@@ -37,7 +38,7 @@ export async function CheckUpdates(client:MongoClient) {
         urls.push(url);
     }
     //console.log(urls)
-    const mainstarttime = (new Date()).getTime();
+    
     for (let i = 0; i < urls.length; i ++) {
         let starttime = (new Date()).getTime();
         let url = urls[i]
@@ -48,12 +49,11 @@ export async function CheckUpdates(client:MongoClient) {
             Promise.reject("AXIOS ERROR:ECONNRESET")
             return returnobj
         }
-        
+        console.log(`Axios Query: ${(new Date()).getTime() - mainstarttime} ms`) // TIME LOGGER
         if (res.status == 200)
         {
             let resobj = xml2js(res.data.toString())
-            //console.log(resobj)
-
+            console.log(`XML2js: ${(new Date()).getTime() - mainstarttime} ms`) // TIME LOGGER
             //handling response xml
             let reselem = resobj["elements"][0]["elements"][0]["elements"]
             reselem.splice(0, 4)
@@ -62,6 +62,7 @@ export async function CheckUpdates(client:MongoClient) {
             for (let j = 0; j < reselem.length; j ++) {
                 textobj.push(reselem[j]["elements"][0]["elements"][0]["text"])
             }
+            console.log(`Textobj pushed: ${(new Date()).getTime() - mainstarttime} ms`) // TIME LOGGER
             var sp = false
             let animename = urls[i].split("\"")[3]
             for (let j = 0; j < textobj.length; j ++) {
@@ -77,6 +78,7 @@ export async function CheckUpdates(client:MongoClient) {
                 textobj[j] = textobj[j].slice(0, textobj[j].indexOf("1080p") - 2).replace("[SubsPlease] ", "").replace("[Erai-raws] ", "");
                 reselem[j]["elements"][0]["elements"][0]["text"] = reselem[j]["elements"][0]["elements"][0]["text"].slice(0, reselem[j]["elements"][0]["elements"][0]["text"].indexOf("1080p") - 2);
             }
+            console.log(`Removal of subsplease and erai raws: ${(new Date()).getTime() - mainstarttime} ms`) // TIME LOGGER
             //if (!sp) 
             //    console.log(`\nNo SubsPlease print for ${animename}`)
             //else {
@@ -89,8 +91,11 @@ export async function CheckUpdates(client:MongoClient) {
                     }
                 }
             }
+            console.log(`Removal of erai-raws of sp present: ${(new Date()).getTime() - mainstarttime} ms`) // TIME LOGGER
             //console.log(`Episodes: ${reselem.length}`)
             let wfile = await GetWatchedList(client)
+            console.log(`Mongo Query2: ${(new Date()).getTime() - mainstarttime} ms`) // TIME LOGGER
+            
             let newep = []
             let old_anime_watch:{epnum:number, epname:string}[] = []
             let old_anime_watchlist:string[] = [];
@@ -101,6 +106,7 @@ export async function CheckUpdates(client:MongoClient) {
                     break
                 }
             }
+            console.log(`Removal of already watched shit: ${(new Date()).getTime() - mainstarttime} ms`) // TIME LOGGER
             
             for (let k = 0; k < textobj.length; k++) {
                 if (!(old_anime_watchlist.includes(textobj[k]))) { //checking if ep in old_anime is there in textobj
@@ -115,7 +121,7 @@ export async function CheckUpdates(client:MongoClient) {
                     notwatched: [],
                     watched: old_anime_watch.reverse(),
                     links: [],
-                    xdcclink: [],
+                    notwatchedepnames: [],
                     torrentlink: [],
                     imagelink: ""
                 })
@@ -128,15 +134,14 @@ export async function CheckUpdates(client:MongoClient) {
                     reselem.splice(j, 1)
                 }
             }
+            console.log(`Random for loop label: ${(new Date()).getTime() - mainstarttime} ms`) // TIME LOGGER
             let downloadlinks = []; 
             let viewlinks = []; 
             for (let j = 0; j < reselem.length; j++) {
                 downloadlinks.push(reselem[j]["elements"][1]["elements"][0]["text"])
                 viewlinks.push(reselem[j]["elements"][2]["elements"][0]["text"])
             }
-            // console.log(downloadlinks);
-            // console.log(viewlinks);
-            //dbupdate the downloadlinks
+
             let newepnum:number[] = []
             try {
                 for (let j = 0; j < newep.length; j ++) {
@@ -164,6 +169,7 @@ export async function CheckUpdates(client:MongoClient) {
                 for (let j = 1; j <= old_anime_watchlist.length; j++) 
                     watchepnum.push(j);
             }
+            console.log(`Episode numbers: ${(new Date()).getTime() - mainstarttime} ms`) // TIME LOGGER
             
             let newepdis:ResObj["notwatched"] = []
             for (let j = 0; j < newep.length; j ++) {
@@ -182,35 +188,32 @@ export async function CheckUpdates(client:MongoClient) {
                 })
             }
             
-            let malid:number;
+            let AlId:number;
             for (let j = 0; j < filelist.length; j ++) {
                 if (filelist[j]["JpName"] == animename) {
-                    malid = parseInt(filelist[j]["MalId"])
+                    AlId = parseInt(filelist[j]["AlID"])
                 }
             }
-            let xdcclinks:SPSearch[] = []
+            console.log(`Pushed all shit: ${(new Date()).getTime() - mainstarttime} ms`) // TIME LOGGER
+            
+            /*let xdcclinks:SPSearch[] = []
             if (sp) {
                 for (let j = 0; j < actualnotwatch.length; j ++) {
                     xdcclinks.push(await getxdcc(actualnotwatch[j]))
                 }
             }
+            console.log(`XDCC query: ${(new Date()).getTime() - mainstarttime} ms`) // TIME LOGGER */
             
-            
-            let imagelink = await imageget(malid)
+            let imagelink = await imageget(AlId)
             returnobj.push({
                 anime: animename,
                 notwatched: newepdis.sort((a, b) => (a.epnum > b.epnum) ? 1: -1),
                 watched: watcheddis.sort((a, b) => (a.epnum > b.epnum) ? 1: -1),
                 links: viewlinks.reverse(),
-                xdcclink: xdcclinks.reverse(),
+                notwatchedepnames: actualnotwatch.reverse(),
                 torrentlink: downloadlinks.reverse(),
                 imagelink: imagelink
             })
-            
-            //downloadlinks = ["https://webtorrent.io/torrents/sintel.torrent", "https://webtorrent.io/torrents/big-buck-bunny.torrent"]
-            //for (let j = 0; j < downloadlinks.length; j ++) {
-            //    downloader.startdl(torrent, downloadlinks[j])
-            //}
             
         }
         

@@ -19,6 +19,10 @@ export interface SPSearch {
 export async function getxdcc(name:string) {
     let packnum:number;
     let botnum:number;
+    let returnobj:SPSearch = {
+        packnum: 0,
+        botname: ""
+    }
     let botnames = {
         989: "CR-ARUTHA|NEW",
         696: "CR-HOLLAND|NEW",
@@ -63,12 +67,15 @@ export async function getxdcc(name:string) {
             botname: ""
         }
     }
-
-    let returnobj:SPSearch = {
-        packnum: packnum,
-        botname: botnames[botnum]
+    if (packnum === undefined || botnum === undefined) 
+        return returnobj
+    else {
+        returnobj = {
+            packnum: packnum,
+            botname: botnames[botnum]
+        }
+        return returnobj
     }
-    return returnobj
 }
 
 /* export async function startspxdcc()

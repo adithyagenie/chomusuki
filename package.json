@@ -16,6 +16,7 @@
     "@grammyjs/types": "^2.11.2",
     "@types/fs-extra": "^11.0.1",
     "@types/node-fetch": "^2.6.2",
+    "anilist-node": "^1.13.1",
     "axios": "^1.2.3",
     "dotenv": "^16.0.3",
     "express": "^4.18.2",
