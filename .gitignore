@@ -2,4 +2,12 @@ node_modules
 out
 .env
 .eslintrc.js
+log.*
+*.txt
 .vscode
+node_modules
+out
+.env
+.eslintrc.js
+.vscode
+debug.log

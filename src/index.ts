@@ -10,12 +10,9 @@ async function spinup() {
     config()
     initMAL()
     const mongoClient = await initMongo()
-    //const xdccJS = await xdccInit();
-    //const torrclient = new Torrent();
-
     const authchat = parseInt(process.env.AUTHORISED_CHAT)
     let updater = new UpdateHold(mongoClient);
-    await updater.updater()
+    //await updater.updater()
     const bot = await botinit(updater, authchat)
     const app = startserver()
     app.post('/sync', (req, res) => {

@@ -1,7 +1,7 @@
 {
   "name": "cunnime",
   "version": "1.0.0",
-  "description": "Anime release monitor",
+  "description": "Anime poster + watcher",
   "main": "index.js",
   "scripts": {
     "build": "tsc",

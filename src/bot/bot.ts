@@ -1,7 +1,7 @@
 // telegram bot endpoint
 
 import { config } from "dotenv";
-import { Bot, BotError, Context, GrammyError, HttpError, InlineKeyboard, Keyboard } from "grammy";
+import { Bot, BotError, Context, GrammyError, HttpError, InlineKeyboard, InputFile, Keyboard } from "grammy";
 import { type InlineKeyboardButton } from "@grammyjs/types";
 import { CheckUpdates, ResObj } from "../api/UpdRelease"
 import { apiThrottler } from "@grammyjs/transformer-throttler";
@@ -18,6 +18,7 @@ import {
 import { session } from "grammy";
 import { addAnimeNames, AnimeNames, markWatchedunWatched, delanime } from "../database/db_connect";
 import { messageToHTMLMessage } from "./caption_entity_handler";
+import { createReadStream } from "fs-extra";
   
 export class UpdateHold {
     updateobj: ResObj[];
@@ -234,6 +235,11 @@ function botcommands(bot:Bot<Context & ConversationFlavor>, updater:UpdateHold, 
         }
         return
     }
+    
+    bot.command("log", async (ctx) => {
+        const logfile = new InputFile(createReadStream("./debug.log"), "log.txt")
+        ctx.replyWithDocument(logfile)
+    })
     
     // Makes keyboard for download and mark watched
     function makeEpKeyboard(ctx:Context, callback_data_string:string) {

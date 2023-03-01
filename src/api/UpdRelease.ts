@@ -6,6 +6,7 @@ import { imageget } from "../api/mal_api";
 import { SPSearch, getxdcc } from "../api/subsplease-xdcc";
 import { MongoClient } from 'mongodb';
 import { GetAnimeList, GetWatchedList, GetSearchQueries } from '../database/dbupdater';
+import { writeJson } from "fs-extra";
 
 export interface ResObj {
     anime: string,
@@ -219,7 +220,7 @@ export async function CheckUpdates(client:MongoClient) {
     }
     console.log("Fetched data.")
     console.log(`Sync took ${(new Date()).getTime() - mainstarttime} ms`)
-    //writeJson("./returnobj.json", returnobj,{spaces:"\t"})
+    writeJson("./returnobj.json", returnobj,{spaces:"\t"})
     return returnobj
 }
 
