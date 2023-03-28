@@ -3,3 +3,4 @@ out
 .env
 .eslintrc.js
 .vscode
+debug.log

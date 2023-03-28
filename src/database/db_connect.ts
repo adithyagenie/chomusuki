@@ -6,7 +6,7 @@ export interface AnimeNames {
     JpName: string,
     OptionalNames: Array<string>,
     ExcludeNames: Array<string>,
-    MalId: string
+    AlID: number
 }    
 
 export interface WatchedAnime {

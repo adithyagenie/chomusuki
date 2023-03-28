@@ -60,7 +60,3 @@ const getTag = (entity: MessageEntity, text: string) => {
 			return `<u>`;
 	}
 };
-
-//console.log(parseTelegramMessage("Anime: Ijiranaide, Nagatoro-san 2nd Attack\n\nEpisodes:\nEpisode 2: Ijiranaide, Nagatoro-san S2 - 02\nEpisode 3: Ijiranaide, Nagatoro-san S2 - 03\nEpisode 4: Ijiranaide, Nagatoro-san S2 - 04\nEpisode 5: Ijiranaide, Nagatoro-san S2 - 05\nEpisode 6: Ijiranaide, Nagatoro-san S2 - 06\nEpisode 7: Ijiranaide, Nagatoro-san S2 - 07",
-//[{"offset":0,"length":6,"type":"bold"},{"offset":0,"length":6,"type":"underline"},{"offset":44,"length":9,"type":"bold"},{"offset":44,"length":9,"type":"underline"},{"offset":65,"length":32,"type":"text_link","url":"https://nyaa.si/view/1623574"},{"offset":109,"length":32,"type":"text_link","url":"https://nyaa.si/view/1624895"},{"offset":153,"length":32,"type":"text_link","url":"https://nyaa.si/view/1627696"},{"offset":197,"length":32,"type":"text_link","url":"https://nyaa.si/view/1630680"},{"offset":241,"length":32,"type":"text_link","url":"https://nyaa.si/view/1633576"},{"offset":285,"length":32,"type":"text_link","url":"https://nyaa.si/view/1636434"}])
-//)

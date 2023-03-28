@@ -1,5 +1,4 @@
 import axios from "axios";
-//import { xdccInit } from "../downloader/xdcc-down"
 
 interface NIBLQuery {
     botId: number,
@@ -19,6 +18,10 @@ export interface SPSearch {
 export async function getxdcc(name:string) {
     let packnum:number;
     let botnum:number;
+    let returnobj:SPSearch = {
+        packnum: 0,
+        botname: ""
+    }
     let botnames = {
         989: "CR-ARUTHA|NEW",
         696: "CR-HOLLAND|NEW",
@@ -26,8 +29,7 @@ export async function getxdcc(name:string) {
     }
     const axiosclient = axios.create({
         method: "GET",
-        baseURL: "https://api.nibl.co.uk/nibl"//,
-        //headers: {"User-Agent": "Cunnime 1.0", "Accept":"application/json"}
+        baseURL: "https://api.nibl.co.uk/nibl"
     })
     const encodename = encodeURI(name)
     let res = await axiosclient(`/search/?query=${encodename}`)
@@ -63,36 +65,15 @@ export async function getxdcc(name:string) {
             botname: ""
         }
     }
-
-    let returnobj:SPSearch = {
-        packnum: packnum,
-        botname: botnames[botnum]
+    if (packnum === undefined || botnum === undefined) 
+        return returnobj
+    else {
+        returnobj = {
+            packnum: packnum,
+            botname: botnames[botnum]
+        }
+        return returnobj
     }
-    return returnobj
 }
 
-/* export async function startspxdcc()
-{
-    const xdccJS = await xdccInit()
-    xdccJS.on('ready', async () => {
-        //let todl = await getxdcc("[SubsPlease] Revenger - 02 (1080p) [41CCBF88].mkv")
-        //if (todl === undefined) {
-        //    todl = {
-        //        packnum:0,botname:""
-        //    }
-        //}
-        //startdl(xdccJS, todl.botname, todl.packnum.toFixed())
-    })
-    // process.on('SIGINT', function() {
-    //     console.log("Quitting...");
-    //     terminator(xdccJS)
-    //   });
-} */
-
-//startspxdcc()
 module.exports = { getxdcc }
-
-/* process.on('SIGINT', function() {
-    console.log("Quitting...");
-    terminator()
-  }); */

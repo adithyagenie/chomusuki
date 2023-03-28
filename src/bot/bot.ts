@@ -1,13 +1,12 @@
 // telegram bot endpoint
 
-import { config } from "dotenv";
-import { Bot, BotError, Context, GrammyError, HttpError, InlineKeyboard, Keyboard, webhookCallback } from "grammy";
+require("dotenv").config()
+import { Bot, BotError, Context, GrammyError, HttpError, InlineKeyboard, InputFile, Keyboard } from "grammy";
 import { type InlineKeyboardButton } from "@grammyjs/types";
 import { CheckUpdates, ResObj } from "../api/UpdRelease"
 import { apiThrottler } from "@grammyjs/transformer-throttler";
-import { SPSearch } from "../api/subsplease-xdcc";
+import { SPSearch, getxdcc } from "../api/subsplease-xdcc";
 import { MongoClient } from "mongodb";
-import { getMalId } from "../api/mal_api";
 import {
     type Conversation,
     type ConversationFlavor,
@@ -18,6 +17,8 @@ import {
 import { session } from "grammy";
 import { addAnimeNames, AnimeNames, markWatchedunWatched, delanime } from "../database/db_connect";
 import { messageToHTMLMessage } from "./caption_entity_handler";
+import { createReadStream } from "fs-extra";
+import { getAlId } from "../api/anilist_api";
   
 export class UpdateHold {
     updateobj: ResObj[];
@@ -48,13 +49,7 @@ export const bot = new Bot<Context & ConversationFlavor>(`${process.env.BOT_TOKE
     }
 })
 
-export async function botinit(bot:Bot<Context & ConversationFlavor>, updater:UpdateHold, authchat:number, app) {
-    config()
-    //bot.api.setMyCommands([
-    //    { command: "start", description: "Start the bot" },
-    //    { command: "help", description: "Show help text" },
-    //    { command: "settings", description: "Open settings" },
-    //  ]);
+export async function botinit(bot:Bot<Context & ConversationFlavor>, updater:UpdateHold, authchat:number) {
     const throttler = apiThrottler();
     bot.api.config.use(throttler);
     bot.use(session({ initial: () => ({}) }));
@@ -108,9 +103,9 @@ function botcommands(bot:Bot<Context & ConversationFlavor>, updater:UpdateHold, 
     async function animeadd(conversation: MyConversation, ctx: MyContext) {
         let responseobj:AnimeNames;
         await ctx.reply("Please provide data required. Type /cancel at any point to cancel adding.", {reply_markup: {remove_keyboard: true}})
-        await ctx.reply("What is the exact Japanese name of the anime? (Refer MAL for name)")
+        await ctx.reply("What is the exact Japanese name of the anime? (Refer Anilist for name)")
         const jpanimename = await conversation.form.text();
-        await ctx.reply("What is the exact English name of the anime? (Refer MAL for name)")
+        await ctx.reply("What is the exact English name of the anime? (Refer Anilist for name)")
         const enanimename = await conversation.form.text();
         await ctx.reply("Any other optional names you would like to provide? (seperated by commas, NIL for nothing)")
         const optnameres = await conversation.form.text();
@@ -125,17 +120,18 @@ function botcommands(bot:Bot<Context & ConversationFlavor>, updater:UpdateHold, 
             excnames = excnameres.split(',')
             excnames = excnames.map((x:string) => x.trim())   
         }
-        let malid = await getMalId(jpanimename).catch((err) => console.error("Couldnt get MAL ID."+err))
-        if (malid === undefined) {
-            await ctx.reply("MyAnimeList ID for the anime?")
-            malid = await conversation.form.text();
+        let AlID = 0;
+        AlID = await getAlId(enanimename, jpanimename)
+        if (AlID == 0) {
+            await ctx.reply("Anilist ID for the anime?")
+            AlID = parseInt(await conversation.form.text());
         }
         responseobj = {
             EnName: enanimename,
             JpName: jpanimename,
             OptionalNames: optnames === undefined ? [] : optnames,
             ExcludeNames: excnames === undefined ? [] : excnames,
-            MalId: malid
+            AlID: AlID
         }
         await addAnimeNames(updater.client, responseobj)
         await ctx.reply("Anime has been added!")
@@ -243,6 +239,11 @@ function botcommands(bot:Bot<Context & ConversationFlavor>, updater:UpdateHold, 
         return
     }
     
+    bot.command("log", async (ctx) => {
+        const logfile = new InputFile(createReadStream("./debug.log"), "log.txt")
+        ctx.replyWithDocument(logfile)
+    })
+    
     // Makes keyboard for download and mark watched
     function makeEpKeyboard(ctx:Context, callback_data_string:string) {
         let updateobj = updater.updateobj
@@ -276,7 +277,7 @@ function botcommands(bot:Bot<Context & ConversationFlavor>, updater:UpdateHold, 
     })
 
     // also a download callback handle
-    bot.callbackQuery(/dlep_.*/,async (ctx) => {
+    bot.callbackQuery(/dlep_.*/, async (ctx) => {
         let oldmsg = ctx.callbackQuery.message.caption
         let epnum = ctx.callbackQuery.data.split("_")[1]
         let updateobj = updater.updateobj
@@ -286,26 +287,26 @@ function botcommands(bot:Bot<Context & ConversationFlavor>, updater:UpdateHold, 
         for (let i = 0; i < updateobj.length; i ++) {
             if (updateobj[i].anime === animename) {
                 for (let j = 0; j < updateobj[i].notwatched.length; j ++){
-                    if (updateobj[i].xdcclink.length > 0) {
-                        if (updateobj[i].notwatched[j].epnum == parseInt(epnum))
-                            links = (updateobj[i].xdcclink[j])
-                    }
-                    else {
-                        if (updateobj[i].notwatched[j].epnum == parseInt(epnum))
+                    if (updateobj[i].notwatched[j].epnum == parseInt(epnum)) {
+                        let actualnotwatch = updateobj[i].notwatchedepnames[j]
+                        const xdcclink = await getxdcc(actualnotwatch)
+                        console.log(actualnotwatch)
+                        if (xdcclink.packnum != 0) {
+                            links = xdcclink
+                            console.log("startdl triggered", links.botname, links.packnum)
+                        }
+                        else {
                             torrentlinks = (updateobj[i].torrentlink[j])
+                            console.log(`torrentdl triggered ${torrentlinks}`)
+                        }
+                        break
                     }
                 }
                 break
             }
         }
-        if (links === undefined)
-            console.log("torrentdl triggered", torrentlinks)
-            //starttorrentdl(torrclient, torrentlinks)
-        else
-            console.log("startdl triggered", links.botname, links.packnum)
-            //startdl(xdccJS, links.botname, links.packnum.toFixed())
         
-        ctx.answerCallbackQuery("Bruh")
+        ctx.answerCallbackQuery("Download request recieved.")
     })
     
     // A markwatch handle
@@ -413,4 +414,4 @@ export async function syncresponser(bot:Bot, authchat:number, updater:UpdateHold
     }
 }
 
-module.exports = { bot, UpdateHold, botinit, syncresponser }
+module.exports = { UpdateHold, botinit, syncresponser, bot }
