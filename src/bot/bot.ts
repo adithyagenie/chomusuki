@@ -288,7 +288,7 @@ function botcommands(bot:Bot<Context & ConversationFlavor>, updater:UpdateHold, 
                     if (updateobj[i].notwatched[j].epnum == parseInt(epnum)) {
                         let actualnotwatch = updateobj[i].notwatchedepnames[j]
                         const xdcclink = await getxdcc(actualnotwatch)
-                        console.log(actualnotwatch)
+                        console.log(`Downloading: ${actualnotwatch}`)
                         if (xdcclink.packnum != 0) {
                             links = xdcclink
                             console.log("startdl triggered", links.botname, links.packnum)
