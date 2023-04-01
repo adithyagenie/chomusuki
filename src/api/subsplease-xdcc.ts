@@ -54,11 +54,9 @@ export async function getxdcc(name:string) {
                 botnum = resobj[0].botId
             }
         }
-        else 
-            console.log("No packs found")
     }
     else {
-        console.error("err")
+        console.error("SUBSPLEASE-XDCC - axios err")
         Promise.reject("axios err")
         return {
             packnum: 0,

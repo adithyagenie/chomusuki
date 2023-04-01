@@ -1,19 +1,11 @@
-// handles all mongo db updates
+// handles search query formation
 
 import { MongoClient } from "mongodb";
-import { getData } from "./db_connect";
-
-const fs = require('fs-extra')
-
-export async function GetAnimeList(client:MongoClient) {
-    const obj:any = await getData(client, "AnimeNames")
-    return obj
-}
+import { AnimeNames, getData } from "./db_connect";
 
 export async function GetSearchQueries(client:MongoClient) {
-    let searchqueries = []
-    //return fs.readJson("./AnimeNames.json")
-    const obj:any = await getData(client, "AnimeNames")
+    let searchqueries: string[] = []
+    const obj:AnimeNames[] = await getData(client, "AnimeNames")
     for (let i = 0; i < obj.length; i++) {
         let cs = obj[i];
         let name = `"${cs["EnName"]}"|"${cs["JpName"]}"`;
@@ -32,11 +24,12 @@ export async function GetSearchQueries(client:MongoClient) {
         let finalsearch = `${name} "[SubsPlease]"|"[Erai-Raws]" 1080p`;
         searchqueries.push(finalsearch)
     }
-    return searchqueries
+    let returnobj: [string[], AnimeNames[]] = [searchqueries, obj]
+    return returnobj
 }
 
 export async function GetWatchedList(client:MongoClient) {
     return await getData(client, "WatchedAnime")
 }
 
-module.exports = { GetAnimeList, GetWatchedList, GetSearchQueries }
+module.exports = { GetWatchedList, GetSearchQueries }

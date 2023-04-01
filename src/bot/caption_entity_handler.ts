@@ -1,9 +1,6 @@
-//import type { Context } from 'grammy';
 import type { MessageEntity } from 'grammy/out/types.node';
 
 export const messageToHTMLMessage = (text: string, entities:MessageEntity[]) => {
-	//const text = ctx.msg?.text;
-	//const entities = ctx.msg?.entities;
 
 	if (!entities || !text) {
 		return text;

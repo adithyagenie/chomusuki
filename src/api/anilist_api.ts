@@ -1,6 +1,5 @@
 import anilist from "anilist-node"
 
-require("dotenv").config()
 const token = JSON.parse(process.env.ANILIST_TOKEN)
 const al = new anilist(token.token)
 

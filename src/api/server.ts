@@ -18,6 +18,9 @@ export function startserver() {
     app.get('/', (req, res) => {
         res.send('Cunnime bot up and running ^_^');
     });
+    app.get('/keepalive', (req, res) => {
+        res.status(200).json({keepalive:true});
+    })
     app.listen(port, async () => {
         await bot.api.setWebhook(`${process.env.RENDER_EXTERNAL_URL}/${process.env.BOT_TOKEN}`);
         console.log(`Cunnime server listening on port ${port}!`)

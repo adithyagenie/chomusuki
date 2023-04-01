@@ -1,5 +1,4 @@
 import { MongoClient } from "mongodb";
-import { config } from "dotenv";
 
 export interface AnimeNames {
     EnName: string,
@@ -17,8 +16,17 @@ export interface WatchedAnime {
     }[]
 }
 
+export interface DLSync {
+    queuenum: number,
+    synctype: string,
+    anime: string,
+    epnum: number, 
+    dltype: string,
+    torrentData?: {links: string},
+    xdccData?: {botname: string, packnum :number}
+}
+
 export async function initMongo() {
-    config()
     const uri = process.env.DATABASE_URL;
     const client = new MongoClient(uri);
     return client
@@ -81,6 +89,34 @@ export async function delanime(client:MongoClient, delname:string) {
     }
 }
 
-module.exports = { initMongo, getData, addAnimeNames, markWatchedunWatched, delanime }
-//addAnimeNames(database).then(() => client.close()).catch(console.dir);
-//get(database).then(() => client.close()).catch(console.dir);
+export async function DlSync(client: MongoClient, obj: DLSync) {
+    try {
+        const db = client.db('cunnime');
+        const collection = db.collection("SyncPC")
+        let insertres = await collection.insertOne(obj)
+		console.log(`MONGO: Documents inserted: ${insertres.acknowledged}`);
+		return insertres.acknowledged
+    } catch (error) {
+        console.error(error)
+    }
+}
+
+export async function getPendingDL(client: MongoClient) {
+    let pendingdl = [];
+    try {
+        const db = client.db('cunnime');
+        let res = db.collection("SyncPC").find()
+        let reslist = await res.toArray()
+        if (reslist.length == 0) {
+            return []
+        }
+        for (let i = 0; i < reslist.length; i ++ )
+            delete reslist[i]._id
+        pendingdl = Array.from(reslist.values())
+    } catch (error) {
+        console.error(error)
+    }
+    return pendingdl
+}
+
+module.exports = { initMongo, getData, addAnimeNames, markWatchedunWatched, delanime, getPendingDL, DlSync }
