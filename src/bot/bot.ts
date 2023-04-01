@@ -69,7 +69,6 @@ export async function botinit(bot:Bot<Context & ConversationFlavor>, updater:Upd
         }
       });
     botcommands(bot, updater, authchat)
-    bot.start();
     console.log("*********************")
     console.log("Cunnime has started!")
     console.log("*********************")
@@ -93,7 +92,6 @@ function botcommands(bot:Bot<Context & ConversationFlavor>, updater:UpdateHold, 
     
     // Synces anime
     bot.command("async", async (ctx) => {
-        console.log(`${ctx.chat.id}, ${authchat}, ${ctx.chat.id != authchat}`)
         if (ctx.chat.id != authchat) {await ctx.reply("Bot not yet available for public use (｡•́︿•̀｡)"); return;}
         await syncresponser(bot, authchat, updater, ctx)
     })

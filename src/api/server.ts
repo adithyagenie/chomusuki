@@ -16,7 +16,7 @@ export function startserver() {
       })
     app.use(`/${process.env.BOT_TOKEN}`, webhookCallback(bot, "express", "throw", 20000));
     app.get('/', (req, res) => {
-        res.send('Cunnime bot up and running ^_^');
+        res.status(200).send('Cunnime bot up and running ^_^');
     });
     app.get('/keepalive', (req, res) => {
         res.status(200).json({keepalive:true});

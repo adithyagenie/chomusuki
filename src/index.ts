@@ -41,12 +41,12 @@ async function spinup() {
     app.post('/sync', (req, res) => {
         if(req.headers.calledby == "manualcall") {
             console.log("Got manual sync request.")
-            res.send("Syncing anime...")
+            res.status(200).send("Syncing anime...")
             syncresponser(bot, authchat, updater)
         }
         else if(req.headers.calledby == "croncall") {
             console.log("Got automatic sync request.")
-            res.send("Syncing anime...")
+            res.status(200).send("Syncing anime...")
             syncresponser(bot, authchat, updater, true)
         }
         else

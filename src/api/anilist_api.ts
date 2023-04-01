@@ -1,7 +1,6 @@
 import anilist from "anilist-node"
 
-const token = JSON.parse(process.env.ANILIST_TOKEN)
-const al = new anilist(token.token)
+const al = new anilist(process.env.ANILIST_TOKEN)
 
 export async function imageget(id:number) {
     let url = "";
