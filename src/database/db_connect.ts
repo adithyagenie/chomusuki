@@ -17,12 +17,13 @@ export interface WatchedAnime {
 }
 
 export interface DLSync {
+    queuenum: number,
     synctype: string,
     anime: string,
-    epnum: number[], 
+    epnum: number, 
     dltype: string,
     torrentData?: {links: string},
-    xdccData?: {botname: string, packnum :number}[]
+    xdccData?: {botname: string, packnum :number}
 }
 
 export async function initMongo() {
@@ -92,20 +93,19 @@ export async function DlSync(client: MongoClient, obj: DLSync) {
     try {
         const db = client.db('cunnime');
         const collection = db.collection("SyncPC")
-        const query = {anime: obj.anime, synctype: obj.synctype}
-        const updres = await collection.replaceOne(query, obj, {upsert: true})
-        console.log(`MONGO: DLSync updated: ${updres.acknowledged}; Update count: ${updres.modifiedCount}; Add count: ${updres.upsertedCount}`)
-        return updres.acknowledged
+        let insertres = await collection.insertOne(obj)
+		console.log(`MONGO: Documents inserted: ${insertres.acknowledged}`);
+		return insertres.acknowledged
     } catch (error) {
         console.error(error)
     }
 }
 
-export async function getPendingDL(client: MongoClient, animename: string) {
+export async function getPendingDL(client: MongoClient) {
     let pendingdl = [];
     try {
         const db = client.db('cunnime');
-        const res = db.collection("SyncPC").find({anime: animename, synctype: "dl"})
+        let res = db.collection("SyncPC").find()
         let reslist = await res.toArray()
         if (reslist.length == 0) {
             return []

@@ -5,7 +5,7 @@ import { Bot, BotError, Context, GrammyError, HttpError, InlineKeyboard, InputFi
 import { type InlineKeyboardButton } from "@grammyjs/types";
 import { CheckUpdates, ResObj } from "../api/UpdRelease"
 import { apiThrottler } from "@grammyjs/transformer-throttler";
-import { SPSearch, getxdcc } from "../api/subsplease-xdcc";
+import { getxdcc } from "../api/subsplease-xdcc";
 import { MongoClient } from "mongodb";
 import {
     type Conversation,
@@ -15,7 +15,7 @@ import {
   } from "@grammyjs/conversations";
   
 import { session } from "grammy";
-import { addAnimeNames, AnimeNames, markWatchedunWatched, delanime } from "../database/db_connect";
+import { addAnimeNames, AnimeNames, markWatchedunWatched, delanime, DLSync, getPendingDL, DlSync } from "../database/db_connect";
 import { messageToHTMLMessage } from "./caption_entity_handler";
 import { createReadStream } from "fs-extra";
 import { getAlId } from "../api/anilist_api";
@@ -79,6 +79,7 @@ function botcommands(bot:Bot<Context & ConversationFlavor>, updater:UpdateHold, 
     bot.use(createConversation(unwatchhelper));
     type MyContext = Context & ConversationFlavor;
     type MyConversation = Conversation<MyContext>;
+    const getUpdaterAnimeIndex = (name: string) => updater.updateobj.map(object => object.anime).indexOf(name);
     
     // Start command
     bot.command("start", (ctx) => ctx.reply("Sup ni-", {reply_markup: {remove_keyboard: true}}));
@@ -170,10 +171,8 @@ function botcommands(bot:Bot<Context & ConversationFlavor>, updater:UpdateHold, 
             await ctx.reply(`Deleted ${todel}`, {reply_markup:{remove_keyboard: true}});
             console.log(`Delete request for ${todel} received!`)
             delanime(updater.client, todel)
-            for (let i = 0; i < updater.updateobj.length; i ++) {
-                if (updater.updateobj[i].anime == todel) updater.updateobj.splice(i, 1);
-                break
-            }
+            let i = getUpdaterAnimeIndex(todel)
+            updater.updateobj.splice(i, 1);
             return
         }
         else if (confirmation.message.text == "No, cancel it.") {
@@ -198,16 +197,10 @@ function botcommands(bot:Bot<Context & ConversationFlavor>, updater:UpdateHold, 
         await ctx.reply("Select the anime: (/cancel to cancel)", {reply_markup:keyboard})
         const animename = ((await conversation.waitForHears(/Anime: (.+)/)).message.text).slice(7).trim();
         let eplist:number[] = []
-        let animeindex = 0;
-        for (let i = 0; i < updateobj.length; i ++) {
-            if (updateobj[i].anime === animename) {
-                for (let j = 0; j < updateobj[i].watched.length; j ++){
-                    eplist.push(updateobj[i].watched[j].epnum)
-                }
-                animeindex = i;
-                break;
-            }
-        }
+        let animeindex = getUpdaterAnimeIndex(animename);
+        for (let j = 0; j < updateobj[animeindex].watched.length; j ++)
+            eplist.push(updateobj[animeindex].watched[j].epnum)
+        
         while (true) {
             let newkey = new Keyboard().persistent().resized();
             for (let i = 0; i < eplist.length; i ++)
@@ -237,6 +230,17 @@ function botcommands(bot:Bot<Context & ConversationFlavor>, updater:UpdateHold, 
         return
     }
     
+    bot.command("dllist", async(ctx) => {
+        const pendingdl: DLSync[] = await getPendingDL(updater.client)
+        if (pendingdl.length == 0) {
+            ctx.reply("No pending downloads!")
+        }
+        else {
+            const xdcclist = pendingdl.filter(obj => obj.dltype == "xdcc").map(obj => {obj.anime, obj.epnum})
+            const torrentlist = pendingdl.filter(obj => obj.dltype == "torrent").map(obj => {obj.anime, obj.epnum})
+        }
+    })
+    
     bot.command("log", async (ctx) => {
         const logfile = new InputFile(createReadStream("./debug.log"), "log.txt")
         ctx.replyWithDocument(logfile)
@@ -247,14 +251,10 @@ function botcommands(bot:Bot<Context & ConversationFlavor>, updater:UpdateHold, 
         let updateobj = updater.updateobj
         let animename = ctx.callbackQuery.message.caption.split("Anime: ")[1].split("Episodes:")[0].trim()
         let eplist = []
-        for (let i = 0; i < updateobj.length; i ++) {
-            if (updateobj[i].anime === animename) {
-                for (let j = 0; j < updateobj[i].notwatched.length; j ++){
-                    eplist.push(updateobj[i].notwatched[j].epnum)
-                }
-                break
-            }
-        }
+        const animeindex = getUpdaterAnimeIndex(animename)
+        for (let j = 0; j < updateobj[animeindex].notwatched.length; j ++)
+            eplist.push(updateobj[animeindex].notwatched[j].epnum)
+
         let keyboard = new InlineKeyboard()
         for (let i = 0; i < eplist.length; i += 2){
             let bruh:InlineKeyboardButton.CallbackButton = {text: `Episode ${eplist[i]}`, callback_data:`${callback_data_string}_${eplist[i]}`}
@@ -277,31 +277,63 @@ function botcommands(bot:Bot<Context & ConversationFlavor>, updater:UpdateHold, 
     // also a download callback handle
     bot.callbackQuery(/dlep_.*/, async (ctx) => {
         let oldmsg = ctx.callbackQuery.message.caption
-        let epnum = ctx.callbackQuery.data.split("_")[1]
+        let epnum = parseInt(ctx.callbackQuery.data.split("_")[1])
         let updateobj = updater.updateobj
-        let animename = oldmsg.split("Anime: ")[1].split("Episodes:")[0].trim()
-        let links:SPSearch;
-        let torrentlinks:string;
-        for (let i = 0; i < updateobj.length; i ++) {
-            if (updateobj[i].anime === animename) {
-                for (let j = 0; j < updateobj[i].notwatched.length; j ++){
-                    if (updateobj[i].notwatched[j].epnum == parseInt(epnum)) {
-                        let actualnotwatch = updateobj[i].notwatchedepnames[j]
-                        const xdcclink = await getxdcc(actualnotwatch)
-                        console.log(`Downloading: ${actualnotwatch}`)
-                        if (xdcclink.packnum != 0) {
-                            links = xdcclink
-                            console.log("startdl triggered", links.botname, links.packnum)
-                        }
-                        else {
-                            torrentlinks = (updateobj[i].torrentlink[j])
-                            console.log(`torrentdl triggered ${torrentlinks}`)
-                        }
-                        break
-                    }
-                }
-                break
+        let animename = (ctx.callbackQuery.message.caption).split("Anime: ")[1].split("Episodes:")[0].trim()
+        const i = getUpdaterAnimeIndex(animename)
+        const j = updater.updateobj[i].notwatched.map(object => object.epnum).indexOf(epnum);
+        
+        let pendingdl: DLSync[] = await getPendingDL(updater.client);
+        let queuenum = 0;
+        var flag = false;
+        if (pendingdl.length != 0) queuenum = Math.max(...pendingdl.map(o => o.queuenum))
+        for (let i = 0; i < pendingdl.length; i ++) {
+            if (pendingdl[i].anime == animename && pendingdl[i].epnum == epnum) {
+                flag = true; break;
             }
+        }  
+        if (flag == true) {
+            ctx.reply(`*__Episode ${epnum}__* of *__${animename}__* already queued for download! Use /dllist to view your pending downloads.`, {parse_mode: "MarkdownV2"})
+            return;
+        }    
+        let actualnotwatch = updateobj[i].notwatchedepnames[j]
+        
+        const xdcclink = await getxdcc(actualnotwatch)
+        console.log(`Downloading: ${actualnotwatch}`)
+        
+        if (xdcclink.packnum != 0) {
+            console.log(`startdl triggered @ ${xdcclink.botname}: ${xdcclink.packnum}`)
+            let sync_toupd: DLSync = {
+                queuenum: queuenum + 1,
+                synctype: "dl",
+                anime: animename,
+                epnum: epnum,
+                dltype: "xdcc",
+                xdccData: {
+                    botname: xdcclink.botname, packnum: xdcclink.packnum
+                }
+            }
+            let returncode = await DlSync(updater.client, sync_toupd)
+            if (returncode !== true) ctx.reply("Sending DL failed.")
+            else ctx.reply(`*__Episode ${epnum}__* of *__${animename}__* queued for download!`, {parse_mode: "MarkdownV2"})
+            return
+        }
+        
+        else {
+            let torrentlinks = (updateobj[i].torrentlink[j])
+            console.log(`torrentdl triggered ${torrentlinks}`)
+            let sync_toupd: DLSync = {
+                queuenum: queuenum + 1,
+                synctype: "dl",
+                anime: animename,
+                epnum: epnum,
+                dltype: "torrent",
+                torrentData: {links: torrentlinks}
+            }
+            let returncode = await DlSync(updater.client, sync_toupd)
+            if (returncode !== true) ctx.reply("Sending DL failed.")
+            else ctx.reply(`*__Episode ${epnum}__* of *__${animename}__* queued for download!`, {parse_mode: "MarkdownV2"})
+            return
         }
         
         ctx.answerCallbackQuery("Download request recieved.")
@@ -322,20 +354,15 @@ function botcommands(bot:Bot<Context & ConversationFlavor>, updater:UpdateHold, 
         let oldmsg = ctx.callbackQuery.message.caption
         let animename = oldmsg.split("Anime: ")[1].split("Episodes:")[0].trim();
         let oldwatch:{epnum:number, epname:string}[] = [];
-        let indexnum:number;
+        let indexnum = getUpdaterAnimeIndex(animename);
         let toupdateanime:{epnum:number, epname:string};
-        for (let i = 0; i < updateobj.length; i ++) {
-            if (updateobj[i].anime == animename) {
-                for (let j = 0; j < updateobj[i].watched.length; j ++)
-                    oldwatch.push(updateobj[i].watched[j])
-                for (let j = 0; j < updateobj[i].notwatched.length; j ++) {
-                    if (updateobj[i].notwatched[j].epnum == epnum)
-                        toupdateanime = updateobj[i].notwatched[j]
-                }
-                indexnum = i;
-                break
-            }
-        }        
+        for (let j = 0; j < updateobj[indexnum].watched.length; j ++)
+            oldwatch.push(updateobj[indexnum].watched[j])
+        for (let j = 0; j < updateobj[indexnum].notwatched.length; j ++) {
+            if (updateobj[indexnum].notwatched[j].epnum == epnum)
+                toupdateanime = updateobj[indexnum].notwatched[j]
+        }
+
         oldwatch.push(toupdateanime)
         
         var index = updater.updateobj[indexnum].notwatched.indexOf(toupdateanime);
@@ -376,7 +403,7 @@ function botcommands(bot:Bot<Context & ConversationFlavor>, updater:UpdateHold, 
 }
 
 // Helps in syncing anime, called by /async and by outer functions when needed.
-export async function syncresponser(bot:Bot, authchat:number, updater:UpdateHold, ctx = undefined) {
+export async function syncresponser(bot:Bot, authchat:number, updater:UpdateHold, ctx = undefined, croncall = false) {
     let chatid = 0
     if (ctx === undefined) 
         chatid = authchat
@@ -391,23 +418,57 @@ export async function syncresponser(bot:Bot, authchat:number, updater:UpdateHold
         if (updateobj[i].notwatched.length > 0)
             count += 1
     }
-    if (count == 0)
+    if (croncall == false && count == 0)
         bot.api.sendMessage(chatid, "No new episodes have been released!")
     else {
-        bot.api.sendMessage(chatid, "New episodes have been released!")
+        if (croncall)
+            bot.api.sendMessage(chatid, "Automatic syncing completed! New episodes have been released!")
+        else
+            bot.api.sendMessage(chatid, "New episodes have been released!")
+            
         for (let i = 0; i < updateobj.length; i ++) {
             if (updateobj[i].notwatched.length == 0)
                 continue
-            let msg = ""
+            let [msg, msgheader] = ["", ""]
+            let msglist = []
             let imagelink = updateobj[i]["imagelink"]
-            msg += `<b><u>Anime:</u></b> ${updateobj[i]["anime"]}\n\n`
-            msg += `<b><u>Episodes:</u></b>\n`
+            msgheader += `<b><u>Anime:</u></b> ${updateobj[i]["anime"]}\n\n`
+            msgheader += `<b><u>Episodes:</u></b>\n`
             for (let j = 0; j < updateobj[i]["links"].length; j ++) {
                 msg += `Episode ${updateobj[i]["notwatched"][j]["epnum"]}: `
                 msg += `<a href = "${updateobj[i]["links"][j]}">${updateobj[i]["notwatched"][j]["epname"]}</a>\n`
             }
+            if (msg.length + msgheader.length > 1024 && updateobj[i].shortname !== undefined) {
+                while (msg.includes(updateobj[i].anime))
+                    msg = msg.replace(updateobj[i].anime, updateobj[i].shortname)
+            }
+            if (msg.length + msgheader.length > 1024) {
+                let chunk = "";
+                let lines = msg.split("\n");
+                for (let msgline = 0; msgline < lines.length; msgline ++) {
+                    if (msgline = 0)
+                        chunk += msgheader
+                    if (chunk.length + lines[msgline].length < 1024) {
+                        chunk += `${lines[msgline]}\n`
+                    }
+                    else {
+                        msglist.push(chunk)
+                        chunk = `${lines[msgline]}\n`
+                    }
+                }
+                msglist.push(chunk)
+            }
+            else
+                msg = msgheader + msg
             let replykeyboard = new InlineKeyboard().text("Mark watched", "mark_watch").text("Download", "download");
-            bot.api.sendPhoto(chatid, imagelink, {caption:msg, parse_mode:"HTML", reply_markup:replykeyboard})
+            if (msglist.length > 0) {
+                bot.api.sendPhoto(chatid, imagelink, {caption:msglist[0], parse_mode:"HTML", reply_markup: replykeyboard})
+                for (let msgnum = 1; msgnum < msglist.length; msgnum++) 
+                    bot.api.sendMessage(chatid, msglist[msgnum], {parse_mode:"HTML"})
+            }
+            else 
+                bot.api.sendPhoto(chatid, imagelink, {caption:msg, parse_mode:"HTML", reply_markup:replykeyboard})
+            
         }
     }
 }

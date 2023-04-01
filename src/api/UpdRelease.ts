@@ -62,7 +62,7 @@ export async function CheckUpdates(client:MongoClient) {
 async function GetUpdate(url: string, querynum: number, mainstarttime: number, wfile: any[], filelist: AnimeNames) {
     let starttime = (new Date()).getTime();
     let returnobj:ResObj;
-    let shortname;
+    let shortname: string | undefined;
     if (filelist.OptionalNames.length > 0) {
         shortname = filelist.OptionalNames.reduce((a, b) => a.length <= b.length ? a : b)
         if (filelist.JpName.length <= shortname.length) {
@@ -262,6 +262,7 @@ async function GetUpdate(url: string, querynum: number, mainstarttime: number, w
         }
         
         let AlId = filelist["AlID"]
+        let imagelink = await imageget(AlId)
         console.log(`Query: ${querynum} - Pushed all shit: ${(new Date()).getTime() - mainstarttime} ms`) // TIME LOGGER
         
         /*let xdcclinks:SPSearch[] = []
@@ -272,7 +273,6 @@ async function GetUpdate(url: string, querynum: number, mainstarttime: number, w
         }
         console.log(`XDCC query: ${(new Date()).getTime() - mainstarttime} ms`) // TIME LOGGER */
         
-        let imagelink = await imageget(AlId)
         returnobj = {
             anime: animename,
             shortname: shortname,
