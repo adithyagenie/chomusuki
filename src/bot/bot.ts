@@ -82,7 +82,7 @@ function botcommands(bot:Bot<Context & ConversationFlavor>, updater:UpdateHold, 
     const getUpdaterAnimeIndex = (name: string) => updater.updateobj.map(object => object.anime).indexOf(name);
     
     // Start command
-    bot.command("start", (ctx) => ctx.reply("Sup ni-", {reply_markup: {remove_keyboard: true}}));
+    bot.command("start", (ctx) => ctx.reply("Sup boss?", {reply_markup: {remove_keyboard: true}}));
     
     // Help command
     bot.command("help", (ctx) => {
@@ -91,11 +91,14 @@ function botcommands(bot:Bot<Context & ConversationFlavor>, updater:UpdateHold, 
     
     // Synces anime
     bot.command("async", async (ctx) => {
+        console.log(`${ctx.chat.id}, ${authchat}, ${ctx.chat.id != authchat}`)
+        if (ctx.chat.id != authchat) {await ctx.reply("Bot not yet available for public use (｡•́︿•̀｡)"); return;}
         await syncresponser(bot, authchat, updater, ctx)
     })
     
     // Add anime command
     bot.command("aadd", async (ctx) => {
+        if (ctx.chat.id  != authchat) {await ctx.reply("Bot not yet available for public use (｡•́︿•̀｡)"); return;}
         await ctx.conversation.enter("animeadd");
     })
     
@@ -139,12 +142,14 @@ function botcommands(bot:Bot<Context & ConversationFlavor>, updater:UpdateHold, 
     
     // Handles cancel calls
     bot.command("cancel", async (ctx) => {
+        if (ctx.chat.id != authchat) {await ctx.reply("Bot not yet available for public use (｡•́︿•̀｡)"); return;}
         await ctx.conversation.exit();
         await ctx.reply("Cancelling operation...", {reply_markup: {remove_keyboard: true}});
       });
       
     // Removing anime
     bot.command("aremove", async (ctx) => {
+        if (ctx.chat.id != authchat) {await ctx.reply("Bot not yet available for public use (｡•́︿•̀｡)"); return;}
         await ctx.conversation.enter("delanimehelper");
     })
     
@@ -183,6 +188,7 @@ function botcommands(bot:Bot<Context & ConversationFlavor>, updater:UpdateHold, 
     
     // Unwatch anime command
     bot.command("aunwatch", async (ctx) => {
+        if (ctx.chat.id != authchat) {await ctx.reply("Bot not yet available for public use (｡•́︿•̀｡)"); return;}
         await ctx.conversation.enter("unwatchhelper");
     })
     
@@ -231,17 +237,46 @@ function botcommands(bot:Bot<Context & ConversationFlavor>, updater:UpdateHold, 
     }
     
     bot.command("dllist", async(ctx) => {
+        if (ctx.chat.id != authchat) {await ctx.reply("Bot not yet available for public use (｡•́︿•̀｡)"); return;}
+        await ctx.replyWithChatAction("typing")
         const pendingdl: DLSync[] = await getPendingDL(updater.client)
         if (pendingdl.length == 0) {
             ctx.reply("No pending downloads!")
         }
         else {
-            const xdcclist = pendingdl.filter(obj => obj.dltype == "xdcc").map(obj => {obj.anime, obj.epnum})
-            const torrentlist = pendingdl.filter(obj => obj.dltype == "torrent").map(obj => {obj.anime, obj.epnum})
+            const resser: {anime: string, epnum: number[]}[] = [];
+            for (let i = 0; i < pendingdl.length; i ++) {
+                let index = resser.findIndex(o => o.anime == pendingdl[i].anime)
+                if (index == -1) 
+                    resser.push({anime: pendingdl[i].anime, epnum: [pendingdl[i].epnum]})
+                else {
+                    resser[index].epnum.push(pendingdl[i].epnum)
+                    resser[index].epnum.sort()
+                }
+            }
+            
+            var msg: string = "<code>DOWNLOAD QUEUE:</code>\n\n";
+            var msglist: string[] = [];
+            for (let i = 0; i < resser.length; i ++) {
+                let tmpmsg = `<b><u>${resser[i].anime}</u></b> - Episode <b>${resser[i].epnum.join(", ")}</b>\n`
+                if (msg.length + tmpmsg.length > 1024) {
+                    msglist.push(msg)
+                    msg = tmpmsg
+                }
+                else 
+                    msg += tmpmsg
+            }
+            if (msglist.length > 0) {
+                for (let i = 0; i < msglist.length; i ++)
+                    bot.api.sendMessage(ctx.message.chat.id, msglist[i], {parse_mode: "HTML"})
+            }
+            else 
+                bot.api.sendMessage(ctx.message.chat.id, msg, {parse_mode: "HTML"})
         }
     })
     
     bot.command("log", async (ctx) => {
+        if (ctx.chat.id != authchat) {await ctx.reply("Bot not yet available for public use (｡•́︿•̀｡)"); return;}
         const logfile = new InputFile(createReadStream("./debug.log"), "log.txt")
         ctx.replyWithDocument(logfile)
     })
