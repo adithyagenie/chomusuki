@@ -93,7 +93,7 @@ function botcommands(bot:Bot<Context & ConversationFlavor>, updater:UpdateHold, 
     // Synces anime
     bot.command("async", async (ctx) => {
         if (ctx.chat.id != authchat) {await ctx.reply("Bot not yet available for public use (｡•́︿•̀｡)"); return;}
-        await syncresponser(bot, authchat, updater, ctx)
+        await syncresponser(bot, authchat, updater, false, ctx)
     })
     
     // Add anime command
@@ -434,7 +434,11 @@ function botcommands(bot:Bot<Context & ConversationFlavor>, updater:UpdateHold, 
 }
 
 // Helps in syncing anime, called by /async and by outer functions when needed.
-export async function syncresponser(bot:Bot, authchat:number, updater:UpdateHold, ctx = undefined, croncall = false) {
+export async function syncresponser(bot:Bot, 
+                    authchat:number, 
+                    updater:UpdateHold, 
+                    croncall: boolean = false, 
+                    ctx: Context | undefined = undefined) {
     let chatid = 0
     if (ctx === undefined) 
         chatid = authchat

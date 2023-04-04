@@ -38,16 +38,16 @@ async function spinup() {
     await updater.updater()
     const app = startserver();
     await botinit(bot, updater, authchat)
-    app.post('/sync', (req, res) => {
+    app.post('/sync', async (req, res) => {
         if(req.headers.calledby == "manualcall") {
             console.log("Got manual sync request.")
             res.status(200).send("Syncing anime...")
-            syncresponser(bot, authchat, updater)
+            await syncresponser(bot, authchat, updater, false, undefined)
         }
         else if(req.headers.calledby == "croncall") {
             console.log("Got automatic sync request.")
             res.status(200).send("Syncing anime...")
-            syncresponser(bot, authchat, updater, true)
+            await syncresponser(bot, authchat, updater, true, undefined)
         }
         else
             return res.sendStatus(401)
