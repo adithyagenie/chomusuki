@@ -1,7 +1,10 @@
 //import type { Context } from 'grammy';
-import type { MessageEntity } from 'grammy/out/types.node';
+import type { MessageEntity } from "grammy/out/types.node";
 
-export const messageToHTMLMessage = (text: string, entities:MessageEntity[]) => {
+export const messageToHTMLMessage = (
+	text: string,
+	entities: MessageEntity[]
+) => {
 	//const text = ctx.msg?.text;
 	//const entities = ctx.msg?.entities;
 
@@ -18,19 +21,23 @@ export const messageToHTMLMessage = (text: string, entities:MessageEntity[]) => 
 		else
 			tags.push({
 				index: entity.offset,
-				tag: startTag
+				tag: startTag,
 			});
 
-		const closeTag = startTag?.indexOf('<a ') === 0 ? '</a>' : '</' + startTag?.slice(1);
-		searchTag = tags.filter((tag) => tag.index === entity.offset + entity.length);
-		if (searchTag.length > 0) searchTag[0].tag = closeTag + searchTag[0].tag;
+		const closeTag =
+			startTag?.indexOf("<a ") === 0 ? "</a>" : "</" + startTag?.slice(1);
+		searchTag = tags.filter(
+			(tag) => tag.index === entity.offset + entity.length
+		);
+		if (searchTag.length > 0)
+			searchTag[0].tag = closeTag + searchTag[0].tag;
 		else
 			tags.push({
 				index: entity.offset + entity.length,
-				tag: closeTag
+				tag: closeTag,
 			});
 	});
-	let html = '';
+	let html = "";
 	for (let i = 0; i < text.length; i++) {
 		const tag = tags.filter((tag) => tag.index === i);
 		tags = tags.filter((tag) => tag.index !== i);
@@ -46,17 +53,17 @@ const getTag = (entity: MessageEntity, text: string) => {
 	const entityText = text.slice(entity.offset, entity.offset + entity.length);
 
 	switch (entity.type) {
-		case 'bold':
+		case "bold":
 			return `<b>`;
-		case 'text_link':
+		case "text_link":
 			return `<a href="${entity.url}">`;
-		case 'url':
+		case "url":
 			return `<a href="${entityText}">`;
-		case 'italic':
+		case "italic":
 			return `<i>`;
-		case 'strikethrough':
+		case "strikethrough":
 			return `<s>`;
-		case 'underline':
+		case "underline":
 			return `<u>`;
 	}
 };
