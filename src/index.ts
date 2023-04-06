@@ -49,11 +49,25 @@ async function spinup() {
 		if (req.headers.calledby == "manualcall") {
 			console.log("Got manual sync request.");
 			res.status(200).send("Syncing anime...");
-			await syncresponser(bot, authchat, updater, options, false, undefined);
+			await syncresponser(
+				bot,
+				authchat,
+				updater,
+				options,
+				false,
+				undefined
+			);
 		} else if (req.headers.calledby == "croncall") {
 			console.log("Got automatic sync request.");
 			res.status(200).send("Syncing anime...");
-			await syncresponser(bot, authchat, updater, options, true, undefined);
+			await syncresponser(
+				bot,
+				authchat,
+				updater,
+				options,
+				true,
+				undefined
+			);
 		} else return res.sendStatus(401);
 	});
 }

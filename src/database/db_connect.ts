@@ -17,13 +17,13 @@ export interface WatchedAnime {
 }
 
 export interface configuration {
-    pause_sync: boolean, 
-    remind_again: boolean 
+	pause_sync: boolean;
+	remind_again: boolean;
 }
 
 export interface synced {
-    anime: string,
-    reminded: number[]
+	anime: string;
+	reminded: number[];
 }
 
 export interface DLSync {
@@ -135,9 +135,7 @@ export async function configure(client: MongoClient) {
 	try {
 		const db = client.db("cunnime");
 		let res = db
-			.collection<configuration>(
-				"config"
-			)
+			.collection<configuration>("config")
 			.find<configuration>({});
 		let reslist = await res.toArray();
 		if (reslist.length == 0 || reslist.length > 1) {
@@ -171,28 +169,31 @@ export async function changeconfig(
 }
 
 export async function getSynced(client: MongoClient) {
-    try {
-        const db = client.db("cunnime");
-        const coll = await db.collection<synced>("Synced").find<synced>({}).toArray();
-        return coll
-    } catch (error) {
-        console.error(error)
-    }
+	try {
+		const db = client.db("cunnime");
+		const coll = await db
+			.collection<synced>("Synced")
+			.find<synced>({})
+			.toArray();
+		return coll;
+	} catch (error) {
+		console.error(error);
+	}
 }
 
 export async function addSynced(client: MongoClient, obj: synced) {
-    try {
-        const db = client.db("cunnime");
-        const query = { anime: obj.anime };
+	try {
+		const db = client.db("cunnime");
+		const query = { anime: obj.anime };
 		const coll = db.collection("Synced");
 		let updres = await coll.replaceOne(query, obj, { upsert: true });
 		console.log(
 			`MONGO: Documents updated: ${updres.acknowledged}; Update count: ${updres.modifiedCount}; Add count: ${updres.upsertedCount}`
 		);
 		return updres.acknowledged;
-    } catch (error) {
-        console.error(error)
-    }
+	} catch (error) {
+		console.error(error);
+	}
 }
 
 //module.exports = { initMongo, getData, addAnimeNames, markWatchedunWatched, delanime, getPendingDL, DlSync }

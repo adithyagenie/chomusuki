@@ -547,6 +547,7 @@ import {
 	configuration,
 	getSynced,
 	addSynced,
+	changeconfig,
 } from "../database/db_connect";
 import { messageToHTMLMessage } from "./caption_entity_handler";
 import { createReadStream } from "fs-extra";
@@ -639,7 +640,7 @@ function botcommands(
 	});
 
 	// Synces anime
-	bot.command("async", async (ctx) => {
+	bot.command("sync", async (ctx) => {
 		if (ctx.chat.id != authchat) {
 			await ctx.reply("Bot not yet available for public use (｡•́︿•̀｡)");
 			return;
@@ -663,7 +664,7 @@ function botcommands(
 	});
 
 	// Add anime command
-	bot.command("aadd", async (ctx) => {
+	bot.command("add", async (ctx) => {
 		if (ctx.chat.id != authchat) {
 			await ctx.reply("Bot not yet available for public use (｡•́︿•̀｡)");
 			return;
@@ -733,7 +734,7 @@ function botcommands(
 	});
 
 	// Removing anime
-	bot.command("aremove", async (ctx) => {
+	bot.command("remove", async (ctx) => {
 		if (ctx.chat.id != authchat) {
 			await ctx.reply("Bot not yet available for public use (｡•́︿•̀｡)");
 			return;
@@ -797,7 +798,7 @@ function botcommands(
 	}
 
 	// Unwatch anime command
-	bot.command("aunwatch", async (ctx) => {
+	bot.command("unwatch", async (ctx) => {
 		if (ctx.chat.id != authchat) {
 			await ctx.reply("Bot not yet available for public use (｡•́︿•̀｡)");
 			return;
@@ -917,6 +918,47 @@ function botcommands(
 					parse_mode: "HTML",
 				});
 		}
+	});
+
+	bot.command("config", async (ctx) => {
+		let argarray = ctx.message.text.split(" ");
+		argarray.splice(0, 1);
+		console.log(argarray);
+		var newconfig = options;
+		if (argarray.length > 0) {
+			if (argarray[0] == "remind_again") {
+				if (argarray[1] == "true" || argarray[1] == "false") {
+					newconfig.remind_again = true
+						? argarray[1] == "true"
+						: argarray[1] == "false";
+					await changeconfig(updater.client, newconfig);
+					ctx.reply(`Set remind_again to ${newconfig.remind_again}.`);
+				} else
+					ctx.reply(
+						'Invalid value for remind_again. Accepted values: "true/false"'
+					);
+				return;
+			} else if (argarray[0] == "pause_sync") {
+				if (argarray[1] == "true" || argarray[1] == "false") {
+					newconfig.pause_sync = true
+						? argarray[1] == "true"
+						: argarray[1] == "false";
+					await changeconfig(updater.client, newconfig);
+					ctx.reply(`Set pause_sync to ${newconfig.pause_sync}.`);
+				} else
+					ctx.reply(
+						'Invalid value for pause_sync. Accepted values: "true/false"'
+					);
+				return;
+			} else
+				ctx.reply(
+					'Invalid config option. Accepted config option: "remind_again/pause_sync"'
+				);
+			return;
+		} else
+			ctx.reply(
+				'Provide a config option. Accepted config option: "remind_again/pause_sync"'
+			);
 	});
 
 	bot.command("log", async (ctx) => {
@@ -1138,7 +1180,6 @@ export async function syncresponser(
 	ctx: Context | undefined = undefined,
 	remind_again: boolean = options.remind_again
 ) {
-	console.log(options);
 	if (options.pause_sync == true && croncall == true) return;
 	let chatid = 0;
 	if (ctx === undefined) chatid = authchat;
@@ -1165,24 +1206,37 @@ export async function syncresponser(
 		}
 	}
 	const remind_purged_count = updateobj.length;
-    let topmsg = '';
-	if ((actualcount - remind_purged_count) > 0) {
-		topmsg += ` (Some episodes were omitted, use \"/async remind\" to include those!)`
+	let topmsg = "";
+	if (actualcount - remind_purged_count > 0) {
+		topmsg += ` (Some episodes were omitted, use \"/sync remind\" to include those!)`;
 	}
 	if (actualcount == 0) {
 		if (croncall == false)
 			bot.api.sendMessage(chatid, "No new episodes have been released!");
 		return;
-	}
-	else if(remind_purged_count == 0 && actualcount != 0 && croncall == false) {
-	    bot.api.sendMessage(chatid, "No new episodes have been released!"+topmsg);
-	}
-	if (croncall)
+	} else if (
+		remind_purged_count == 0 &&
+		actualcount != 0 &&
+		croncall == false
+	) {
 		bot.api.sendMessage(
 			chatid,
-			"Automatic syncing completed! New episodes have been released!" + topmsg
+			"No new episodes have been released!" + topmsg
 		);
-    else bot.api.sendMessage(chatid, "New episodes have been released!" + topmsg);
+		return;
+	} else if (actualcount > 0 && remind_purged_count > 0) {
+		if (croncall)
+			bot.api.sendMessage(
+				chatid,
+				"Automatic syncing completed! New episodes have been released!" +
+					topmsg
+			);
+		else
+			bot.api.sendMessage(
+				chatid,
+				"New episodes have been released!" + topmsg
+			);
+	}
 	for (let i = 0; i < updateobj.length; i++) {
 		if (updateobj[i].notwatched.length == 0) continue;
 		let [msg, msgheader] = ["", ""];
