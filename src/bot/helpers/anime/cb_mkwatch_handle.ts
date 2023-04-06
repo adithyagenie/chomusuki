@@ -1,7 +1,7 @@
-import { updater } from "../../../..";
-import { markWatchedunWatched } from "../../../../database/db_connect";
-import { MyContext, bot, getUpdaterAnimeIndex } from "../../../bot";
-import { messageToHTMLMessage } from "../../caption_entity_handler";
+import { updater } from "../../..";
+import { markWatchedunWatched } from "../../../database/db_connect";
+import { MyContext, bot, getUpdaterAnimeIndex } from "../../bot";
+import { messageToHTMLMessage } from "../caption_entity_handler";
 import { makeEpKeyboard } from "./EpKeyboard";
 
 export async function callback_mkwatch(ctx: MyContext) {

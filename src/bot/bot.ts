@@ -1,44 +1,44 @@
 // telegram bot endpoint
 
 import {
-	Bot,
-	BotError,
-	Context,
-	GrammyError,
-	HttpError,
-} from "grammy";
-import { CheckUpdates, ResObj } from "../api/UpdRelease";
-import { apiThrottler } from "@grammyjs/transformer-throttler";
-import { MongoClient } from "mongodb";
-import {
-	type Conversation,
-	type ConversationFlavor,
-	conversations,
-	createConversation,
+    conversations,
+    createConversation,
+    type Conversation,
+    type ConversationFlavor,
 } from "@grammyjs/conversations";
+import { apiThrottler } from "@grammyjs/transformer-throttler";
+import {
+    Bot,
+    BotError,
+    Context,
+    GrammyError,
+    HttpError,
+    session
+} from "grammy";
+import { MongoClient } from "mongodb";
+import { CheckUpdates, ResObj } from "../api/UpdRelease";
 
-import { session } from "grammy";
+import { authchat, updater } from "..";
 import { configuration } from "../database/db_connect";
-import { anime_sync } from "./helpers/anime/anime_sync";
 import { anime_add, animeadd } from "./helpers/anime/anime_add";
-import { updater, authchat } from "..";
-import { anime_remove, delanimehelper } from "./helpers/anime/anime_remove";
-import { anime_unwatch, unwatchhelper } from "./helpers/anime/anime_unwatch";
 import { anime_dllist } from "./helpers/anime/anime_dllist";
-import { anime_config } from "./helpers/anime_config";
+import { anime_remove, delanimehelper } from "./helpers/anime/anime_remove";
+import { anime_sync } from "./helpers/anime/anime_sync";
+import { anime_unwatch, unwatchhelper } from "./helpers/anime/anime_unwatch";
 import {
-	callback_dl,
-	callback_dlep,
-} from "./helpers/anime/callback_handlers/download_handle";
+    callback_dl,
+    callback_dlep,
+} from "./helpers/anime/cb_dl_handle";
 import {
-	callback_mkwatch,
-	callback_mkwatchep,
-} from "./helpers/anime/callback_handlers/mkwatch_handle";
+    callback_mkwatch,
+    callback_mkwatchep,
+} from "./helpers/anime/cb_mkwatch_handle";
 import {
-	back_handle,
-	cancel_handle,
-	log_command,
+    back_handle,
+    cancel_handle,
+    log_command,
 } from "./helpers/anime/misc_handles";
+import { anime_config } from "./helpers/anime_config";
 
 export class UpdateHold {
 	updateobj: ResObj[];

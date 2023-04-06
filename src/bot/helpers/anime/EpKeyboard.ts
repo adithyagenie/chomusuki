@@ -1,7 +1,7 @@
 import { InlineKeyboardButton } from "@grammyjs/types";
 import { Context, InlineKeyboard } from "grammy";
-import { updater } from "../../../..";
-import { getUpdaterAnimeIndex } from "../../../bot";
+import { updater } from "../../..";
+import { getUpdaterAnimeIndex } from "../../bot";
 
 // Makes keyboard for download and mark watched
 export function makeEpKeyboard(ctx: Context, callback_data_string: string) {
