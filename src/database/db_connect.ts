@@ -36,7 +36,7 @@ export interface DLSync {
 	xdccData?: { botname: string; packnum: number };
 }
 
-export async function initMongo() {
+export function initMongo() {
 	const uri = process.env.DATABASE_URL;
 	const client = new MongoClient(uri);
 	return client;
@@ -157,10 +157,10 @@ export async function changeconfig(
 		const coll = db.collection("config");
 		const old = await coll.deleteMany();
 		if (old.acknowledged) {
-			console.log(`MONGO: REMOVE OLD CONFIG ${old.acknowledged}`);
+			console.log(`MONGO: Remove old config: ${old.acknowledged}`);
 			const newconf = await coll.insertOne(newconfig);
 			if (newconf.acknowledged) {
-				console.log(`MONGO: UPDATE CONFIG: ${newconf.acknowledged}`);
+				console.log(`MONGO: Update config: ${newconf.acknowledged}`);
 			}
 		}
 	} catch (error) {

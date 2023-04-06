@@ -4,3 +4,4 @@ out
 .eslintrc.js
 .vscode
 debug.log
+.prettierrc.json
