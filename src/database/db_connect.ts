@@ -36,7 +36,7 @@ export interface DLSync {
 	xdccData?: { botname: string; packnum: number };
 }
 
-export async function initMongo() {
+export function initMongo() {
 	const uri = process.env.DATABASE_URL;
 	const client = new MongoClient(uri);
 	return client;
