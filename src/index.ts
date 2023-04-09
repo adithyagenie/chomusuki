@@ -44,26 +44,18 @@ export const updater = new UpdateHold(mongoClient);
 
 async function spinup() {
 	const options = await configure(mongoClient);
-	//await updater.updater()
+	await updater.updater();
 	const app = startserver();
 	await botinit(options);
 	app.post("/sync", async (req, res) => {
 		if (req.headers.calledby == "manualcall") {
 			console.log("Got manual sync request.");
 			res.status(200).send("Syncing anime...");
-			await syncresponser(
-				options,
-				false,
-				undefined
-			);
+			await syncresponser(options, false, undefined);
 		} else if (req.headers.calledby == "croncall") {
 			console.log("Got automatic sync request.");
 			res.status(200).send("Syncing anime...");
-			await syncresponser(
-				options,
-				true,
-				undefined
-			);
+			await syncresponser(options, true, undefined);
 		} else return res.sendStatus(401);
 	});
 }

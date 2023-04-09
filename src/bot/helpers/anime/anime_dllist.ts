@@ -4,7 +4,7 @@ import { MyContext, authchatEval, bot } from "../../bot";
 
 export async function anime_dllist(ctx: MyContext) {
 	{
-		if (!authchatEval(ctx)) return
+		if (!authchatEval(ctx)) return;
 		await ctx.replyWithChatAction("typing");
 		const pendingdl: DLSync[] = await getPendingDL(updater.client);
 		if (pendingdl.length == 0) {

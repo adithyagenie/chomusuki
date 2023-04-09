@@ -5,7 +5,7 @@ import { bot } from "../bot/bot";
 import { webhookCallback } from "grammy";
 
 export function startserver() {
-	const port = process.env.PORT || 4000;
+	const port = process.env.PORT || 3000;
 	const app: express.Application = express();
 	app.use(express.json());
 	app.use((err, req, res, next) => {
