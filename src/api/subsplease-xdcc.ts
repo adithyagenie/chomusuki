@@ -2,17 +2,17 @@ import axios from "axios";
 //import { xdccInit } from "../downloader/xdcc-down"
 
 interface NIBLQuery {
-    botId: number,
-    number: number,
-    name: string,
-    size: string,
-    sizekbits: number,
-    episodeNumber: number,
-    lastModified: string
+	botId: number;
+	number: number;
+	name: string;
+	size: string;
+	sizekbits: number;
+	episodeNumber: number;
+	lastModified: string;
 }
 export interface SPSearch {
-    packnum: number,
-    botname: string
+	packnum: number;
+	botname: string;
 }
 
 export async function getxdcc(name: string) {
@@ -54,7 +54,7 @@ export async function getxdcc(name: string) {
 			}
 		} else console.log("No packs found");
 	} else {
-		console.error("SUBSPLEASE-XDCC - axios err");
+		console.error("err");
 		Promise.reject("axios err");
 		return {
 			packnum: 0,

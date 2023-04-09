@@ -30,3 +30,5 @@ export async function GetSearchQueries(client: MongoClient) {
 export async function GetWatchedList(client: MongoClient) {
 	return await getData(client, "WatchedAnime");
 }
+
+module.exports = { GetWatchedList, GetSearchQueries };

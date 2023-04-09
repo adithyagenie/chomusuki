@@ -11,9 +11,9 @@ export interface AnimeNames {
 export interface WatchedAnime {
 	name: string;
 	watched: {
-	    epnum: number,
-	    epname: string
-    }[]
+		epnum: number;
+		epname: string;
+	}[];
 }
 
 export interface configuration {
