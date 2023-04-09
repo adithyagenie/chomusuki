@@ -7,7 +7,7 @@ import {
 	configuration,
 	getSynced,
 } from "../../../database/db_connect";
-import { MyContext, UpdateHold, authchatEval, bot } from "../../bot";
+import { MyContext, authchatEval, bot } from "../../bot";
 import { authchat, updater } from "../../..";
 
 // Helps in syncing anime, called by /async and by outer functions when needed.
@@ -32,7 +32,7 @@ export async function syncresponser(
 	bot.api.deleteMessage(chatid, msgid);
 	if (remind_again == false) {
 		console.log(`Remind again`);
-		const oldwatch = await getSynced(updater.client);
+		const oldwatch = await getSynced();
 		for (let i = updateobj.length - 1; i >= 0; i--) {
 			let found = oldwatch.find((o) => o.anime == updateobj[i].anime);
 			if (found !== undefined || found.reminded.length !== 0)
@@ -132,25 +132,17 @@ export async function syncresponser(
 			anime: updateobj[i].anime,
 			reminded: updateobj[i].notwatched.map((o) => o.epnum),
 		};
-		promisearray.push(addSynced(updater.client, obj));
+		promisearray.push(addSynced(obj));
 	}
 	await Promise.allSettled(promisearray);
 }
 
-export async function anime_sync(
-	ctx: MyContext,
-	options: configuration
-) {
+export async function anime_sync(ctx: MyContext, options: configuration) {
 	if (!authchatEval(ctx)) return;
 	const msg = ctx.message.text.split(" ");
 	if (msg.length == 2) {
 		if (msg[1] == "remind") {
-			await syncresponser(
-				options,
-				false,
-				ctx,
-				true
-			);
+			await syncresponser(options, false, ctx, true);
 			return;
 		}
 	}

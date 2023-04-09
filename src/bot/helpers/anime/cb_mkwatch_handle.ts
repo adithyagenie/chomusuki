@@ -33,7 +33,7 @@ export async function callback_mkwatchep(ctx: MyContext) {
 	}
 	updater.updateobj[indexnum].watched.push(toupdateanime);
 	oldwatch.sort((a, b) => (a.epnum > b.epnum ? 1 : -1));
-	const updres = await markWatchedunWatched(updater.client, {
+	const updres = await markWatchedunWatched({
 		name: animename,
 		watched: oldwatch,
 	});

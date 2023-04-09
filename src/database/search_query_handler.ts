@@ -6,7 +6,7 @@ import { AnimeNames, getData } from "./db_connect";
 export async function GetSearchQueries(client: MongoClient) {
 	let searchqueries: string[] = [];
 	//return fs.readJson("./AnimeNames.json")
-	const obj: AnimeNames[] = await getData(client, "AnimeNames");
+	const obj: AnimeNames[] = await getData("AnimeNames");
 	for (let i = 0; i < obj.length; i++) {
 		let cs = obj[i];
 		let name = `"${cs["EnName"]}"|"${cs["JpName"]}"`;
@@ -28,7 +28,7 @@ export async function GetSearchQueries(client: MongoClient) {
 }
 
 export async function GetWatchedList(client: MongoClient) {
-	return await getData(client, "WatchedAnime");
+	return await getData("WatchedAnime");
 }
 
 module.exports = { GetWatchedList, GetSearchQueries };

@@ -40,10 +40,10 @@ console.error = function (d: any) {
 
 export const authchat = parseInt(process.env.AUTHORISED_CHAT);
 export const mongoClient = initMongo();
-export const updater = new UpdateHold(mongoClient);
+export const updater = new UpdateHold();
 
 async function spinup() {
-	const options = await configure(mongoClient);
+	const options = await configure();
 	//await updater.updater()
 	const app = startserver();
 	await botinit(options);
@@ -51,19 +51,11 @@ async function spinup() {
 		if (req.headers.calledby == "manualcall") {
 			console.log("Got manual sync request.");
 			res.status(200).send("Syncing anime...");
-			await syncresponser(
-				options,
-				false,
-				undefined
-			);
+			await syncresponser(options, false, undefined);
 		} else if (req.headers.calledby == "croncall") {
 			console.log("Got automatic sync request.");
 			res.status(200).send("Syncing anime...");
-			await syncresponser(
-				options,
-				true,
-				undefined
-			);
+			await syncresponser(options, true, undefined);
 		} else return res.sendStatus(401);
 	});
 }

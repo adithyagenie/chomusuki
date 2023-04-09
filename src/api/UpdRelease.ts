@@ -12,6 +12,7 @@ import { appendFile, writeJson } from "fs-extra";
 import { Queue } from "async-await-queue";
 import { AnimeNames } from "../database/db_connect";
 import aniep from "aniep";
+import { mongoClient } from "..";
 
 export interface ResObj {
 	anime: string;
@@ -30,15 +31,15 @@ export interface ResObj {
 	imagelink: string;
 }
 
-export async function CheckUpdates(client: MongoClient) {
+export async function CheckUpdates() {
 	const myq = new Queue(2, 100);
 	console.log("Fetching data...");
 	const mainstarttime = new Date().getTime();
-	const [searchqueries, filelist] = await GetSearchQueries(client);
+	const [searchqueries, filelist] = await GetSearchQueries(mongoClient);
 	console.log(
 		`Mongo Initial query ${new Date().getTime() - mainstarttime} ms`
 	); // TIME LOGGER
-	const wfile = await GetWatchedList(client);
+	const wfile = await GetWatchedList(mongoClient);
 	console.log(`Mongo Query2: ${new Date().getTime() - mainstarttime} ms`); // TIME LOGGER
 	const baseurl = "https://nyaa.si/?page=rss";
 	let urls = [];
@@ -49,7 +50,7 @@ export async function CheckUpdates(client: MongoClient) {
 	}
 	const queue = [];
 	for (let i = 0; i < urls.length; i++) {
-		//await GetUpdate(urls[i], i, mainstarttime, client, filelist)
+		//await GetUpdate(urls[i], i, mainstarttime, mongoClient, filelist)
 		queue.push(
 			myq.run(() =>
 				GetUpdate(urls[i], i, mainstarttime, wfile, filelist[i]).catch(

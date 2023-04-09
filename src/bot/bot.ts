@@ -1,19 +1,19 @@
 // telegram bot endpoint
 
 import {
-    conversations,
-    createConversation,
-    type Conversation,
-    type ConversationFlavor,
+	conversations,
+	createConversation,
+	type Conversation,
+	type ConversationFlavor,
 } from "@grammyjs/conversations";
 import { apiThrottler } from "@grammyjs/transformer-throttler";
 import {
-    Bot,
-    BotError,
-    Context,
-    GrammyError,
-    HttpError,
-    session
+	Bot,
+	BotError,
+	Context,
+	GrammyError,
+	HttpError,
+	session,
 } from "grammy";
 import { MongoClient } from "mongodb";
 import { CheckUpdates, ResObj } from "../api/UpdRelease";
@@ -25,31 +25,27 @@ import { anime_dllist } from "./helpers/anime/anime_dllist";
 import { anime_remove, delanimehelper } from "./helpers/anime/anime_remove";
 import { anime_sync } from "./helpers/anime/anime_sync";
 import { anime_unwatch, unwatchhelper } from "./helpers/anime/anime_unwatch";
+import { callback_dl, callback_dlep } from "./helpers/anime/cb_dl_handle";
 import {
-    callback_dl,
-    callback_dlep,
-} from "./helpers/anime/cb_dl_handle";
-import {
-    callback_mkwatch,
-    callback_mkwatchep,
+	callback_mkwatch,
+	callback_mkwatchep,
 } from "./helpers/anime/cb_mkwatch_handle";
 import {
-    back_handle,
-    cancel_handle,
-    log_command,
+	back_handle,
+	cancel_handle,
+	log_command,
 } from "./helpers/anime/misc_handles";
 import { anime_config } from "./helpers/anime_config";
+import { getUser } from "./helpers/watchlist/watchlist";
 
 export class UpdateHold {
 	updateobj: ResObj[];
-	client: MongoClient;
-	constructor(client: MongoClient) {
+	constructor() {
 		this.updateobj = [];
-		this.client = client;
 	}
 	async updater() {
 		try {
-			this.updateobj = await CheckUpdates(this.client);
+			this.updateobj = await CheckUpdates();
 		} catch (error) {
 			console.error(error);
 		}
@@ -121,14 +117,16 @@ function botcommands(options: configuration) {
 		ctx.reply("Help me onii-chan I'm stuck~");
 	});
 	bot.command("sync", async (ctx) => await anime_sync(ctx, options));
-	bot.command("add", async (ctx) => await anime_add(ctx));
+	bot.command("addanime", async (ctx) => await anime_add(ctx));
 	bot.command("cancel", async (ctx) => await cancel_handle(ctx));
-	bot.command("remove", async (ctx) => await anime_remove(ctx));
+	bot.command("removeanime", async (ctx) => await anime_remove(ctx));
 	bot.command("unwatch", async (ctx) => await anime_unwatch(ctx));
 	bot.command("dllist", async (ctx) => await anime_dllist(ctx));
 	bot.command("config", async (ctx) => await anime_config(ctx, options));
 	bot.command("log", async (ctx) => await log_command(ctx));
-
+    
+    bot.command("watchlist", async (ctx) => await getUser(ctx.chat.id, {Username: true, watchlists: true}))
+    
 	bot.callbackQuery(/download/, async (ctx) => await callback_dl(ctx));
 	bot.callbackQuery(/dlep_.*/, async (ctx) => await callback_dlep(ctx));
 	bot.callbackQuery(/mark_watch/, async (ctx) => await callback_mkwatch(ctx));

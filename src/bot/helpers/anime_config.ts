@@ -1,9 +1,8 @@
-import { updater } from "../..";
 import { changeconfig, configuration } from "../../database/db_connect";
 import { MyContext, authchatEval } from "../bot";
 
 export async function anime_config(ctx: MyContext, options: configuration) {
-    if (!authchatEval) return;
+	if (!authchatEval) return;
 	let argarray = ctx.message.text.split(" ");
 	argarray.splice(0, 1);
 	console.log(argarray);
@@ -14,7 +13,7 @@ export async function anime_config(ctx: MyContext, options: configuration) {
 				newconfig.remind_again = true
 					? argarray[1] == "true"
 					: argarray[1] == "false";
-				await changeconfig(updater.client, newconfig);
+				await changeconfig(newconfig);
 				ctx.reply(`Set remind_again to ${newconfig.remind_again}.`);
 			} else
 				ctx.reply(
@@ -26,7 +25,7 @@ export async function anime_config(ctx: MyContext, options: configuration) {
 				newconfig.pause_sync = true
 					? argarray[1] == "true"
 					: argarray[1] == "false";
-				await changeconfig(updater.client, newconfig);
+				await changeconfig(newconfig);
 				ctx.reply(`Set pause_sync to ${newconfig.pause_sync}.`);
 			} else
 				ctx.reply(

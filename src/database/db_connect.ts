@@ -1,4 +1,5 @@
 import { MongoClient } from "mongodb";
+import { mongoClient } from "..";
 
 export interface AnimeNames {
 	EnName: string;
@@ -42,10 +43,10 @@ export function initMongo() {
 	return client;
 }
 
-export async function getData(client: MongoClient, tablename: string) {
+export async function getData(tablename: string) {
 	let animenames = [];
 	try {
-		const db = client.db("cunnime");
+		const db = mongoClient.db("cunnime");
 		const res = db.collection(tablename).find();
 		let reslist = await res.toArray();
 		for (let i = 0; i < reslist.length; i++) delete reslist[i]._id;
@@ -56,9 +57,9 @@ export async function getData(client: MongoClient, tablename: string) {
 	return animenames;
 }
 
-export async function addAnimeNames(client: MongoClient, obj: AnimeNames) {
+export async function addAnimeNames(obj: AnimeNames) {
 	try {
-		const db = client.db("cunnime");
+		const db = mongoClient.db("cunnime");
 		const animenames = db.collection("AnimeNames");
 		let insertres = await animenames.insertOne(obj);
 		console.log(`MONGO: Documents inserted: ${insertres.acknowledged}`);
@@ -68,11 +69,10 @@ export async function addAnimeNames(client: MongoClient, obj: AnimeNames) {
 }
 
 export async function markWatchedunWatched(
-	client: MongoClient,
 	obj: WatchedAnime
 ) {
 	try {
-		const db = client.db("cunnime");
+		const db = mongoClient.db("cunnime");
 		const query = { name: obj.name };
 		const animenames = db.collection("WatchedAnime");
 		let updres = await animenames.replaceOne(query, obj, { upsert: true });
@@ -85,9 +85,9 @@ export async function markWatchedunWatched(
 	}
 }
 
-export async function delanime(client: MongoClient, delname: string) {
+export async function delanime(delname: string) {
 	try {
-		const db = client.db("cunnime");
+		const db = mongoClient.db("cunnime");
 		const collection1 = db.collection("AnimeNames");
 		const collection2 = db.collection("WatchedAnime");
 		let del1 = await collection1.deleteOne({ JpName: delname });
@@ -102,9 +102,9 @@ export async function delanime(client: MongoClient, delname: string) {
 	}
 }
 
-export async function DlSync(client: MongoClient, obj: DLSync) {
+export async function DlSync(obj: DLSync) {
 	try {
-		const db = client.db("cunnime");
+		const db = mongoClient.db("cunnime");
 		const collection = db.collection("SyncPC");
 		let insertres = await collection.insertOne(obj);
 		console.log(`MONGO: Documents inserted: ${insertres.acknowledged}`);
@@ -114,10 +114,10 @@ export async function DlSync(client: MongoClient, obj: DLSync) {
 	}
 }
 
-export async function getPendingDL(client: MongoClient) {
+export async function getPendingDL() {
 	let pendingdl = [];
 	try {
-		const db = client.db("cunnime");
+		const db = mongoClient.db("cunnime");
 		let res = db.collection("SyncPC").find();
 		let reslist = await res.toArray();
 		if (reslist.length == 0) {
@@ -131,9 +131,9 @@ export async function getPendingDL(client: MongoClient) {
 	return pendingdl;
 }
 
-export async function configure(client: MongoClient) {
+export async function configure() {
 	try {
-		const db = client.db("cunnime");
+		const db = mongoClient.db("cunnime");
 		let res = db
 			.collection<configuration>("config")
 			.find<configuration>({});
@@ -149,11 +149,10 @@ export async function configure(client: MongoClient) {
 }
 
 export async function changeconfig(
-	client: MongoClient,
 	newconfig: { pause_sync: boolean; remind_again: boolean }
 ) {
 	try {
-		const db = client.db("cunnime");
+		const db = mongoClient.db("cunnime");
 		const coll = db.collection("config");
 		const old = await coll.deleteMany();
 		if (old.acknowledged) {
@@ -168,9 +167,9 @@ export async function changeconfig(
 	}
 }
 
-export async function getSynced(client: MongoClient) {
+export async function getSynced() {
 	try {
-		const db = client.db("cunnime");
+		const db = mongoClient.db("cunnime");
 		const coll = await db
 			.collection<synced>("Synced")
 			.find<synced>({})
@@ -181,9 +180,9 @@ export async function getSynced(client: MongoClient) {
 	}
 }
 
-export async function addSynced(client: MongoClient, obj: synced) {
+export async function addSynced(obj: synced) {
 	try {
-		const db = client.db("cunnime");
+		const db = mongoClient.db("cunnime");
 		const query = { anime: obj.anime };
 		const coll = db.collection("Synced");
 		let updres = await coll.replaceOne(query, obj, { upsert: true });

@@ -26,10 +26,7 @@ export async function cancel_handle(ctx: MyContext) {
 
 // sends log file
 export async function log_command(ctx: MyContext) {
-    if (!authchatEval) return;
-    const logfile = new InputFile(
-        createReadStream("./debug.log"),
-        "log.txt"
-    );
-    ctx.replyWithDocument(logfile);
+	if (!authchatEval) return;
+	const logfile = new InputFile(createReadStream("./debug.log"), "log.txt");
+	ctx.replyWithDocument(logfile);
 }
