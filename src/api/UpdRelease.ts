@@ -10,7 +10,7 @@ import {
 } from "../database/search_query_handler";
 import { appendFile, writeJson } from "fs-extra";
 import { Queue } from "async-await-queue";
-import { AnimeNames } from "../database/db_connect";
+import { AnimeNames } from "../database/anime_db";
 import aniep from "aniep";
 import { mongoClient } from "..";
 

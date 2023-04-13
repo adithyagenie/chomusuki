@@ -1,4 +1,4 @@
-import { DLSync, getPendingDL } from "../../../database/db_connect";
+import { DLSync, getPendingDL } from "../../../database/anime_db";
 import { MyContext, authchatEval, bot } from "../../bot";
 
 export async function anime_dllist(ctx: MyContext) {

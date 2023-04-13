@@ -1,4 +1,4 @@
-import { changeconfig, configuration } from "../../database/db_connect";
+import { changeconfig, configuration } from "../../database/anime_db";
 import { MyContext, authchatEval } from "../bot";
 
 export async function anime_config(ctx: MyContext, options: configuration) {

@@ -2,7 +2,7 @@
 
 import { Keyboard } from "grammy";
 import { updater } from "../../..";
-import { markWatchedunWatched } from "../../../database/db_connect";
+import { markWatchedunWatched } from "../../../database/anime_db";
 import {
 	MyContext,
 	MyConversation,

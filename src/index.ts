@@ -13,7 +13,7 @@ if (
 }
 import { UpdateHold, botinit, bot } from "./bot/bot";
 import { startserver } from "./api/server";
-import { configure, initMongo } from "./database/db_connect";
+import { configure, initMongo } from "./database/anime_db";
 import { createWriteStream } from "fs-extra";
 import { format } from "util";
 import { syncresponser } from "./bot/helpers/anime/anime_sync";

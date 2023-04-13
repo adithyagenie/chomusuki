@@ -2,7 +2,7 @@
 
 import { authchat } from "../../..";
 import { getAlId } from "../../../api/anilist_api";
-import { AnimeNames, addAnimeNames } from "../../../database/db_connect";
+import { AnimeNames, addAnimeNames } from "../../../database/anime_db";
 import { MyContext, MyConversation } from "../../bot";
 
 export async function anime_add(ctx: MyContext) {

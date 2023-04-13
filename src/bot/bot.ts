@@ -19,7 +19,7 @@ import { MongoClient } from "mongodb";
 import { CheckUpdates, ResObj } from "../api/UpdRelease";
 
 import { authchat, updater } from "..";
-import { configuration } from "../database/db_connect";
+import { configuration } from "../database/anime_db";
 import { anime_add, animeadd } from "./helpers/anime/anime_add";
 import { anime_dllist } from "./helpers/anime/anime_dllist";
 import { anime_remove, delanimehelper } from "./helpers/anime/anime_remove";
@@ -36,7 +36,7 @@ import {
 	log_command,
 } from "./helpers/anime/misc_handles";
 import { anime_config } from "./helpers/anime_config";
-import { getUser } from "./helpers/watchlist/watchlist";
+import { getUser, getWL } from "../database/watchlist_db";
 
 export class UpdateHold {
 	updateobj: ResObj[];
@@ -124,9 +124,21 @@ function botcommands(options: configuration) {
 	bot.command("dllist", async (ctx) => await anime_dllist(ctx));
 	bot.command("config", async (ctx) => await anime_config(ctx, options));
 	bot.command("log", async (ctx) => await log_command(ctx));
-    
-    bot.command("watchlist", async (ctx) => await getUser(ctx.chat.id, {Username: true, watchlists: true}))
-    
+
+	bot.command("watchlist", async (ctx) => {
+		const user = await getUser(ctx.chat.id, {
+			Username: true,
+			watchlists: true,
+		});
+		const wlList = getWL(user.watchlists[0]);
+		const wlListarr = [];
+		var nextelem = wlList.next();
+		while ((await nextelem).done == false) {
+			wlListarr.push((await nextelem).value);
+			nextelem = wlList.next();
+		}
+	});
+
 	bot.callbackQuery(/download/, async (ctx) => await callback_dl(ctx));
 	bot.callbackQuery(/dlep_.*/, async (ctx) => await callback_dlep(ctx));
 	bot.callbackQuery(/mark_watch/, async (ctx) => await callback_mkwatch(ctx));

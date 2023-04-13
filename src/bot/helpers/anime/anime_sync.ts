@@ -6,7 +6,7 @@ import {
 	addSynced,
 	configuration,
 	getSynced,
-} from "../../../database/db_connect";
+} from "../../../database/anime_db";
 import { MyContext, authchatEval, bot } from "../../bot";
 import { authchat, updater } from "../../..";
 

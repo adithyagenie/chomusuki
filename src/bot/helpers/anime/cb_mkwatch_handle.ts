@@ -1,5 +1,5 @@
 import { updater } from "../../..";
-import { markWatchedunWatched } from "../../../database/db_connect";
+import { markWatchedunWatched } from "../../../database/anime_db";
 import { MyContext, bot, getUpdaterAnimeIndex } from "../../bot";
 import { messageToHTMLMessage } from "../caption_entity_handler";
 import { makeEpKeyboard } from "./EpKeyboard";

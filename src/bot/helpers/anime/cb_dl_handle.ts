@@ -1,6 +1,6 @@
 import { updater } from "../../..";
 import { getxdcc } from "../../../api/subsplease-xdcc";
-import { DLSync, getPendingDL, DlSync } from "../../../database/db_connect";
+import { DLSync, getPendingDL, DlSync } from "../../../database/anime_db";
 import { MyContext, getUpdaterAnimeIndex } from "../../bot";
 import { makeEpKeyboard } from "./EpKeyboard";
 

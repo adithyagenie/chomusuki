@@ -1,7 +1,7 @@
 // handles search query formation
 
 import { MongoClient } from "mongodb";
-import { AnimeNames, getData } from "./db_connect";
+import { AnimeNames, getData } from "./anime_db";
 
 export async function GetSearchQueries(client: MongoClient) {
 	let searchqueries: string[] = [];
