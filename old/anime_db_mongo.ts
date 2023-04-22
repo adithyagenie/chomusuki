@@ -1,5 +1,5 @@
 import { MongoClient } from "mongodb";
-import { mongoClient } from "..";
+import { mongoClient } from "../src";
 
 export interface AnimeNames {
 	EnName: string;

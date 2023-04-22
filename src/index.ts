@@ -11,12 +11,12 @@ if (
 	console.log("ENV VARIABLE NOT SET!");
 	process.exit();
 }
-import { UpdateHold, botinit, bot } from "./bot/bot";
+import { UpdateHold, botinit, bot, cachedDB } from "./bot/bot";
 import { startserver } from "./api/server";
-import { configure, initMongo } from "./database/anime_db";
 import { createWriteStream } from "fs-extra";
 import { format } from "util";
 import { syncresponser } from "./bot/helpers/anime/anime_sync";
+import { Prisma, PrismaClient, config } from "@prisma/client";
 
 var log_file = createWriteStream("./debug.log", { flags: "w" });
 var log_stdout = process.stdout;
@@ -39,23 +39,22 @@ console.error = function (d: any) {
 };
 
 export const authchat = parseInt(process.env.AUTHORISED_CHAT);
-export const mongoClient = initMongo();
+export const db = new PrismaClient();
 export const updater = new UpdateHold();
-
+export const dbcache = new cachedDB();
 async function spinup() {
-	const options = await configure();
 	//await updater.updater()
 	const app = startserver();
-	await botinit(options);
+	await botinit();
 	app.post("/sync", async (req, res) => {
 		if (req.headers.calledby == "manualcall") {
 			console.log("Got manual sync request.");
 			res.status(200).send("Syncing anime...");
-			await syncresponser(options, false, undefined);
+			await syncresponser(false, undefined);
 		} else if (req.headers.calledby == "croncall") {
 			console.log("Got automatic sync request.");
 			res.status(200).send("Syncing anime...");
-			await syncresponser(options, true, undefined);
+			await syncresponser(true, undefined);
 		} else return res.sendStatus(401);
 	});
 }

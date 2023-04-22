@@ -2,37 +2,37 @@
 
 import { Context, InlineKeyboard } from "grammy";
 import { ResObj } from "../../../api/UpdRelease";
-import {
-	addSynced,
-	configuration,
-	getSynced,
-} from "../../../database/anime_db";
 import { MyContext, authchatEval, bot } from "../../bot";
-import { authchat, updater } from "../../..";
+import { authchat, dbcache, updater } from "../../..";
+import { getData } from "../../../database/animeDB";
+import { remindedepanime } from "@prisma/client";
+import { i_configuration } from "../../../interfaces";
 
 // Helps in syncing anime, called by /async and by outer functions when needed.
 export async function syncresponser(
-	options: configuration,
+	chatid: number,
+	options: i_configuration,
 	croncall: boolean = false,
-	ctx: Context | undefined = undefined,
 	remind_again: boolean = options.remind_again
 ) {
-	if (options.pause_sync == true && croncall == true) return;
-	let chatid = 0;
-	if (ctx === undefined) chatid = authchat;
-	else chatid = ctx.message.chat.id;
+	// if (options.pause_sync == true && croncall == true) return;
+	// let chatid = 0;
+	// if (ctx === undefined) chatid = authchat;
+	// else chatid = ctx.message.chat.id;
 	let msgid = (
 		await bot.api.sendMessage(chatid, "Syncing anime...", {
 			reply_markup: { remove_keyboard: true },
 		})
 	).message_id;
-	bot.api.sendChatAction(chatid, "typing");
-	let updateobj: ResObj[] = await updater.updater();
+	await bot.api.sendChatAction(chatid, "typing");
+	let updateobj: ResObj[] = await updater.updater(chatid);
 	const actualcount = updateobj.length;
 	bot.api.deleteMessage(chatid, msgid);
 	if (remind_again == false) {
 		console.log(`Remind again`);
-		const oldwatch = await getSynced();
+		const oldwatch = await getData<Omit<remindedepanime, "userid">>(
+			"remindedepanime"
+		); //remindedanime;
 		for (let i = updateobj.length - 1; i >= 0; i--) {
 			let found = oldwatch.find((o) => o.anime == updateobj[i].anime);
 			if (found !== undefined || found.reminded.length !== 0)
@@ -137,14 +137,17 @@ export async function syncresponser(
 	await Promise.allSettled(promisearray);
 }
 
-export async function anime_sync(ctx: MyContext, options: configuration) {
+export async function anime_sync(ctx: MyContext) {
 	if (!authchatEval(ctx)) return;
+	const options = await dbcache.getConfig(ctx.chat.id);
 	const msg = ctx.message.text.split(" ");
 	if (msg.length == 2) {
 		if (msg[1] == "remind") {
-			await syncresponser(options, false, ctx, true);
+			await syncresponser(ctx.chat.id, options, false, true);
 			return;
 		}
 	}
-	await syncresponser(options, false, ctx);
+	await syncresponser(ctx.chat.id, options, false);
 }
+
+//export async function anime_sync_cron()

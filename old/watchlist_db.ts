@@ -1,4 +1,4 @@
-import { mongoClient } from "..";
+import { mongoClient } from "../src";
 
 export interface User {
 	ChatID: number;
