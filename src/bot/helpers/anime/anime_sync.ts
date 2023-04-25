@@ -1,12 +1,11 @@
 // Synces anime
 
-import { Context, InlineKeyboard } from "grammy";
-import { ResObj } from "../../../api/UpdRelease";
+import { InlineKeyboard } from "grammy";
 import { MyContext, authchatEval, bot } from "../../bot";
-import { authchat, dbcache, updater } from "../../..";
-import { getData } from "../../../database/animeDB";
+import { db, dbcache, updater } from "../../..";
 import { remindedepanime } from "@prisma/client";
 import { i_configuration } from "../../../interfaces";
+import { addReminded } from "../../../database/animeDB";
 
 // Helps in syncing anime, called by /async and by outer functions when needed.
 export async function syncresponser(
@@ -19,27 +18,45 @@ export async function syncresponser(
 	// let chatid = 0;
 	// if (ctx === undefined) chatid = authchat;
 	// else chatid = ctx.message.chat.id;
+	const userid = await dbcache.getUserID(chatid);
 	let msgid = (
 		await bot.api.sendMessage(chatid, "Syncing anime...", {
 			reply_markup: { remove_keyboard: true },
 		})
 	).message_id;
 	await bot.api.sendChatAction(chatid, "typing");
-	let updateobj: ResObj[] = await updater.updater(chatid);
+	let updateobj = await updater.updater(userid);
 	const actualcount = updateobj.length;
 	bot.api.deleteMessage(chatid, msgid);
+	const getAlID = updateobj.map((o) => o.alid);
 	if (remind_again == false) {
-		console.log(`Remind again`);
-		const oldwatch = await getData<Omit<remindedepanime, "userid">>(
-			"remindedepanime"
-		); //remindedanime;
-		for (let i = updateobj.length - 1; i >= 0; i--) {
-			let found = oldwatch.find((o) => o.anime == updateobj[i].anime);
-			if (found !== undefined || found.reminded.length !== 0)
-				updateobj[i].notwatched = updateobj[i].notwatched.filter(
-					(o) => !found.reminded.includes(o.epnum)
+		const oldwatch = await db.remindedepanime.findMany({
+			where: {
+				userid: userid,
+				alid: { in: getAlID },
+			},
+			select: {
+				alid: true,
+				ep: true,
+			},
+		});
+		const remindedAlID = oldwatch.map((o) => o.alid);
+		if (remindedAlID.length != 0) {
+			for (let i = updateobj.length - 1; i >= 0; i--) {
+				// let found = oldwatch.find(
+				// 	(o) => o.anime == updateobj[userid][i].anime
+				// );
+				// if (found !== undefined || found.reminded.length !== 0)
+				// 	updateobj[i].notwatched = updateobj[i].notwatched.filter(
+				// 		(o) => !found.reminded.includes(o.epnum)
+				// 	);
+				let elem = oldwatch.find((o) => o.alid == updateobj[i].alid);
+				updateobj[i].notwatched.filter(
+					(o) => !elem.ep.includes(o.epnum)
 				);
-			if (updateobj[i].notwatched.length === 0) updateobj.splice(i, 1);
+				if (updateobj[i].notwatched.length === 0)
+					updateobj.splice(i, 1);
+			}
 		}
 	}
 	const remind_purged_count = updateobj.length;
@@ -128,11 +145,12 @@ export async function syncresponser(
 	}
 	const promisearray = [];
 	for (let i = 0; i < updateobj.length; i++) {
-		let obj = {
-			anime: updateobj[i].anime,
-			reminded: updateobj[i].notwatched.map((o) => o.epnum),
+		let obj: remindedepanime = {
+			userid: userid,
+			alid: updateobj[i].alid,
+			ep: updateobj[i].notwatched.map((o) => o.epnum),
 		};
-		promisearray.push(addSynced(obj));
+		promisearray.push(addReminded(obj));
 	}
 	await Promise.allSettled(promisearray);
 }

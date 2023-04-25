@@ -42,6 +42,7 @@ export const authchat = parseInt(process.env.AUTHORISED_CHAT);
 export const db = new PrismaClient();
 export const updater = new UpdateHold();
 export const dbcache = new cachedDB();
+
 async function spinup() {
 	//await updater.updater()
 	const app = startserver();
@@ -50,11 +51,11 @@ async function spinup() {
 		if (req.headers.calledby == "manualcall") {
 			console.log("Got manual sync request.");
 			res.status(200).send("Syncing anime...");
-			await syncresponser(false, undefined);
+			//await syncresponser(false, undefined);
 		} else if (req.headers.calledby == "croncall") {
 			console.log("Got automatic sync request.");
 			res.status(200).send("Syncing anime...");
-			await syncresponser(true, undefined);
+			//await syncresponser(true, undefined);
 		} else return res.sendStatus(401);
 	});
 }

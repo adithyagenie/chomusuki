@@ -47,6 +47,7 @@ export interface i_NyaaResponse {
 }
 
 export interface i_ProcessedObj {
+	alid: number;
 	anime: string;
 	shortname: string | undefined;
 	notwatched: {

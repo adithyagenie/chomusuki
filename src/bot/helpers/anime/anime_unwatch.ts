@@ -1,14 +1,15 @@
 // Unwatch anime command
 
 import { Keyboard } from "grammy";
-import { updater } from "../../..";
-import { markWatchedunWatched } from "../../../database/anime_db";
+import { db, dbcache, updater } from "../../..";
+import { markWatchedunWatched } from "../../../database/animeDB";
 import {
 	MyContext,
 	MyConversation,
 	authchatEval,
 	getUpdaterAnimeIndex,
 } from "../../bot";
+import { watchedepanime } from "@prisma/client";
 
 export async function anime_unwatch(ctx: MyContext) {
 	if (authchatEval(ctx)) await ctx.conversation.enter("unwatchhelper");
@@ -18,7 +19,8 @@ export async function unwatchhelper(
 	conversation: MyConversation,
 	ctx: MyContext
 ) {
-	let updateobj = updater.updateobj;
+	const userid = await dbcache.getUserID(ctx.chat.id);
+	let updateobj = updater.updateobj[userid];
 	let keyboard = new Keyboard().resized().persistent().oneTime();
 	let animelist = [];
 	for (let i = 0; i < updateobj.length; i++) {
@@ -33,8 +35,9 @@ export async function unwatchhelper(
 	).message.text
 		.slice(7)
 		.trim();
+	const alid = updateobj.find((o) => o.anime == animename).alid;
 	let eplist: number[] = [];
-	let animeindex = getUpdaterAnimeIndex(animename);
+	let animeindex = getUpdaterAnimeIndex(animename, userid);
 	for (let j = 0; j < updateobj[animeindex].watched.length; j++)
 		eplist.push(updateobj[animeindex].watched[j].epnum);
 
@@ -62,14 +65,18 @@ export async function unwatchhelper(
 		watchedAnime = watchedAnime.filter(
 			({ epnum, epname }) => epnum != tounwatch
 		);
-		const toupdate = { name: animename, watched: watchedAnime };
+		const toupdate: watchedepanime = {
+			userid: userid,
+			alid: alid,
+			ep: watchedAnime.map((o) => o.epnum),
+		};
 		const updres = await markWatchedunWatched(toupdate);
-		if (updres == true) {
+		if (updres == 0) {
 			await ctx.reply(
 				`Marked Ep ${tounwatch} of ${animename} as not watched`,
 				{ reply_markup: { remove_keyboard: true } }
 			);
-			updater.updateobj[animeindex].watched = watchedAnime;
+			updater.updateobj[userid][animeindex].watched = watchedAnime;
 		} else {
 			await ctx.reply(
 				`Error occured while marking episode as unwatched`,

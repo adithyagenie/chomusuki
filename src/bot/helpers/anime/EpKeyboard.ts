@@ -4,14 +4,18 @@ import { updater } from "../../..";
 import { getUpdaterAnimeIndex } from "../../bot";
 
 // Makes keyboard for download and mark watched
-export function makeEpKeyboard(ctx: Context, callback_data_string: string) {
-	let updateobj = updater.updateobj;
+export function makeEpKeyboard(
+	ctx: Context,
+	callback_data_string: string,
+	userid: string
+) {
+	let updateobj = updater.updateobj[userid];
 	let animename = ctx.callbackQuery.message.caption
 		.split("Anime: ")[1]
 		.split("Episodes:")[0]
 		.trim();
 	let eplist = [];
-	const animeindex = getUpdaterAnimeIndex(animename);
+	const animeindex = getUpdaterAnimeIndex(animename, userid);
 	for (let j = 0; j < updateobj[animeindex].notwatched.length; j++)
 		eplist.push(updateobj[animeindex].notwatched[j].epnum);
 

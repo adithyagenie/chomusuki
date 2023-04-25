@@ -1,4 +1,4 @@
-import { db } from "../api/UpdRelease";
+import { db } from "..";
 import * as Prisma from "@prisma/client";
 import * as types from "../interfaces";
 

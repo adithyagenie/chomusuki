@@ -1,4 +1,5 @@
-import anilist from "anilist-node";
+import anilist, { MediaSearchEntry } from "anilist-node";
+import { Queue } from "async-await-queue";
 
 const al = new anilist(process.env.ANILIST_TOKEN);
 
@@ -28,5 +29,19 @@ export async function getAlId(enname: string, jpname: string) {
 	} catch {
 		console.log(`ANILIST: Error fetching ${enname}`);
 		return alid;
+	}
+}
+
+export async function searchAnime(query: string, pagenum: number) {
+	try {
+		let res: MediaSearchEntry = await al.searchEntry.anime(
+			query,
+			null,
+			pagenum
+		);
+		if (res.media.length > 0) return res;
+		else return undefined;
+	} catch (err) {
+		console.log(err);
 	}
 }

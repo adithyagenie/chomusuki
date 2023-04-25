@@ -1,19 +1,20 @@
-import { changeconfig, configuration } from "../../database/anime_db";
+import { dbcache } from "../..";
+import { changeConfig } from "../../database/animeDB";
 import { MyContext, authchatEval } from "../bot";
 
-export async function anime_config(ctx: MyContext, options: configuration) {
+export async function anime_config(ctx: MyContext) {
 	if (!authchatEval) return;
 	let argarray = ctx.message.text.split(" ");
 	argarray.splice(0, 1);
 	console.log(argarray);
-	var newconfig = options;
+	var newconfig = await dbcache.getConfig(ctx.chat.id);
 	if (argarray.length > 0) {
 		if (argarray[0] == "remind_again") {
 			if (argarray[1] == "true" || argarray[1] == "false") {
 				newconfig.remind_again = true
 					? argarray[1] == "true"
 					: argarray[1] == "false";
-				await changeconfig(newconfig);
+				await changeConfig(newconfig);
 				ctx.reply(`Set remind_again to ${newconfig.remind_again}.`);
 			} else
 				ctx.reply(
@@ -25,7 +26,7 @@ export async function anime_config(ctx: MyContext, options: configuration) {
 				newconfig.pause_sync = true
 					? argarray[1] == "true"
 					: argarray[1] == "false";
-				await changeconfig(newconfig);
+				await changeConfig(newconfig);
 				ctx.reply(`Set pause_sync to ${newconfig.pause_sync}.`);
 			} else
 				ctx.reply(

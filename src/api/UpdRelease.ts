@@ -1,7 +1,5 @@
 // checks and returns new releases with link/msg
-require("dotenv").config();
-import { PrismaClient, anime } from "@prisma/client";
-export const db = new PrismaClient();
+import { anime } from "@prisma/client";
 import axios from "axios";
 import { imageget } from "./anilist_api";
 import {
@@ -11,7 +9,7 @@ import {
 import { writeJson } from "fs-extra";
 import { Queue } from "async-await-queue";
 import aniep from "aniep";
-//import { db } from "../database/animeDB";
+import { db } from "..";
 import { i_NyaaResponse, i_WatchedAnime, i_ProcessedObj } from "../interfaces";
 
 export async function CheckUpdatesForUser(userid: string) {
@@ -157,6 +155,7 @@ async function getNotWatched(
 			`Query ${querynum + 1} took ${new Date().getTime() - starttime} ms`
 		);
 		returnobj = {
+			alid: animelist.alid,
 			anime: animelist.jpname,
 			shortname: shortname,
 			notwatched: [],
@@ -281,6 +280,7 @@ async function getNotWatched(
         console.log(`XDCC query: ${(new Date()).getTime() - mainstarttime} ms`) // TIME LOGGER */
 
 	returnobj = {
+		alid: animelist.alid,
 		anime: animelist.jpname,
 		shortname: shortname,
 		notwatched: newepdis,

@@ -3,7 +3,7 @@
 import { anime, PrismaClient } from "@prisma/client";
 //import { db } from "..";
 // export const db = new PrismaClient();
-import { db } from "../api/UpdRelease";
+import { db } from "..";
 
 /**Takes alid list as parameter and returns list of nyaa search queries along with their anime objects. */
 export async function GetNyaaSearchQueries(alid: number[]) {
