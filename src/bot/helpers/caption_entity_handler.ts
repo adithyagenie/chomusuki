@@ -1,10 +1,7 @@
 //import type { Context } from 'grammy';
 import type { MessageEntity } from "grammy/out/types.node";
 
-export const messageToHTMLMessage = (
-	text: string,
-	entities: MessageEntity[]
-) => {
+export const messageToHTMLMessage = (text: string, entities: MessageEntity[]) => {
 	if (!entities || !text) {
 		return text;
 	}
@@ -16,19 +13,15 @@ export const messageToHTMLMessage = (
 		else
 			tags.push({
 				index: entity.offset,
-				tag: startTag,
+				tag: startTag
 			});
-		const closeTag =
-			startTag?.indexOf("<a ") === 0 ? "</a>" : "</" + startTag?.slice(1);
-		searchTag = tags.filter(
-			(tag) => tag.index === entity.offset + entity.length
-		);
-		if (searchTag.length > 0)
-			searchTag[0].tag = closeTag + searchTag[0].tag;
+		const closeTag = startTag?.indexOf("<a ") === 0 ? "</a>" : "</" + startTag?.slice(1);
+		searchTag = tags.filter((tag) => tag.index === entity.offset + entity.length);
+		if (searchTag.length > 0) searchTag[0].tag = closeTag + searchTag[0].tag;
 		else
 			tags.push({
 				index: entity.offset + entity.length,
-				tag: closeTag,
+				tag: closeTag
 			});
 	});
 	let html = "";

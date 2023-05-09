@@ -1,30 +1,25 @@
 // checks and returns new releases with link/msg
 import { anime } from "@prisma/client";
-import axios from "axios";
-import { imageget } from "./anilist_api";
-import {
-	GetNyaaSearchQueries,
-	GetWatchedList,
-} from "../database/search_query_handler";
+import { axios } from "../src";
+import { imageGet } from "../src/api/anilist_api";
+import { GetNyaaSearchQueries } from "../src/database/search_query_handler";
+import { GetWatchedList, getNumber } from "../src/database/animeDB";
 import { writeJson } from "fs-extra";
 import { Queue } from "async-await-queue";
 import aniep from "aniep";
-import { db } from "..";
-import { i_NyaaResponse, i_WatchedAnime, i_ProcessedObj } from "../interfaces";
+import { db } from "../src";
+import { i_NyaaResponse, i_ProcessedObj } from "../src/interfaces";
 
-export async function CheckUpdatesForUser(userid: string) {
+export async function CheckUpdatesForUser(userid: number) {
 	const myq = new Queue(2, 100);
 	console.log("Fetching data...");
 	const mainstarttime = new Date().getTime();
-	const alidlist = await db.subscribedanime.findUnique({
+	const alidlist = await db.watchinganime.findUnique({
 		where: { userid: userid },
-		select: { alid: true },
+		select: { alid: true }
 	});
-	const [searchqueries, animelist] = await GetNyaaSearchQueries(
-		alidlist.alid
-	);
+	const [searchqueries, animelist] = await GetNyaaSearchQueries(alidlist.alid);
 	const watched = await GetWatchedList(userid, alidlist.alid); // all subscribed alid's ep prog
-
 	const baseurl = `${process.env.NYAA_API_URL}/user/SubsPlease`;
 	let urls = [];
 	var returnobj: i_ProcessedObj[] = [];
@@ -35,13 +30,15 @@ export async function CheckUpdatesForUser(userid: string) {
 	const queue = [];
 	for (let i = 0; i < urls.length; i++) {
 		//await GetUpdate(urls[i], i, mainstarttime, mongoClient, filelist)
+		let wanime = watched.find((o) => o.alid == animelist[i].alid);
+		if (wanime == undefined) wanime = { alid: animelist[i].alid, ep: [] };
 		queue.push(
 			myq.run(() =>
 				getNotWatched(
 					urls[i],
 					i,
 					mainstarttime,
-					watched.find((o) => o.alid == animelist[i].alid),
+					getNumber(wanime.ep) as number[],
 					animelist[i]
 				).catch((e) => console.error(e))
 			)
@@ -59,16 +56,14 @@ async function getNotWatched(
 	url: string,
 	querynum: number,
 	mainstarttime: number,
-	watched: i_WatchedAnime,
+	watched: number[],
 	animelist: anime
 ) {
 	let starttime = new Date().getTime();
 	let returnobj: i_ProcessedObj;
 	let shortname: string | undefined;
-	if (animelist.optnames.length > 0) {
-		shortname = animelist.optnames.reduce((a, b) =>
-			a.length <= b.length ? a : b
-		); // returns shortest string in optname
+	if (!(animelist.optnames == null || animelist.optnames.length == 0)) {
+		shortname = animelist.optnames.reduce((a, b) => (a.length <= b.length ? a : b)); // returns shortest string in optname
 		if (animelist.jpname.length <= shortname.length) {
 			shortname = undefined;
 		}
@@ -76,14 +71,10 @@ async function getNotWatched(
 	let res: i_NyaaResponse[];
 	try {
 		var pull = await axios.get<i_NyaaResponse[]>(url);
-		if (pull.status != 200)
-			throw new Error(`API unresponsive ${pull.status}`);
+		if (pull.status != 200) throw new Error(`API unresponsive ${pull.status}`);
 		if (pull.data.length == 0) {
-			pull = await axios.get<i_NyaaResponse[]>(
-				url.replace("SubsPlease", "Erai-Raws")
-			);
-			if (pull.status != 200)
-				throw new Error(`API unresponsive ${pull.status}`);
+			pull = await axios.get<i_NyaaResponse[]>(url.replace("SubsPlease", "Erai-Raws"));
+			if (pull.status != 200) throw new Error(`API unresponsive ${pull.status}`);
 		}
 		if (pull.data.length != 0) res = pull.data;
 		else throw new Error("No records found");
@@ -92,9 +83,7 @@ async function getNotWatched(
 		return returnobj;
 	}
 	res = res.map((o) => {
-		let epnum = aniep(o.title);
-		if (typeof epnum === "string") epnum = parseInt(epnum);
-		if (typeof epnum === "object") epnum = epnum[0];
+		let epnum = aniep(o.title) as number;
 		o.epnum = epnum;
 		return o;
 	});
@@ -105,13 +94,13 @@ async function getNotWatched(
 			.replace("[SubsPlease] ", "")
 			.replace("[Erai-raws] ", "");
 	}
-	let notwatchedres = res.filter((o) => !watched.ep.includes(o.epnum));
+	let notwatchedres = res.filter((o) => !watched.includes(o.epnum));
 	let watcheddis: i_ProcessedObj["watched"] = [];
-	watched.ep.forEach((o) => {
+	watched.forEach((o) => {
 		let elem = res.find((a) => a.epnum == o);
 		watcheddis.push({
 			epname: elem.disname,
-			epnum: elem.epnum,
+			epnum: elem.epnum
 		});
 	}); // pushes all watched epnames to oldanimewatch.
 	let alLink = `https://anilist.co/anime/${animelist.alid}`;
@@ -151,9 +140,7 @@ async function getNotWatched(
 	// 	}
 	// }
 	if (notwatchedres.length == 0) {
-		console.log(
-			`Query ${querynum + 1} took ${new Date().getTime() - starttime} ms`
-		);
+		console.log(`Query ${querynum + 1} took ${new Date().getTime() - starttime} ms`);
 		returnobj = {
 			alid: animelist.alid,
 			anime: animelist.jpname,
@@ -163,7 +150,7 @@ async function getNotWatched(
 			links: [],
 			notwatchedepnames: [],
 			torrentlink: [],
-			imagelink: "",
+			imagelink: ""
 		};
 		return returnobj;
 	}
@@ -269,7 +256,7 @@ async function getNotWatched(
 		return { epnum: o.epnum, epname: o.disname };
 	});
 
-	let imagelink = await imageget(animelist.alid);
+	let imagelink = await imageGet(animelist.alid);
 
 	/*let xdcclinks:SPSearch[] = []
         if (sp) {
@@ -288,12 +275,10 @@ async function getNotWatched(
 		links: viewlinks,
 		notwatchedepnames: notwatchedres.map((o) => o.title),
 		torrentlink: downloadlinks,
-		imagelink: imagelink,
+		imagelink: imagelink
 	};
-	console.log(
-		`Query ${querynum} took ${new Date().getTime() - starttime} ms`
-	);
+	console.log(`Query ${querynum} took ${new Date().getTime() - starttime} ms`);
 	return returnobj;
 }
 
-CheckUpdatesForUser("c578f7").then((o) => console.log(JSON.stringify(o)));
+//CheckUpdatesForUser(2).then((o) => console.log(JSON.stringify(o)));

@@ -1,33 +1,30 @@
 import { InlineKeyboardButton } from "@grammyjs/types";
-import { Context, InlineKeyboard } from "grammy";
+import { InlineKeyboard } from "grammy";
 import { updater } from "../../..";
 import { getUpdaterAnimeIndex } from "../../bot";
 
 // Makes keyboard for download and mark watched
-export function makeEpKeyboard(
-	ctx: Context,
+export async function makeEpKeyboard(
+	caption: string,
 	callback_data_string: string,
-	userid: string
+	userid: number
 ) {
-	let updateobj = updater.updateobj[userid];
-	let animename = ctx.callbackQuery.message.caption
-		.split("Anime: ")[1]
-		.split("Episodes:")[0]
-		.trim();
+	let updateobj = await updater.getUpdateObj(userid);
+	caption = caption.split("Anime: ")[1].split("\n")[0].trim();
 	let eplist = [];
-	const animeindex = getUpdaterAnimeIndex(animename, userid);
-	for (let j = 0; j < updateobj[animeindex].notwatched.length; j++)
-		eplist.push(updateobj[animeindex].notwatched[j].epnum);
+	const animeindex = await getUpdaterAnimeIndex(caption, userid);
+	console.log(updateobj);
+	updateobj[animeindex].notwatched.forEach((o) => eplist.push(o));
 
 	let keyboard = new InlineKeyboard();
 	for (let i = 0; i < eplist.length; i += 2) {
 		let bruh: InlineKeyboardButton.CallbackButton = {
 			text: `Episode ${eplist[i]}`,
-			callback_data: `${callback_data_string}_${eplist[i]}`,
+			callback_data: `${callback_data_string}_${eplist[i]}`
 		};
 		let bruh2: InlineKeyboardButton.CallbackButton = {
 			text: `Episode ${eplist[i + 1]}`,
-			callback_data: `${callback_data_string}_${eplist[i + 1]}`,
+			callback_data: `${callback_data_string}_${eplist[i + 1]}`
 		};
 		if (eplist[i + 1] === undefined) keyboard.add(bruh).row();
 		else keyboard.add(bruh).add(bruh2).row();

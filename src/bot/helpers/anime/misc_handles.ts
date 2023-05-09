@@ -20,7 +20,7 @@ export async function cancel_handle(ctx: MyContext) {
 	}
 	await ctx.conversation.exit();
 	await ctx.reply("Cancelling operation...", {
-		reply_markup: { remove_keyboard: true },
+		reply_markup: { remove_keyboard: true }
 	});
 }
 

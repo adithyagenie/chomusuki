@@ -1,4 +1,4 @@
-import axios from "axios";
+import { axios } from "..";
 //import { xdccInit } from "../downloader/xdcc-down"
 
 interface NIBLQuery {
@@ -20,20 +20,16 @@ export async function getxdcc(name: string) {
 	let botnum: number;
 	let returnobj: SPSearch = {
 		packnum: 0,
-		botname: "",
+		botname: ""
 	};
 	let botnames = {
 		989: "CR-ARUTHA|NEW",
 		696: "CR-HOLLAND|NEW",
-		21: "Ginpachi-Sensei",
+		21: "Ginpachi-Sensei"
 	};
-	const axiosclient = axios.create({
-		method: "GET",
-		baseURL: "https://api.nibl.co.uk/nibl", //,
-		//headers: {"User-Agent": "Cunnime 1.0", "Accept":"application/json"}
-	});
+	const baseURL = "https://api.nibl.co.uk/nibl";
 	const encodename = encodeURI(name);
-	let res = await axiosclient(`/search/?query=${encodename}`);
+	let res = await axios.get(`${baseURL}/search/?query=${encodename}`);
 	if (res.status == 200) {
 		let resobj: NIBLQuery[] = res.data.content;
 
@@ -58,14 +54,14 @@ export async function getxdcc(name: string) {
 		Promise.reject("axios err");
 		return {
 			packnum: 0,
-			botname: "",
+			botname: ""
 		};
 	}
 	if (packnum === undefined || botnum === undefined) return returnobj;
 	else {
 		returnobj = {
 			packnum: packnum,
-			botname: botnames[botnum],
+			botname: botnames[botnum]
 		};
 		return returnobj;
 	}
@@ -90,7 +86,6 @@ export async function getxdcc(name: string) {
 } */
 
 //startspxdcc()
-module.exports = { getxdcc };
 
 /* process.on('SIGINT', function() {
     console.log("Quitting...");

@@ -14,8 +14,7 @@ export interface i_WatchedAnime {
 }
 
 export interface i_configuration {
-	pause_sync: boolean;
-	remind_again: boolean;
+	pause_airing_updates: boolean;
 }
 
 export interface i_remindedepanime {
@@ -24,7 +23,8 @@ export interface i_remindedepanime {
 }
 
 export interface i_DlSync
-	extends Omit<Prisma.syncupd, "queuenum" | "xdccdata" | "torrentdata"> {
+	extends Omit<Prisma.syncupd, "queuenum" | "xdccdata" | "torrentdata" | "epnum"> {
+	epnum: number;
 	queuenum?: number;
 	xdccdata?: string[];
 	torrentdata?: string;
@@ -42,7 +42,7 @@ export interface i_NyaaResponse {
 	leechers: number;
 	completed: number;
 	magnet: string;
-	epnum?: number | null;
+	epnum?: number;
 	disname?: string | null;
 }
 
@@ -61,5 +61,15 @@ export interface i_ProcessedObj {
 	links: string[];
 	notwatchedepnames: string[];
 	torrentlink: string[];
+	imagelink: string;
+}
+
+export interface i_ProcessedObjV2 {
+	alid: number;
+	jpname: string;
+	enname: string;
+	watched: number[];
+	notwatched: number[];
+	shortname: string | undefined;
 	imagelink: string;
 }

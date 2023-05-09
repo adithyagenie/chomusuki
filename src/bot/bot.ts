@@ -4,49 +4,52 @@ import {
 	conversations,
 	createConversation,
 	type Conversation,
-	type ConversationFlavor,
+	type ConversationFlavor
 } from "@grammyjs/conversations";
 import { apiThrottler } from "@grammyjs/transformer-throttler";
-import {
-	Bot,
-	BotError,
-	Context,
-	GrammyError,
-	HttpError,
-	session,
-} from "grammy";
-import { CheckUpdatesForUser } from "../api/UpdRelease";
+import { Bot, BotError, Context, GrammyError, HttpError, InlineKeyboard, session } from "grammy";
 
-import { authchat, db, updater } from "..";
-import { anime_add, animeadd } from "./helpers/anime/anime_add";
+import { authchat, db, dbcache, updater } from "..";
+
 import { anime_dllist } from "./helpers/anime/anime_dllist";
-import { anime_remove, delanimehelper } from "./helpers/anime/anime_remove";
-import { anime_sync } from "./helpers/anime/anime_sync";
+
 import { anime_unwatch, unwatchhelper } from "./helpers/anime/anime_unwatch";
 import { callback_dl, callback_dlep } from "./helpers/anime/cb_dl_handle";
-import {
-	callback_mkwatch,
-	callback_mkwatchep,
-} from "./helpers/anime/cb_mkwatch_handle";
-import {
-	back_handle,
-	cancel_handle,
-	log_command,
-} from "./helpers/anime/misc_handles";
+import { callback_mkwatch, callback_mkwatchep } from "./helpers/anime/cb_mkwatch_handle";
+import { back_handle, cancel_handle, log_command } from "./helpers/anime/misc_handles";
 import { anime_config } from "./helpers/anime_config";
-import { i_configuration, i_ProcessedObj } from "../interfaces";
+import { i_configuration, i_ProcessedObjV2 } from "../interfaces";
+import { InlineKeyboardButton } from "@grammyjs/types";
+import {
+	animeSearchStart,
+	animeStartWatch,
+	remindMe,
+	remindMe_startWatch_cb
+} from "./helpers/anime/anime_add";
+import { animePendingMsgHandler } from "./helpers/anime/anime_pending";
+import { getPending } from "../api/pending";
 
 export class UpdateHold {
-	updateobj: { [userid: string]: i_ProcessedObj[] };
+	updateobj: { [userid: number]: i_ProcessedObjV2[] };
 	constructor() {
 		this.updateobj = {};
 	}
-	async updater(userid: string) {
+	async updater(userid: number) {
 		try {
-			this.updateobj[userid] = await CheckUpdatesForUser(userid);
+			this.updateobj[userid] = await getPending(userid);
 		} catch (error) {
 			console.error(error);
 		}
+		return this.updateobj[userid];
+	}
+	async getUpdateObj(userid: number) {
+		if (this.updateobj[userid] === undefined) {
+			await this.updater(userid);
+			if (this.updateobj[userid].length == 0) {
+				this.updateobj[userid] = [];
+			} else return undefined;
+		}
+		console.log(this.updateobj[userid]);
 		return this.updateobj[userid];
 	}
 }
@@ -54,7 +57,7 @@ export class UpdateHold {
 /**Note to self: yeet this shit and implement redis */
 export class cachedDB {
 	dbcache: {
-		userid: string;
+		userid: number;
 		chatid: number;
 		config?: i_configuration;
 	}[];
@@ -63,57 +66,58 @@ export class cachedDB {
 	}
 	async getUserID(chatid: number) {
 		try {
-			const cached = (await this.getAllCachedData(chatid)).userid;
-			if (cached == undefined) return cached;
+			const cached = await this.getAllCachedData(chatid);
+			if (cached !== undefined) return cached.userid;
 			else {
 				const userid = await db.users.findUnique({
 					where: { chatid: chatid },
-					select: { userid: true },
+					select: { userid: true }
 				});
+				if (userid === null) return 0;
 				this.dbcache.push({
 					userid: userid.userid,
-					chatid: chatid,
+					chatid: chatid
 				});
+				console.log(`DB cache updated! User ${userid.userid} added.`);
 				return userid.userid;
-			}
-		} catch (err) {
-			console.error(err);
-			return "";
-		}
-	}
-	async getAllCachedData(chatid?: number, userid?: string) {
-		try {
-			if (chatid != undefined) {
-				const data = this.dbcache.filter((o) => o.chatid == chatid);
-				if (data.length === 1) return data[0];
-				throw new Error("Multiple data for same user in cache");
-			}
-			if (userid != undefined) {
-				const data = this.dbcache.filter((o) => o.userid == userid);
-				if (data.length === 1) return data[0];
-				throw new Error("Multiple data for same user in cache");
 			}
 		} catch (err) {
 			console.error(err);
 			return undefined;
 		}
 	}
-	async getConfig(chatid?: number, userid?: string) {
+	async getAllCachedData(chatid?: number, userid?: number) {
 		try {
-			if (userid == undefined && chatid != 0)
-				userid = await this.getUserID(chatid);
-			if (userid === "") throw new Error("UserID not found.");
-
+			if (chatid != undefined && userid === undefined) {
+				const data = this.dbcache.find((o) => o.chatid == chatid);
+				if (data !== undefined) return data;
+				return undefined;
+				//else if (data.length > 1) throw new Error("Multiple data for same user in cache");
+			}
+			if (userid != undefined) {
+				const data = this.dbcache.find((o) => o.userid == userid);
+				if (data !== undefined) return data;
+				return undefined;
+				//else if (data.length > 1) throw new Error("Multiple data for same user in cache");
+			}
+		} catch (err) {
+			console.error(err);
+			return undefined;
+		}
+	}
+	async getConfig(chatid?: number, userid?: number) {
+		try {
+			if (userid === undefined && chatid != 0) userid = await this.getUserID(chatid);
+			if (userid === undefined) throw new Error("UserID not found.");
+			const index = this.dbcache.findIndex((o) => o.userid == userid);
+			if (this.dbcache[index].config !== undefined) return this.dbcache[index].config;
 			const data = await db.config.findUnique({
-				where: { userid: userid },
+				where: { userid: userid }
 			});
 
-			const index = this.dbcache.findIndex((o) => o.userid == userid);
-			if (index === -1)
-				throw new Error(`No userid found for ${userid}:${chatid}`);
+			if (index === -1) throw new Error(`No userid found for ${userid}:${chatid}`);
 			this.dbcache[index].config = {
-				pause_sync: data[0].pause_sync,
-				remind_again: data[0].remind_again,
+				pause_airing_updates: data.pause_airing_updates
 			};
 			return data;
 		} catch (err) {
@@ -123,20 +127,17 @@ export class cachedDB {
 	}
 }
 
-export const bot = new Bot<Context & ConversationFlavor>(
-	`${process.env.BOT_TOKEN}`,
-	{
-		botInfo: {
-			id: 6104968853,
-			is_bot: true,
-			first_name: "Cunnime_DEV",
-			username: "cunnime_dev_bot",
-			can_join_groups: false,
-			can_read_all_group_messages: false,
-			supports_inline_queries: false,
-		},
+export const bot = new Bot<Context & ConversationFlavor>(`${process.env.BOT_TOKEN}`, {
+	botInfo: {
+		id: 6104968853,
+		is_bot: true,
+		first_name: "Cunnime_DEV",
+		username: "cunnime_dev_bot",
+		can_join_groups: false,
+		can_read_all_group_messages: false,
+		supports_inline_queries: false
 	}
-);
+});
 
 export async function botinit() {
 	const throttler = apiThrottler();
@@ -172,24 +173,54 @@ export const authchatEval = (ctx: MyContext) => {
 	}
 	return true;
 };
-export const getUpdaterAnimeIndex = (name: string, userid: string) =>
-	updater.updateobj[userid].map((object) => object.anime).indexOf(name);
 
+export const getUpdaterAnimeIndex = async (name: string, userid: number) =>
+	(await updater.getUpdateObj(userid)).map((object) => object.jpname).indexOf(name);
+
+export function getPagination(current: number, maxpage: number, text: string) {
+	var keys: InlineKeyboardButton[] = [];
+	if (current > 1) keys.push({ text: `«1`, callback_data: `${text}_1` });
+	if (current > 2)
+		keys.push({
+			text: `‹${current - 1}`,
+			callback_data: `${text}_${(current - 1).toString()}`
+		});
+	keys.push({
+		text: `-${current}-`,
+		callback_data: `${text}_${current.toString()}`
+	});
+	if (current < maxpage - 1)
+		keys.push({
+			text: `${current + 1}›`,
+			callback_data: `${text}_${(current + 1).toString()}`
+		});
+	if (current < maxpage)
+		keys.push({
+			text: `${maxpage}»`,
+			callback_data: `${text}_${maxpage.toString()}`
+		});
+
+	return new InlineKeyboard().add(...keys);
+}
+
+/**
+ * Note to self: implement sessions and user not registered.
+ */
 function botcommands() {
-	bot.use(createConversation(animeadd));
-	bot.use(createConversation(delanimehelper));
 	bot.use(createConversation(unwatchhelper));
-
 	bot.command("start", (ctx) =>
 		ctx.reply("Sup boss?", { reply_markup: { remove_keyboard: true } })
 	);
 	bot.command("help", (ctx) => {
 		ctx.reply("Help me onii-chan I'm stuck~");
 	});
-	bot.command("sync", async (ctx) => await anime_sync(ctx));
-	bot.command("addanime", async (ctx) => await anime_add(ctx));
+	//bot.command("pending", async (ctx) => await anime_sync(ctx));
+	bot.command("pendingv2", (ctx) => animePendingMsgHandler(ctx));
+	bot.command("startwatching", (ctx) => animeSearchStart(ctx, "startwatching"));
+	bot.hears(/^\/startwatching_(\d+)/, (ctx) => animeStartWatch(ctx));
+	bot.hears(/^\/remindme_(\d+)/, (ctx) => remindMe(ctx));
 	bot.command("cancel", async (ctx) => await cancel_handle(ctx));
-	bot.command("removeanime", async (ctx) => await anime_remove(ctx));
+	//bot.command("removeanime", async ctx => await anime_remove(ctx));
 	bot.command("unwatch", async (ctx) => await anime_unwatch(ctx));
 	bot.command("dllist", async (ctx) => await anime_dllist(ctx));
 	bot.command("config", async (ctx) => await anime_config(ctx));
@@ -198,9 +229,10 @@ function botcommands() {
 	bot.callbackQuery(/download/, async (ctx) => await callback_dl(ctx));
 	bot.callbackQuery(/dlep_.*/, async (ctx) => await callback_dlep(ctx));
 	bot.callbackQuery(/mark_watch/, async (ctx) => await callback_mkwatch(ctx));
-	bot.callbackQuery(
-		/mkwtch_.*/,
-		async (ctx) => await callback_mkwatchep(ctx)
-	);
+	bot.callbackQuery(/mkwtch_.*/, async (ctx) => await callback_mkwatchep(ctx));
 	bot.callbackQuery(/back/, async (ctx) => await back_handle(ctx));
+	bot.callbackQuery(
+		/(startwatching|remindme)_(.+)/gi,
+		async (ctx) => await remindMe_startWatch_cb(ctx)
+	);
 }

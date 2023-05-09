@@ -8,55 +8,40 @@ datasource db {
 }
 
 model anime {
-  alid            Int               @id(map: "animenames_pkey")
-  enname          String            @db.VarChar(200)
-  jpname          String            @db.VarChar(200)
-  optnames        String[]
-  excludenames    String[]
-  airing          Boolean?
-  next_ep_num     Int?              @db.SmallInt
-  next_ep_air     Int?
-  remindedepanime remindedepanime[]
-  watchedepanime  watchedepanime[]
+  alid           Int              @id(map: "animenames_pkey")
+  enname         String           @db.VarChar(200)
+  jpname         String           @db.VarChar(200)
+  optnames       String[]
+  excludenames   String[]
+  status         String?          @db.VarChar(16)
+  next_ep_num    Decimal?         @db.Decimal
+  next_ep_air    Int?
+  last_ep        Int?             @db.SmallInt
+  ep_extras      Decimal[]        @db.Decimal
+  imglink        String?          @db.VarChar(255)
+  watchedepanime watchedepanime[]
 }
 
 model completedanime {
-  userid    String @id @db.Char(6)
+  userid    Int   @id
   completed Int[]
-  users     users  @relation(fields: [userid], references: [userid], onDelete: NoAction, onUpdate: NoAction, map: "userid")
+  users     users @relation(fields: [userid], references: [userid], onDelete: NoAction, onUpdate: NoAction, map: "userid")
 
   @@unique([userid, completed], map: "completedanime_user_anime_unique")
 }
 
 model config {
-  userid       String   @id @db.Char(6)
-  pause_sync   Boolean? @default(false)
-  remind_again Boolean? @default(true)
-  users        users    @relation(fields: [userid], references: [userid], onDelete: NoAction, onUpdate: NoAction, map: "userid")
-}
-
-model remindedepanime {
-  userid String @id @db.Char(6)
-  alid   Int?
-  ep     Int[]
-  anime  anime? @relation(fields: [alid], references: [alid], onDelete: NoAction, onUpdate: NoAction, map: "alid")
-  users  users  @relation(fields: [userid], references: [userid], onDelete: NoAction, onUpdate: NoAction, map: "userid")
-
-  @@unique([userid, alid], map: "remindedepanime_user_anime_unique")
-}
-
-model subscribedanime {
-  userid String @id @db.Char(6)
-  alid   Int[]
-  users  users  @relation(fields: [userid], references: [userid], onDelete: NoAction, onUpdate: NoAction, map: "userid")
+  userid               Int      @id
+  pause_airing_updates Boolean? @default(false)
+  users                users    @relation(fields: [userid], references: [userid], onDelete: NoAction, onUpdate: NoAction, map: "userid")
 }
 
 model syncupd {
-  userid      String   @id @db.Char(6)
-  queuenum    Int?     @default(autoincrement()) @db.SmallInt
+  userid      Int      @id
+  queuenum    Int      @default(autoincrement()) @db.SmallInt
   synctype    String?  @db.VarChar(20)
   anime       String?  @db.VarChar(255)
-  epnum       Int?
+  epnum       Decimal? @db.Decimal
   dltype      String?  @db.VarChar(10)
   xdccdata    String[]
   torrentdata String?  @db.VarChar(255)
@@ -64,33 +49,45 @@ model syncupd {
 }
 
 model users {
-  userid          String           @id @db.Char(6)
-  chatid          Int?             @unique(map: "unique_chatid")
-  username        String?          @db.VarChar(255)
-  completedanime  completedanime?
-  config          config?
-  remindedepanime remindedepanime?
-  subscribedanime subscribedanime?
-  syncupd         syncupd?
-  watchedepanime  watchedepanime[]
-  watchlists      watchlists[]
+  userid         Int              @id @default(autoincrement()) @db.SmallInt
+  chatid         Int?             @unique(map: "unique_chatid")
+  username       String?          @db.VarChar(255)
+  airingupdates  airingupdates?
+  completedanime completedanime?
+  config         config?
+  syncupd        syncupd?
+  watchedepanime watchedepanime[]
+  watchinganime  watchinganime?
+  watchlists     watchlists[]
 }
 
 model watchedepanime {
-  userid String @db.Char(6)
+  userid Int
   alid   Int
-  ep     Int[]
-  anime  anime  @relation(fields: [alid], references: [alid], onDelete: NoAction, onUpdate: NoAction, map: "alid")
-  users  users  @relation(fields: [userid], references: [userid], onDelete: NoAction, onUpdate: NoAction, map: "userid")
+  ep     Decimal[] @db.Decimal
+  anime  anime     @relation(fields: [alid], references: [alid], onDelete: NoAction, onUpdate: NoAction, map: "alid")
+  users  users     @relation(fields: [userid], references: [userid], onDelete: NoAction, onUpdate: NoAction, map: "userid")
 
   @@unique([userid, alid], map: "watchedepanime_user_anime_unique")
 }
 
 model watchlists {
-  watchlistid    String    @id @db.Char(6)
+  watchlistid    Int       @id @default(autoincrement()) @db.SmallInt
   watchlist_name String?   @db.VarChar(255)
   animeid        Int[]
   status         Boolean[]
-  generated_by   String?   @db.VarChar(255)
-  users          users?    @relation(fields: [generated_by], references: [userid], onDelete: NoAction, onUpdate: NoAction, map: "generated_by")
+  generated_by   Int
+  users          users     @relation(fields: [generated_by], references: [userid], onDelete: NoAction, onUpdate: NoAction, map: "generated_by")
+}
+
+model airingupdates {
+  userid Int   @id
+  alid   Int[]
+  users  users @relation(fields: [userid], references: [userid], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model watchinganime {
+  userid Int   @id
+  alid   Int[]
+  users  users @relation(fields: [userid], references: [userid], onDelete: NoAction, onUpdate: NoAction, map: "userid")
 }
