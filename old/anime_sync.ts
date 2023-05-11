@@ -16,6 +16,7 @@ export async function syncresponser(
 	// if (ctx === undefined) chatid = authchat;
 	// else chatid = ctx.message.chat.id;
 	const userid = await dbcache.getUserID(chatid);
+	if (userid === undefined) return;
 	let msgid = (
 		await bot.api.sendMessage(chatid, "Syncing anime...", {
 			reply_markup: { remove_keyboard: true }

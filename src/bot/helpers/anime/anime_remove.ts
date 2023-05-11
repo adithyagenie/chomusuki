@@ -1,8 +1,9 @@
 // Removing anime
 
-import { dbcache } from "../../..";
+import { InlineKeyboard } from "grammy";
 import { getWatching } from "../../../database/animeDB";
-import { MyContext, getPagination, bot } from "../../bot";
+import { MyContext, MyConversation, bot, getPagination } from "../../bot";
+import { db } from "../../..";
 
 // export async function anime_remove(ctx: MyContext) {
 // 	if (authchatEval(ctx)) await ctx.conversation.enter("delanimehelper");
@@ -59,37 +60,104 @@ import { MyContext, getPagination, bot } from "../../bot";
 // 	}
 // }
 
+export async function stopWatching(conversation: MyConversation, ctx: MyContext) {
+	const match = parseInt(ctx.match[1]);
+	if (Number.isNaN(match[1])) {
+		await ctx.reply("Invalid command.");
+		return;
+	}
+	const msgid = (
+		await ctx.reply(`You will lose all the progress in the anime. Proceed?`, {
+			reply_markup: new InlineKeyboard().text("Yes.", "y").text("Hell no.", "n")
+		})
+	).message_id;
+	const cbq = await conversation.waitForCallbackQuery(/y|n/);
+	cbq.answerCallbackQuery("Processing...");
+	if (cbq.callbackQuery.data == "y") {
+		await conversation.external(async () => {
+			const _ = (
+				await db.watchinganime.findUnique({
+					where: { userid: conversation.session.userid },
+					select: { alid: true }
+				})
+			).alid;
+			_.splice(
+				_.findIndex((o) => o == match),
+				1
+			);
+			await db.watchinganime.update({
+				where: { userid: conversation.session.userid },
+				data: { alid: _, userid: undefined }
+			});
+			await db.watchedepanime.delete({
+				where: {
+					userid_alid: {
+						userid: conversation.session.userid,
+						alid: match
+					}
+				}
+			});
+		});
+		await ctx.api.deleteMessage(ctx.from.id, msgid);
+		await ctx.reply(
+			`${
+				(
+					await db.anime.findUnique({
+						where: { alid: match },
+						select: { jpname: true }
+					})
+				).jpname
+			} has been removed from your watching list.`
+		);
+		return;
+	} else if (cbq.callbackQuery.data == "n") {
+		await ctx.api.deleteMessage(ctx.from.id, msgid);
+		await ctx.reply(`Alright cancelling deletion.`);
+	}
+}
+
 /**
  ** Sends the first page of the list of anime the user is currently watching.
  ** Called by /watching.
  */
 export async function watchingList(ctx: MyContext) {
-	const { msg, keyboard } = await watchingListHelper(ctx.chat.id, 0);
-	await ctx.reply(msg, { reply_markup: keyboard });
+	const userid = ctx.session.userid;
+	const { msg, keyboard } = await watchingListHelper(userid, 1);
+	if (keyboard == undefined) await ctx.reply(msg, { parse_mode: "HTML" });
+	else await ctx.reply(msg, { reply_markup: keyboard, parse_mode: "HTML" });
 }
 
 /**
  ** Returns message and keyboard for pages of watching list.
  ** Internally called.*/
-export async function watchingListHelper(chatid: number, offset: number) {
-	const userid = await dbcache.getUserID(chatid);
+export async function watchingListHelper(userid: number, offset: number) {
 	const { alidlist, animelist, amount } = await getWatching(userid, 5, offset);
-	var msg = `<b>Displaying subscriptions of ${userid}: </b>\n\n`;
+	var msg = "";
+	if (amount == 0) {
+		msg = `<b> You are currently not watching any anime. Add some with /startwatching to get started.</b>`;
+		return { msg: msg, keyboard: undefined };
+	} else msg = `<b>Displaying your currently watching list: </b>\n\n`;
 	for (let i = 0; i < alidlist.length; i++) {
-		msg += `${i + 1}. ${animelist[i]}\n<i>Unsubscribe: /unsubscribe_${alidlist[i]}\n\n`;
+		msg += `${i + 1}. ${animelist[i]}\n<i>Remove from watching list: /stopwatching_${
+			alidlist[i]
+		}</i>\n\n`;
 	}
-	const keyboard = getPagination(offset + 1, amount, "subs");
+	const keyboard = getPagination(offset, amount, "watch");
 	return { msg, keyboard };
 }
 
 /**The callback from pages of watching. */
-bot.callbackQuery(/subs_(.+)/, async (ctx) => {
+export async function watchingListCBQ(ctx: MyContext) {
 	const movepg = parseInt(ctx.match[1]);
 	await ctx.answerCallbackQuery("Searching!");
 	const { msg, keyboard } = await watchingListHelper(ctx.chat.id, movepg);
 	try {
-		await ctx.editMessageText(msg, { reply_markup: keyboard });
+		if (
+			ctx.callbackQuery.message.text != msg &&
+			ctx.callbackQuery.message.reply_markup == keyboard
+		)
+			await ctx.editMessageText(msg, { reply_markup: keyboard, parse_mode: "HTML" });
 	} catch (e) {
 		console.log(e);
 	}
-});
+}

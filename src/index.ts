@@ -11,7 +11,7 @@ if (
 	console.log("ENV VARIABLE NOT SET!");
 	process.exit();
 }
-import { UpdateHold, botinit, cachedDB } from "./bot/bot";
+import { botinit } from "./bot/bot";
 import { startserver } from "./api/server";
 import { createWriteStream } from "fs-extra";
 import { format } from "util";
@@ -44,8 +44,6 @@ console.error = function (d: any) {
 export const app = startserver();
 export const authchat = parseInt(process.env.AUTHORISED_CHAT);
 export const db = new PrismaClient();
-export const updater = new UpdateHold();
-export const dbcache = new cachedDB();
 
 async function spinup() {
 	//await updater.updater()

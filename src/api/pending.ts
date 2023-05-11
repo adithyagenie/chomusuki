@@ -4,13 +4,14 @@ import { db } from "..";
 import { i_ProcessedObjV2 } from "../interfaces";
 import { Decimal } from "@prisma/client/runtime";
 
+/** Returns all yet to watch episodes of user. */
 export async function getPending(userid: number) {
 	const t = new Date().getTime();
 	let alidlist = await db.watchinganime.findUnique({
 		where: { userid },
 		select: { alid: true }
 	});
-	if (alidlist === undefined) return undefined;
+	if (alidlist === null) return undefined;
 	const animelist = db.anime.findMany({
 		where: { alid: { in: alidlist.alid } }
 	});
@@ -28,6 +29,10 @@ export async function getPending(userid: number) {
 	return res;
 }
 
+/**
+ ** Internal function.
+ ** Returns the 'res' obj for each watching anime.
+ */
 async function getPendingInAnime(watchedep: Decimal[], animeentry: anime) {
 	var resobj: i_ProcessedObjV2;
 	var shortname: string | undefined;

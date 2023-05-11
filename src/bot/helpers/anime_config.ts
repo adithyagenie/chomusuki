@@ -1,15 +1,30 @@
 import { config } from "@prisma/client";
-import { dbcache } from "../..";
+import { db } from "../..";
 import { changeConfig } from "../../database/animeDB";
-import { MyContext, authchatEval } from "../bot";
+import { MyContext } from "../bot";
+
+async function getConfig(ctx: MyContext) {
+	try {
+		if (ctx.session.config !== undefined) return ctx.session.config;
+		const data = await db.config.findUnique({
+			where: { userid: ctx.session.userid },
+			select: { pause_airing_updates: true }
+		});
+		ctx.session.config = data;
+		return data;
+	} catch (err) {
+		console.error(err);
+		return undefined;
+	}
+}
 
 export async function anime_config(ctx: MyContext) {
-	if (!authchatEval) return;
 	let argarray = ctx.message.text.split(" ");
 	argarray.splice(0, 1);
 	console.log(argarray);
-	const oldconfig = await dbcache.getConfig(ctx.chat.id);
-	const userid = await dbcache.getUserID(ctx.chat.id);
+	const userid = ctx.session.userid;
+	const oldconfig = await getConfig(ctx);
+
 	var newconfig: config = {
 		userid: userid,
 		pause_airing_updates: oldconfig.pause_airing_updates

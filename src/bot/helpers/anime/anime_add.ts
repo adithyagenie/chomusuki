@@ -1,13 +1,11 @@
 // Adding anime to subscriptions
 
 import { Prisma, anime } from "@prisma/client";
-import { db, dbcache } from "../../..";
+import { db } from "../../..";
 import { getAnimeDetails, imageGet, searchAnime } from "../../../api/anilist_api";
 import { addAiringFollow, addAnimeNames, addWatching, getDecimal } from "../../../database/animeDB";
 
-import { MyContext, bot, getPagination } from "../../bot";
-
-import { MediaFilterTypes } from "anilist-node";
+import { MyContext, getPagination } from "../../bot";
 import aniep from "aniep";
 
 // export async function anime_add(ctx: MyContext) {
@@ -130,7 +128,8 @@ export async function animeStartWatch(ctx: MyContext) {
 		await ctx.reply("Invalid.");
 		return;
 	}
-	const userid = await dbcache.getUserID(ctx.chat.id);
+	const userid = ctx.session.userid;
+
 	const old = (
 		await db.watchinganime.findUnique({
 			where: { userid }
@@ -171,7 +170,8 @@ export async function animeStartWatch(ctx: MyContext) {
  ** Live updates for airing shit.
  ** Responds to "/remindme_alid". */
 export async function remindMe(ctx: MyContext) {
-	const userid = await dbcache.getUserID(ctx.chat.id);
+	const userid = ctx.session.userid;
+
 	const alid = parseInt(ctx.match[1]);
 	if (alid == undefined) {
 		await ctx.reply("Invalid.");
@@ -209,20 +209,20 @@ export async function remindMe(ctx: MyContext) {
  ** For subsequent pages, animeSearchHandler is called (mostly with callbackQueries).
  ** Call this in bot.command() with appropriate arguments. */
 export async function animeSearchStart(ctx: MyContext, command: string) {
-	const msgid = (await ctx.reply("Searching...")).message_id;
 	const query = ctx.match as string;
 	if (query === "" || query === undefined) {
 		await ctx.reply("Please provide a search query!");
 		return;
 	}
+	const msgid = (await ctx.reply("Searching...")).message_id;
 	const { msg, keyboard } = await animeSearchHandler(
 		query,
 		command,
 		1,
-		await dbcache.getUserID(ctx.chat.id)
+		command == "startwatching" ? ctx.session.userid : undefined
 	);
 	if (msg == undefined || keyboard == undefined) {
-		await ctx.reply("Unable to find any results.");
+		await ctx.api.editMessageText(ctx.from.id, msgid, "Unable to find any results.");
 		return;
 	}
 	await ctx.api.editMessageText(ctx.chat.id, msgid, msg, {
@@ -266,7 +266,7 @@ export async function animeSearchHandler(
 			if (old.alid.includes(pages.media[i].id))
 				msg += `<i>Anime already marked as watching!</i>\n\n`;
 			else msg += `<i>Start Watching:</i> /startwatching_${pages.media[i].id}\n\n`;
-		}
+		} else msg += "\n";
 	}
 	return { msg, keyboard };
 }
@@ -281,12 +281,7 @@ export async function remindMe_startWatch_cb(ctx: MyContext) {
 		...ctx.callbackQuery.message.text.split("\n")[0].matchAll(/^Search results for '(.+)'$/gi)
 	].map((o) => o[1])[0];
 	//console.log(`${command}, ${movepg}, ${query}`);
-	const { msg, keyboard } = await animeSearchHandler(
-		query,
-		command,
-		movepg,
-		await dbcache.getUserID(ctx.callbackQuery.message.chat.id)
-	);
+	const { msg, keyboard } = await animeSearchHandler(query, command, movepg, ctx.session.userid);
 	if (msg == undefined || keyboard == undefined) {
 		await ctx.reply("Unable to find any results.");
 		return;

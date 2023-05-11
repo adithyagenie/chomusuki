@@ -25,7 +25,7 @@ model anime {
 model completedanime {
   userid    Int   @id
   completed Int[]
-  users     users @relation(fields: [userid], references: [userid], onDelete: NoAction, onUpdate: NoAction, map: "userid")
+  users     users @relation(fields: [userid], references: [userid], onDelete: Cascade, onUpdate: Cascade, map: "userid")
 
   @@unique([userid, completed], map: "completedanime_user_anime_unique")
 }
@@ -33,7 +33,7 @@ model completedanime {
 model config {
   userid               Int      @id
   pause_airing_updates Boolean? @default(false)
-  users                users    @relation(fields: [userid], references: [userid], onDelete: NoAction, onUpdate: NoAction, map: "userid")
+  users                users    @relation(fields: [userid], references: [userid], onDelete: Cascade, onUpdate: Cascade, map: "userid")
 }
 
 model syncupd {
@@ -45,7 +45,7 @@ model syncupd {
   dltype      String?  @db.VarChar(10)
   xdccdata    String[]
   torrentdata String?  @db.VarChar(255)
-  users       users    @relation(fields: [userid], references: [userid], onDelete: NoAction, onUpdate: NoAction)
+  users       users    @relation(fields: [userid], references: [userid], onDelete: Cascade, onUpdate: Cascade)
 }
 
 model users {
@@ -59,14 +59,16 @@ model users {
   watchedepanime watchedepanime[]
   watchinganime  watchinganime?
   watchlists     watchlists[]
+  
+  @@unique([userid, chatid], map: "userid_chatid_unique")
 }
 
 model watchedepanime {
   userid Int
   alid   Int
   ep     Decimal[] @db.Decimal
-  anime  anime     @relation(fields: [alid], references: [alid], onDelete: NoAction, onUpdate: NoAction, map: "alid")
-  users  users     @relation(fields: [userid], references: [userid], onDelete: NoAction, onUpdate: NoAction, map: "userid")
+  anime  anime     @relation(fields: [alid], references: [alid], onDelete: Cascade, onUpdate: Cascade, map: "alid")
+  users  users     @relation(fields: [userid], references: [userid], onDelete: Cascade, onUpdate: Cascade, map: "userid")
 
   @@unique([userid, alid], map: "watchedepanime_user_anime_unique")
 }
@@ -77,17 +79,17 @@ model watchlists {
   animeid        Int[]
   status         Boolean[]
   generated_by   Int
-  users          users     @relation(fields: [generated_by], references: [userid], onDelete: NoAction, onUpdate: NoAction, map: "generated_by")
+  users          users     @relation(fields: [generated_by], references: [userid], onDelete: Cascade, onUpdate: Cascade, map: "generated_by")
 }
 
 model airingupdates {
   userid Int   @id
   alid   Int[]
-  users  users @relation(fields: [userid], references: [userid], onDelete: NoAction, onUpdate: NoAction)
+  users  users @relation(fields: [userid], references: [userid], onDelete: Cascade, onUpdate: Cascade)
 }
 
 model watchinganime {
   userid Int   @id
   alid   Int[]
-  users  users @relation(fields: [userid], references: [userid], onDelete: NoAction, onUpdate: NoAction, map: "userid")
+  users  users @relation(fields: [userid], references: [userid], onDelete: Cascade, onUpdate: Cascade, map: "userid")
 }

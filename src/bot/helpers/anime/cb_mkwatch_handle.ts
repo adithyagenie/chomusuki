@@ -1,19 +1,26 @@
 import { Prisma } from "@prisma/client";
-import { db, dbcache, updater } from "../../..";
+import { db } from "../../..";
 import { getDecimal, markWatchedunWatched } from "../../../database/animeDB";
-import { MyContext, bot, getUpdaterAnimeIndex } from "../../bot";
-import { messageToHTMLMessage } from "../caption_entity_handler";
+import { MyContext, getUpdaterAnimeIndex } from "../../bot";
 import { makeEpKeyboard } from "./EpKeyboard";
+import { getPending } from "../../../api/pending";
 
 export async function callback_mkwatch(ctx: MyContext) {
-	const userid = await dbcache.getUserID(ctx.callbackQuery.message.chat.id);
-	const keyboard = await makeEpKeyboard(ctx.callbackQuery.message.caption, "mkwtch", userid);
-	ctx.editMessageReplyMarkup({ reply_markup: keyboard });
 	ctx.answerCallbackQuery();
+	const userid = ctx.session.userid;
+	const updateobj = await getPending(userid);
+	const keyboard = await makeEpKeyboard(
+		ctx.callbackQuery.message.caption,
+		"mkwtch",
+		userid,
+		updateobj
+	);
+	ctx.editMessageReplyMarkup({ reply_markup: keyboard });
 }
 
 export async function callback_mkwatchep(ctx: MyContext) {
-	const userid = await dbcache.getUserID(ctx.callbackQuery.message.chat.id);
+	const userid = ctx.session.userid;
+	const updateobj = await getPending(userid);
 	const epnum = parseInt(ctx.callbackQuery.data.split("_")[1]);
 	let oldmsg = ctx.callbackQuery.message.caption;
 	let animename = oldmsg.split("Anime: ")[1].split("\n")[0].trim();
@@ -42,8 +49,7 @@ export async function callback_mkwatchep(ctx: MyContext) {
 	const res = await markWatchedunWatched({ userid, alid, ep });
 
 	// let oldwatch: { epnum: number; epname: string }[] = [];
-	let indexnum = await getUpdaterAnimeIndex(animename, userid);
-	(await updater.getUpdateObj(userid))[indexnum];
+	let indexnum = await getUpdaterAnimeIndex(animename, updateobj);
 	// let toupdateanime: { epnum: number; epname: string };
 	// for (let j = 0; j < updateobj[indexnum].watched.length; j++)
 	// 	oldwatch.push(updateobj[indexnum].watched[j]);

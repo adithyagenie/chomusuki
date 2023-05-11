@@ -1,11 +1,11 @@
 import { InlineKeyboard } from "grammy";
-import { axios, dbcache } from "../../..";
+import { axios } from "../../..";
 import { getPending } from "../../../api/pending";
 import { MyContext, bot } from "../../bot";
 import { Application } from "express";
 
 export async function animePendingMsgHandler(ctx: MyContext) {
-	const userid = await dbcache.getUserID(ctx.chat.id);
+	const userid = ctx.session.userid;
 	try {
 		const res = await axios.get("http://localhost:4000/pending", {
 			params: { chatid: ctx.chat.id, userid: userid },
@@ -24,7 +24,7 @@ export async function animePendingMsgHandler(ctx: MyContext) {
 export async function animePending(chatid: number, userid: number) {
 	const res = await getPending(userid);
 	var msgs: { imagelink: string; msg: string }[] = [];
-	if (res.length == 0) {
+	if (res === undefined || res.length == 0) {
 		await bot.api.sendMessage(
 			chatid,
 			"You are currently not watching any anime. Add an anime with /startwatching to get started."
@@ -115,8 +115,8 @@ export function registerPendingHandler(app: Application) {
 			if (Number.isNaN(chatid) || Number.isNaN(userid))
 				throw new Error("Incorrect URL params");
 			console.log(`${chatid}:${userid} pendingv2`);
-			res.status(200).json({ status: 200 });
 			await animePending(chatid, userid);
+			res.status(200).json({ status: 200 });
 		} catch (error) {
 			console.error(`ERROR: /pending: ${error}`);
 			return res.status(400).json({ status: 400 });

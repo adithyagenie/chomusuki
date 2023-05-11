@@ -1,18 +1,19 @@
 import { InlineKeyboardButton } from "@grammyjs/types";
 import { InlineKeyboard } from "grammy";
-import { updater } from "../../..";
 import { getUpdaterAnimeIndex } from "../../bot";
+import { getPending } from "../../../api/pending";
+import { i_ProcessedObjV2 } from "../../../interfaces";
 
 // Makes keyboard for download and mark watched
 export async function makeEpKeyboard(
 	caption: string,
 	callback_data_string: string,
-	userid: number
+	userid: number,
+	updateobj: i_ProcessedObjV2[]
 ) {
-	let updateobj = await updater.getUpdateObj(userid);
 	caption = caption.split("Anime: ")[1].split("\n")[0].trim();
 	let eplist = [];
-	const animeindex = await getUpdaterAnimeIndex(caption, userid);
+	const animeindex = await getUpdaterAnimeIndex(caption, updateobj);
 	console.log(updateobj);
 	updateobj[animeindex].notwatched.forEach((o) => eplist.push(o));
 

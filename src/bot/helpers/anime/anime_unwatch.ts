@@ -1,18 +1,18 @@
 // Unwatch anime command
 
 import { Keyboard } from "grammy";
-import { dbcache, updater } from "../../..";
 import { getDecimal, markWatchedunWatched } from "../../../database/animeDB";
-import { MyContext, MyConversation, authchatEval, getUpdaterAnimeIndex } from "../../bot";
+import { MyContext, MyConversation, getUpdaterAnimeIndex } from "../../bot";
 import { Prisma, watchedepanime } from "@prisma/client";
+import { getPending } from "../../../api/pending";
 
 export async function anime_unwatch(ctx: MyContext) {
-	if (authchatEval(ctx)) await ctx.conversation.enter("unwatchhelper");
+	await ctx.conversation.enter("unwatchhelper");
 }
 
 export async function unwatchhelper(conversation: MyConversation, ctx: MyContext) {
-	const userid = await dbcache.getUserID(ctx.chat.id);
-	let updateobj = await updater.getUpdateObj(userid);
+	const userid = ctx.session.userid;
+	let updateobj = await getPending(userid);
 	let keyboard = new Keyboard().resized().persistent().oneTime();
 	let animelist = [];
 	for (let i = 0; i < updateobj.length; i++) {
@@ -25,7 +25,7 @@ export async function unwatchhelper(conversation: MyConversation, ctx: MyContext
 	const animename = (await conversation.waitForHears(/Anime: (.+)/)).message.text.slice(7).trim();
 	const alid = updateobj.find((o) => o.jpname == animename).alid;
 	let eplist: number[] = [];
-	let animeindex = await getUpdaterAnimeIndex(animename, userid);
+	let animeindex = await getUpdaterAnimeIndex(animename, updateobj);
 	for (let j = 0; j < updateobj[animeindex].watched.length; j++)
 		eplist.push(updateobj[animeindex].watched[j]);
 
@@ -56,7 +56,6 @@ export async function unwatchhelper(conversation: MyConversation, ctx: MyContext
 			await ctx.reply(`Marked Ep ${tounwatch} of ${animename} as not watched`, {
 				reply_markup: { remove_keyboard: true }
 			});
-			(await updater.getUpdateObj(userid))[animeindex].watched = watchedAnime;
 		} else {
 			await ctx.reply(`Error occured while marking episode as unwatched`, {
 				reply_markup: { remove_keyboard: true }

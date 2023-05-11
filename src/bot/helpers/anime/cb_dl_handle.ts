@@ -1,27 +1,34 @@
 import aniep from "aniep";
-import { axios, db, dbcache, updater } from "../../..";
+import { axios, db } from "../../..";
 import { getxdcc } from "../../../api/subsplease-xdcc";
 import { getNumber, newDL } from "../../../database/animeDB";
 import { i_DlSync, i_NyaaResponse } from "../../../interfaces";
 import { MyContext, getUpdaterAnimeIndex } from "../../bot";
 import { makeEpKeyboard } from "./EpKeyboard";
+import { getPending } from "../../../api/pending";
 
 // Handles download Callback query
 export async function callback_dl(ctx: MyContext) {
-	const userid = await dbcache.getUserID(ctx.callbackQuery.message.chat.id);
-	const keyboard = await makeEpKeyboard(ctx.callbackQuery.message.caption, "dlep", userid);
-	ctx.editMessageReplyMarkup({ reply_markup: keyboard });
 	ctx.answerCallbackQuery();
+	const userid = ctx.session.userid;
+	const updateobj = await getPending(userid);
+	const keyboard = await makeEpKeyboard(
+		ctx.callbackQuery.message.caption,
+		"dlep",
+		userid,
+		updateobj
+	);
+	ctx.editMessageReplyMarkup({ reply_markup: keyboard });
 }
 
 // also a download callback handle
 export async function callback_dlep(ctx: MyContext) {
 	ctx.answerCallbackQuery("Download request recieved.");
-	const userid = await dbcache.getUserID(ctx.callbackQuery.message.chat.id);
+	const userid = ctx.session.userid;
 	let epnum = parseInt(ctx.callbackQuery.data.split("_")[1]);
-	let updateobj = await updater.getUpdateObj(userid);
+	let updateobj = await getPending(userid);
 	let animename = ctx.callbackQuery.message.caption.split("Anime: ")[1].split("\n")[0].trim();
-	const i = await getUpdaterAnimeIndex(animename, userid);
+	const i = await getUpdaterAnimeIndex(animename, updateobj);
 	const j = updateobj[i].notwatched.indexOf(epnum);
 
 	let pendingdl: i_DlSync[] = (

@@ -42,6 +42,9 @@ export async function addWatching(userid: number, alid: number) {
 			where: { userid: userid },
 			data: { alid: { push: alid } }
 		});
+		await db.watchedepanime.create({
+			data: { userid: userid, alid: alid, ep: [] }
+		});
 		console.log(`POSTGRES: Add subscription - Documents updated: ${add.userid}: ${alid}`);
 	} catch (err) {
 		console.error(`POSTGRES: addWatching - ${err}`);
@@ -58,23 +61,23 @@ export async function GetWatchedList(userid: number, alidlist: number[]) {
 
 export async function getWatching(userid: number, count?: number, offset?: number) {
 	try {
-		let alidlist = (
-			await db.watchinganime.findUnique({
-				where: { userid },
-				select: { alid: true }
-			})
-		).alid;
-		const amount = alidlist.length;
+		let alidlist = await db.watchinganime.findUnique({
+			where: { userid: userid },
+			select: { alid: true }
+		});
+		if (alidlist === null) return { alidlist: [], animelist: [], amount: 0 };
+		const amount = alidlist.alid.length;
 		if (count !== undefined && offset !== undefined)
-			alidlist = alidlist.slice(offset, count + offset);
+			alidlist.alid = alidlist.alid.slice(offset - 1, count + offset - 1);
 		const animelist = (
 			await db.anime.findMany({
-				where: { alid: { in: alidlist } },
+				where: { alid: { in: alidlist.alid } },
 				select: { jpname: true }
 			})
 		).map((o) => o.jpname);
-		if (alidlist.length !== animelist.length) throw new Error("Unequal fetch for anime: alid");
-		return { alidlist, animelist, amount };
+		if (alidlist.alid.length !== animelist.length)
+			throw new Error("Unequal fetch for anime: alid");
+		return { alidlist: alidlist.alid, animelist, amount };
 	} catch (err) {
 		console.error(`POSTGRES: getWatching - ${err}`);
 		return undefined;
@@ -117,16 +120,6 @@ export async function newDL(obj: types.i_DlSync) {
 		return 0;
 	} catch (err) {
 		console.error(`POSTGRES: DlSync - ${err}`);
-	}
-}
-
-export async function getConfig(userid: number) {
-	try {
-		const res = await db.config.findUnique({ where: { userid: userid } });
-		if (res.userid !== undefined) return res;
-		throw new Error(`Cannot fetch config for user ${userid}`);
-	} catch (err) {
-		console.error(`POSTGRES: getConfig - ${err}`);
 	}
 }
 

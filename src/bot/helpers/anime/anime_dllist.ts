@@ -1,6 +1,5 @@
-import { Prisma } from "@prisma/client";
-import { db, dbcache } from "../../..";
-import { MyContext, authchatEval, bot } from "../../bot";
+import { db } from "../../..";
+import { MyContext, bot } from "../../bot";
 import { getNumber } from "../../../database/animeDB";
 
 /**
@@ -9,8 +8,8 @@ import { getNumber } from "../../../database/animeDB";
  */
 export async function anime_dllist(ctx: MyContext) {
 	{
-		if (!authchatEval(ctx)) return;
-		const userid = await dbcache.getUserID(ctx.chat.id);
+		const userid = ctx.session.userid;
+
 		await ctx.replyWithChatAction("typing");
 		const pendingdl = (
 			await db.syncupd.findMany({
