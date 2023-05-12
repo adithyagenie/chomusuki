@@ -2,7 +2,8 @@
 
 import { db } from "../../..";
 import { searchAnime } from "../../../api/anilist_api";
-import { MyContext, getPagination } from "../../bot";
+import { MyContext } from "../../bot";
+import { getPagination } from "./a_misc_helpers";
 
 // export async function anime_add(ctx: MyContext) {
 // 	if (ctx.chat.id != authchat) {

@@ -1,8 +1,7 @@
 // Removing anime
 
 import { InlineKeyboard } from "grammy";
-import { getWatching } from "../../../database/animeDB";
-import { MyContext, MyConversation, bot, getPagination } from "../../bot";
+import { MyContext, MyConversation } from "../../bot";
 import { db } from "../../..";
 
 // export async function anime_remove(ctx: MyContext) {

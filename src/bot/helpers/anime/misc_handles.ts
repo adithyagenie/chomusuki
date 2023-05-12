@@ -1,6 +1,7 @@
 import { InlineKeyboard, InputFile } from "grammy";
-import { MyContext, authchatEval } from "../../bot";
+import { MyContext } from "../../bot";
 import { createReadStream } from "fs-extra";
+import { authchatEval } from "./a_misc_helpers";
 
 // going back in a menu
 export async function back_handle(ctx: MyContext) {

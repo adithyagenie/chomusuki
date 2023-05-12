@@ -1,5 +1,6 @@
 import { getWatching } from "../../../database/animeDB";
-import { MyContext, getPagination } from "../../bot";
+import { MyContext } from "../../bot";
+import { getPagination } from "./a_misc_helpers";
 
 /**
  ** Sends the first page of the list of anime the user is currently watching.
