@@ -1,28 +1,79 @@
-import aniep from "aniep";
 import { axios, db } from "../../..";
-import { getxdcc } from "../../../api/subsplease-xdcc";
+import { MyContext, bot } from "../../bot";
 import { getNumber, newDL } from "../../../database/animeDB";
-import { i_DlSync, i_NyaaResponse } from "../../../interfaces";
-import { MyContext, getUpdaterAnimeIndex } from "../../bot";
-import { makeEpKeyboard } from "./EpKeyboard";
+import aniep from "aniep";
 import { getPending } from "../../../api/pending";
+import { getxdcc } from "../../../api/subsplease-xdcc";
+import { i_DlSync, i_NyaaResponse } from "../../../interfaces";
+import { getUpdaterAnimeIndex, makeEpKeyboard } from "./a_misc_helpers";
+
+/**
+ ** Gives all the downloads queued for the user.
+ ** Responds to /dllist.
+ */
+export async function anime_dllist(ctx: MyContext) {
+	{
+		const userid = ctx.session.userid;
+
+		await ctx.replyWithChatAction("typing");
+		const pendingdl = (
+			await db.syncupd.findMany({
+				where: { userid },
+				select: { anime: true, epnum: true }
+			})
+		).map((o) => {
+			return { anime: o.anime, epnum: getNumber(o.epnum) as number };
+		});
+		if (pendingdl.length == 0) {
+			ctx.reply("No pending downloads!");
+		} else {
+			const resser: { anime: string; epnum: number[] }[] = [];
+			for (let i = 0; i < pendingdl.length; i++) {
+				let index = resser.findIndex((o) => o.anime == pendingdl[i].anime);
+				if (index == -1)
+					resser.push({
+						anime: pendingdl[i].anime,
+						epnum: [pendingdl[i].epnum]
+					});
+				else {
+					resser[index].epnum.push(pendingdl[i].epnum);
+					resser[index].epnum.sort();
+				}
+			}
+
+			var msg: string = "<code>DOWNLOAD QUEUE:</code>\n\n";
+			var msglist: string[] = [];
+			for (let i = 0; i < resser.length; i++) {
+				let tmpmsg = `<b>${resser[i].anime}</b> - Episode ${resser[i].epnum.join(", ")}\n`;
+				if (msg.length + tmpmsg.length > 1024) {
+					msglist.push(msg);
+					msg = tmpmsg;
+				} else msg += tmpmsg;
+			}
+			if (msglist.length > 0) {
+				for (let i = 0; i < msglist.length; i++)
+					bot.api.sendMessage(ctx.message.chat.id, msglist[i], {
+						parse_mode: "HTML"
+					});
+			} else
+				bot.api.sendMessage(ctx.message.chat.id, msg, {
+					parse_mode: "HTML"
+				});
+		}
+	}
+}
 
 // Handles download Callback query
-export async function callback_dl(ctx: MyContext) {
+export async function dl_cbq(ctx: MyContext) {
 	ctx.answerCallbackQuery();
 	const userid = ctx.session.userid;
 	const updateobj = await getPending(userid);
-	const keyboard = await makeEpKeyboard(
-		ctx.callbackQuery.message.caption,
-		"dlep",
-		userid,
-		updateobj
-	);
+	const keyboard = await makeEpKeyboard(ctx.callbackQuery.message.caption, "dlep", updateobj);
 	ctx.editMessageReplyMarkup({ reply_markup: keyboard });
 }
 
 // also a download callback handle
-export async function callback_dlep(ctx: MyContext) {
+export async function dlep_cbq(ctx: MyContext) {
 	ctx.answerCallbackQuery("Download request recieved.");
 	const userid = ctx.session.userid;
 	let epnum = parseInt(ctx.callbackQuery.data.split("_")[1]);

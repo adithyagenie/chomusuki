@@ -7,26 +7,24 @@ import {
 	type ConversationFlavor
 } from "@grammyjs/conversations";
 import { apiThrottler } from "@grammyjs/transformer-throttler";
-import { Bot, Context, InlineKeyboard, NextFunction, SessionFlavor, session } from "grammy";
-
-import { authchat, db } from "..";
-import { anime_dllist } from "./helpers/anime/anime_dllist";
-import { anime_unwatch, unwatchhelper } from "./helpers/anime/anime_unwatch";
-import { callback_dl, callback_dlep } from "./helpers/anime/cb_dl_handle";
-import { callback_mkwatch, callback_mkwatchep } from "./helpers/anime/cb_mkwatch_handle";
+import { Bot, Context, NextFunction, SessionFlavor, session } from "grammy";
+import { db } from "..";
+import { anime_dllist, dl_cbq, dlep_cbq } from "./helpers/anime/a_download";
+import {
+	anime_unwatch,
+	callback_mkwatch,
+	callback_mkwatchep,
+	unwatchhelper
+} from "./helpers/anime/a_watch_unwatch_ep";
 import { back_handle, cancel_handle, log_command } from "./helpers/anime/misc_handles";
 import { anime_config } from "./helpers/anime_config";
-import { InlineKeyboardButton } from "@grammyjs/types";
-import {
-	animeSearchStart,
-	animeStartWatch,
-	remindMe,
-	remindMe_startWatch_cb
-} from "./helpers/anime/anime_add";
-import { animePendingMsgHandler } from "./helpers/anime/anime_pending";
+import { animeSearchStart, remindMe_startWatch_cb } from "./helpers/anime/a_search";
+import { animePendingMsgHandler } from "./helpers/anime/a_pending";
 import { deleteUser, newUser } from "./user_mgmt";
-import { i_ProcessedObjV2 } from "../interfaces";
-import { stopWatching, watchingList, watchingListCBQ } from "./helpers/anime/anime_remove";
+import { stopWatching } from "./helpers/anime/a_remove";
+import { remindMe } from "./helpers/anime/a_airing";
+import { animeStartWatch } from "./helpers/anime/a_startwatch";
+import { watchingList, watchingListCBQ } from "./helpers/anime/a_watching";
 
 interface SessionData {
 	userid: number;
@@ -57,43 +55,6 @@ export async function botinit() {
 	console.log("*********************");
 	console.log("Cunnime has started!");
 	console.log("*********************");
-}
-
-export const authchatEval = (ctx: MyContext) => {
-	if (ctx.chat.id != authchat) {
-		ctx.reply("Bot not yet available for public use (｡•́︿•̀｡)");
-		return false;
-	}
-	return true;
-};
-
-export const getUpdaterAnimeIndex = async (name: string, pending: i_ProcessedObjV2[]) =>
-	pending.map((object) => object.jpname).indexOf(name);
-
-export function getPagination(current: number, maxpage: number, text: string) {
-	var keys: InlineKeyboardButton[] = [];
-	if (current > 1) keys.push({ text: `«1`, callback_data: `${text}_1` });
-	if (current > 2)
-		keys.push({
-			text: `‹${current - 1}`,
-			callback_data: `${text}_${(current - 1).toString()}`
-		});
-	keys.push({
-		text: `-${current}-`,
-		callback_data: `${text}_${current.toString()}`
-	});
-	if (current < maxpage - 1)
-		keys.push({
-			text: `${current + 1}›`,
-			callback_data: `${text}_${(current + 1).toString()}`
-		});
-	if (current < maxpage)
-		keys.push({
-			text: `${maxpage}»`,
-			callback_data: `${text}_${maxpage.toString()}`
-		});
-
-	return new InlineKeyboard().add(...keys);
 }
 
 /**
@@ -148,7 +109,7 @@ function botcommands() {
 	bot.command("help", (ctx) => {
 		ctx.reply("Help me onii-chan I'm stuck~");
 	});
-	//bot.command("pending", async (ctx) => await anime_sync(ctx));
+
 	bot.command("register", async (ctx) => await ctx.conversation.enter("newUser"));
 	bot.command("deleteaccount", async (ctx) => await ctx.conversation.enter("deleteUser"));
 	bot.command("pendingv2", (ctx) => animePendingMsgHandler(ctx));
@@ -158,14 +119,13 @@ function botcommands() {
 	bot.hears(/^\/remindme_(\d+)/, (ctx) => remindMe(ctx));
 	bot.command("cancel", async (ctx) => await cancel_handle(ctx));
 	bot.command("watching", (ctx) => watchingList(ctx));
-	//bot.command("removeanime", async ctx => await anime_remove(ctx));
 	bot.command("unwatch", async (ctx) => await anime_unwatch(ctx));
 	bot.command("dllist", async (ctx) => await anime_dllist(ctx));
 	bot.command("config", async (ctx) => await anime_config(ctx));
 	bot.command("log", async (ctx) => await log_command(ctx));
 
-	bot.callbackQuery(/download/, async (ctx) => await callback_dl(ctx));
-	bot.callbackQuery(/dlep_.*/, async (ctx) => await callback_dlep(ctx));
+	bot.callbackQuery(/download/, async (ctx) => await dl_cbq(ctx));
+	bot.callbackQuery(/dlep_.*/, async (ctx) => await dlep_cbq(ctx));
 	bot.callbackQuery(/mark_watch/, async (ctx) => await callback_mkwatch(ctx));
 	bot.callbackQuery(/mkwtch_.*/, async (ctx) => await callback_mkwatchep(ctx));
 	bot.callbackQuery(/back/, async (ctx) => await back_handle(ctx));

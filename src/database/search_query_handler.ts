@@ -1,6 +1,6 @@
 // handles search query formation
 
-import { anime, PrismaClient } from "@prisma/client";
+import { anime } from "@prisma/client";
 //import { db } from "..";
 // export const db = new PrismaClient();
 import { db } from "..";

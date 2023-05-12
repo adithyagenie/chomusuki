@@ -18,7 +18,7 @@ import { format } from "util";
 import { PrismaClient } from "@prisma/client";
 import { setupCache } from "axios-cache-interceptor";
 import Axios from "axios";
-import { registerPendingHandler } from "./bot/helpers/anime/anime_pending";
+import { registerPendingHandler } from "./bot/helpers/anime/a_pending";
 
 export const axios = setupCache(Axios);
 var log_file = createWriteStream("./debug.log", { flags: "w" });
