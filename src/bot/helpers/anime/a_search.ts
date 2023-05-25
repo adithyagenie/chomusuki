@@ -69,7 +69,7 @@ import { getPagination } from "./a_misc_helpers";
  ** Shows first page alone for search results.
  ** For subsequent pages, animeSearchHandler is called (mostly with callbackQueries).
  ** Call this in bot.command() with appropriate arguments. */
-export async function animeSearchStart(ctx: MyContext, command: string) {
+export async function animeSearchStart(ctx: MyContext, command: "startwatching" | "remindme") {
 	const query = ctx.match as string;
 	if (query === "" || query === undefined) {
 		await ctx.reply("Please provide a search query!");
@@ -80,13 +80,16 @@ export async function animeSearchStart(ctx: MyContext, command: string) {
 		query,
 		command,
 		1,
-		command == "startwatching" ? ctx.session.userid : undefined
+		ctx.me.username,
+		["startwatching", "remindme"].includes(command) ? ctx.session.userid : undefined
 	);
 	if (msg == undefined || keyboard == undefined) {
 		await ctx.api.editMessageText(ctx.from.id, msgid, "Unable to find any results.");
 		return;
 	}
-	await ctx.api.editMessageText(ctx.chat.id, msgid, msg, {
+	if (keyboard.inline_keyboard.length == 0)
+		await ctx.api.editMessageText(ctx.from.id, msgid, msg);
+	await ctx.api.editMessageText(ctx.from.id, msgid, msg, {
 		reply_markup: keyboard,
 		parse_mode: "HTML"
 	});
@@ -98,19 +101,21 @@ export async function animeSearchStart(ctx: MyContext, command: string) {
  ** Called interally.*/
 export async function animeSearchHandler(
 	query: string,
-	command: string,
+	command: "startwatching" | "remindme",
 	currentpg: number = 1,
+	username: string,
 	userid?: number
 ) {
-	let pages = await searchAnime(query, currentpg);
+	let pages = await searchAnime(query, currentpg, command == "remindme");
 	if (pages === undefined) return { msg: undefined, keyboard: undefined };
 	let maxpg: number;
 	if (currentpg != 1) maxpg = pages.pageInfo.lastPage > 5 ? 5 : pages.pageInfo.lastPage;
 	else {
-		let temp = await searchAnime(query, 2);
+		let temp = await searchAnime(query, 2, command == "remindme");
 		if (temp != undefined) maxpg = temp.pageInfo.lastPage > 5 ? 5 : temp.pageInfo.lastPage;
 		else maxpg = 1;
 	}
+	console.log(`${currentpg}: ${maxpg}`);
 	const keyboard = getPagination(currentpg, maxpg, command);
 	let msg = `<b>Search results for '${query}</b>'\n\n`;
 	for (let i = 0; i < pages.media.length; i++) {
@@ -126,7 +131,21 @@ export async function animeSearchHandler(
 			if (old.alid === undefined) old.alid = [];
 			if (old.alid.includes(pages.media[i].id))
 				msg += `<i>Anime already marked as watching!</i>\n\n`;
-			else msg += `<i>Start Watching:</i> /startwatching_${pages.media[i].id}\n\n`;
+			//else msg += `<i>Start Watching:</i> /startwatching_${pages.media[i].id}\n\n`;
+			else
+				msg += `<i>Start Watching: <a href="t.me/${username}?start=startwatching_${pages.media[i].id}">Click here!</a></i>\n\n`;
+		} else if (command == "remindme" && userid !== undefined) {
+			let old: number[] = [];
+			let _ = await db.airingupdates.findMany({
+				where: { userid: { has: userid } },
+				select: { alid: true }
+			});
+			if (_ === null) old = [];
+			else old = _.map((o) => o.alid);
+			if (old.includes(pages.media[i].id))
+				msg += `<i>Already sending airing updates for anime!</i>\n\n`;
+			//else msg += `<i>Send Airing Updates:</i> /remindme_${pages.media[i].id}\n\n`;
+			msg += `<i>Send Airing Updates: <a href="t.me/${username}?start=remindme_${pages.media[i].id}">Click here!</a></i>\n\n`;
 		} else msg += "\n";
 	}
 	return { msg, keyboard };
@@ -134,15 +153,23 @@ export async function animeSearchHandler(
 
 /**This function helps manage page scrolling for search results.
 Migrate the callbackquery and make this a function later.*/
-export async function remindMe_startWatch_cb(ctx: MyContext) {
-	const command = ctx.callbackQuery.data.split("_")[0];
-	const movepg = parseInt(ctx.callbackQuery.data.split("_")[1]);
+export async function search_startWatch_remindMe_cb(ctx: MyContext) {
 	await ctx.answerCallbackQuery("Searching!");
-	const query = [
-		...ctx.callbackQuery.message.text.split("\n")[0].matchAll(/^Search results for '(.+)'$/gi)
-	].map((o) => o[1])[0];
+	const command = ctx.match[1];
+	if (ctx.match[3] === "_current") return;
+	if (command !== "startwatching" && command !== "remindme") return;
+	const movepg = parseInt(ctx.match[2]);
+	const query = [...ctx.msg.text.split("\n")[0].matchAll(/^Search results for '(.+)'$/gi)].map(
+		(o) => o[1]
+	)[0];
 	//console.log(`${command}, ${movepg}, ${query}`);
-	const { msg, keyboard } = await animeSearchHandler(query, command, movepg, ctx.session.userid);
+	const { msg, keyboard } = await animeSearchHandler(
+		query,
+		command,
+		movepg,
+		ctx.me.username,
+		ctx.session.userid
+	);
 	if (msg == undefined || keyboard == undefined) {
 		await ctx.reply("Unable to find any results.");
 		return;

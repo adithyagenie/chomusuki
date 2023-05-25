@@ -72,4 +72,5 @@ export interface i_ProcessedObjV2 {
 	notwatched: number[];
 	shortname: string | undefined;
 	imagelink: string;
+	status: "RELEASING" | "NOT_YET_RELEASED" | "FINISHED";
 }

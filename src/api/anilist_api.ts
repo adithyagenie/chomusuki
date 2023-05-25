@@ -1,4 +1,4 @@
-import anilist, { AnimeEntry, MediaSearchEntry } from "anilist-node";
+import anilist, { AnimeEntry, MediaFilterTypes, MediaSearchEntry } from "anilist-node";
 
 const al = new anilist(process.env.ANILIST_TOKEN);
 
@@ -27,9 +27,11 @@ export async function getAlId(enname: string, jpname: string) {
 	}
 }
 
-export async function searchAnime(query: string, pagenum: number) {
+export async function searchAnime(query: string, pagenum: number, releasingonly: boolean = false) {
 	try {
-		let res: MediaSearchEntry = await al.searchEntry.anime(query, null, pagenum, 5);
+		let filter: MediaFilterTypes = null;
+		if (releasingonly == true) filter = { status_in: ["RELEASING", "NOT_YET_RELEASED"] };
+		let res: MediaSearchEntry = await al.searchEntry.anime(query, filter, pagenum, 5);
 		if (res.media.length > 0) return res;
 		else return undefined;
 	} catch (err) {

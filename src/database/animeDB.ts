@@ -1,11 +1,27 @@
 import { db } from "..";
 import * as Prisma from "@prisma/client";
 import * as types from "../interfaces";
+import aniep from "aniep";
+import { getAnimeDetails, imageGet } from "../api/anilist_api";
+import { bot } from "../bot/bot";
 
 export async function addAnimeNames(obj: Prisma.anime) {
 	try {
-		let insertres = await db.anime.create({
-			data: obj
+		let insertres = await db.anime.upsert({
+			where: { alid: obj.alid },
+			update: obj,
+			create: obj
+		});
+		await db.airingupdates.upsert({
+			where: { alid: obj.alid },
+			update: {
+				alid: undefined,
+				userid: undefined
+			},
+			create: {
+				alid: obj.alid,
+				userid: []
+			}
 		});
 		console.log(`POSTGRES: Add anime - Documents inserted: ${insertres.alid}`);
 		return 0;
@@ -33,6 +49,7 @@ export async function markWatchedunWatched(obj: Prisma.watchedepanime) {
 		return 0;
 	} catch (err) {
 		console.error(`POSTGRES: markWatchedunWatched - ${err}`);
+		return 1;
 	}
 }
 
@@ -59,27 +76,43 @@ export async function GetWatchedList(userid: number, alidlist: number[]) {
 	});
 }
 
-export async function getWatching(userid: number, count?: number, offset?: number) {
+export async function getUserWatchingAiring(
+	table: "watchinganime" | "airingupdates",
+	userid: number,
+	count?: number,
+	offset?: number
+) {
 	try {
-		let alidlist = await db.watchinganime.findUnique({
-			where: { userid: userid },
-			select: { alid: true }
-		});
-		if (alidlist === null) return { alidlist: [], animelist: [], amount: 0 };
-		const amount = alidlist.alid.length;
+		let alidlist: number[] = [];
+		if (table == "airingupdates") {
+			let _ = await db.airingupdates.findMany({
+				where: { userid: { has: userid } },
+				select: { alid: true }
+			});
+			if (_ === null) alidlist = [];
+			else alidlist = _.map((o) => o.alid);
+		} else {
+			let _ = await db.watchinganime.findUnique({
+				where: { userid: userid },
+				select: { alid: true }
+			});
+			if (_ === null) alidlist = [];
+			else alidlist = _.alid;
+		}
+		if (alidlist.length == 0) return { alidlist: [], animelist: [], amount: 0 };
+		const amount = alidlist.length;
 		if (count !== undefined && offset !== undefined)
-			alidlist.alid = alidlist.alid.slice(offset - 1, count + offset - 1);
+			alidlist = alidlist.slice(offset - 1, count + offset - 1);
 		const animelist = (
 			await db.anime.findMany({
-				where: { alid: { in: alidlist.alid } },
+				where: { alid: { in: alidlist } },
 				select: { jpname: true }
 			})
 		).map((o) => o.jpname);
-		if (alidlist.alid.length !== animelist.length)
-			throw new Error("Unequal fetch for anime: alid");
-		return { alidlist: alidlist.alid, animelist, amount };
+		if (alidlist.length !== animelist.length) throw new Error("Unequal fetch for anime: alid");
+		return { alidlist: alidlist, animelist, amount };
 	} catch (err) {
-		console.error(`POSTGRES: getWatching - ${err}`);
+		console.error(`POSTGRES: get_Watching_Airing - ${err}`);
 		return undefined;
 	}
 }
@@ -97,12 +130,11 @@ export async function removeWatching(obj: Prisma.watchinganime) {
 	}
 }
 
-export async function addAiringFollow(obj: Prisma.airingupdates) {
+export async function addAiringFollow(alid: number, userid: number) {
 	try {
-		const res = await db.airingupdates.upsert({
-			where: { userid: obj.userid },
-			update: obj,
-			create: obj
+		await db.airingupdates.update({
+			where: { alid },
+			data: { userid: { push: userid } }
 		});
 		return 0;
 	} catch (err) {
@@ -250,9 +282,13 @@ export async function deleteWatchlist(watchlistid: number) {
 export function getNumber(
 	data: Prisma.Prisma.Decimal | Prisma.Prisma.Decimal[]
 ): number | number[] {
-	if (Array.isArray(data)) return data.map((o) => new Prisma.Prisma.Decimal(o).toNumber());
-	else if (data instanceof Prisma.Prisma.Decimal)
-		return new Prisma.Prisma.Decimal(data).toNumber();
+	try {
+		if (Array.isArray(data)) return data.map((o) => new Prisma.Prisma.Decimal(o).toNumber());
+		else if (data instanceof Prisma.Prisma.Decimal)
+			return new Prisma.Prisma.Decimal(data).toNumber();
+	} catch (e) {
+		console.error(e);
+	}
 }
 
 export function getDecimal(
@@ -260,4 +296,67 @@ export function getDecimal(
 ): Prisma.Prisma.Decimal | Prisma.Prisma.Decimal[] {
 	if (Array.isArray(data)) return data.map((o) => new Prisma.Prisma.Decimal(o));
 	else if (typeof data == "number") return new Prisma.Prisma.Decimal(data);
+}
+
+/** Adds anime details to anime table if not existing.*/
+export async function checkAnimeTable(alid: number, updatedata = false) {
+	var pull = await db.anime.findUnique({
+		where: { alid },
+		select: { alid: true, status: true, jpname: true, next_ep_air: true, next_ep_num: true }
+	});
+	var airing = false;
+	if (pull === null || updatedata === true) {
+		const res = await getAnimeDetails(alid);
+		if (res === undefined) {
+			return "invalid";
+		}
+		var release = res.status === "RELEASING";
+		let imglink: string = undefined,
+			fileid: string = undefined;
+		if (updatedata !== true) {
+			imglink = await imageGet(res.id);
+			fileid = (await bot.api.sendPhoto(-1001869285732, imglink)).photo[0].file_id;
+		}
+		var obj: Prisma.anime = {
+			alid: res.id,
+			jpname: res.title.romaji,
+			enname: res.title.english !== null ? res.title.english : res.title.romaji,
+			optnames: undefined,
+			excludenames: undefined,
+			status: res.status,
+			next_ep_num: undefined,
+			next_ep_air: undefined,
+			last_ep: undefined,
+			ep_extras: undefined,
+			imglink: imglink,
+			fileid: fileid
+		};
+		if (release) {
+			obj.next_ep_air = res.nextAiringEpisode["airingAt"];
+			obj.next_ep_num = getDecimal(res.nextAiringEpisode["episode"]) as Prisma.Prisma.Decimal;
+		}
+		if (obj.status === "RELEASING" || obj.status === "FINISHED") {
+			let _: number[] = [];
+			if (res.airingSchedule.length != 0) {
+				_ = res.airingSchedule.filter((o) => o.timeUntilAiring <= 0).map((o) => o.episode);
+			} else if (res.airingSchedule.length == 0 && res.streamingEpisodes.length != 0) {
+				_ = res.streamingEpisodes.map((o) => aniep(o.title) as number).sort();
+			} else if (
+				res.airingSchedule.length == 0 &&
+				res.streamingEpisodes.length == 0 &&
+				res.episodes != null
+			) {
+				_ = Array.from({ length: res.episodes }, (_, i) => i + 1);
+			}
+			obj.last_ep = Math.max(..._);
+			obj.ep_extras = getDecimal(_.filter((o) => o % 1 !== 0)) as Prisma.Prisma.Decimal[];
+			if (_.includes(0)) obj.ep_extras.push(getDecimal(0) as Prisma.Prisma.Decimal);
+		}
+		const add = await addAnimeNames(obj);
+		if (add == 1) return "err";
+		pull = obj;
+	}
+	airing = pull.status === "RELEASING";
+
+	return { pull, airing };
 }

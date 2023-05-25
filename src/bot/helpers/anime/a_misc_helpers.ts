@@ -1,32 +1,34 @@
-import { InlineKeyboardButton } from "@grammyjs/types";
+import { InlineKeyboardButton, MessageEntity } from "@grammyjs/types";
 import { InlineKeyboard } from "grammy";
 import { i_ProcessedObjV2 } from "../../../interfaces";
 import { authchat } from "../../..";
 import { MyContext } from "../../bot";
+import { getSinglePending } from "../../../api/pending";
 
 // Makes keyboard for download and mark watched
 export async function makeEpKeyboard(
 	caption: string,
 	callback_data_string: string,
-	updateobj: i_ProcessedObjV2[]
+	userid: number
 ) {
 	caption = caption.split("Anime: ")[1].split("\n")[0].trim();
-	let eplist = [];
-	const animeindex = await getUpdaterAnimeIndex(caption, updateobj);
-	console.log(updateobj);
-	updateobj[animeindex].notwatched.forEach((o) => eplist.push(o));
-
+	var updateobj = await getSinglePending(userid, caption);
+	if (updateobj == undefined) return undefined;
 	let keyboard = new InlineKeyboard();
-	for (let i = 0; i < eplist.length; i += 2) {
+	for (
+		let i = 0;
+		i < (updateobj.notwatched.length > 30 ? 30 : updateobj.notwatched.length);
+		i += 2
+	) {
 		let bruh: InlineKeyboardButton.CallbackButton = {
-			text: `Episode ${eplist[i]}`,
-			callback_data: `${callback_data_string}_${eplist[i]}`
+			text: `Episode ${updateobj.notwatched[i]}`,
+			callback_data: `${callback_data_string}_${updateobj.notwatched[i]}`
 		};
 		let bruh2: InlineKeyboardButton.CallbackButton = {
-			text: `Episode ${eplist[i + 1]}`,
-			callback_data: `${callback_data_string}_${eplist[i + 1]}`
+			text: `Episode ${updateobj.notwatched[i + 1]}`,
+			callback_data: `${callback_data_string}_${updateobj.notwatched[i + 1]}`
 		};
-		if (eplist[i + 1] === undefined) keyboard.add(bruh).row();
+		if (updateobj.notwatched[i + 1] === undefined) keyboard.add(bruh).row();
 		else keyboard.add(bruh).add(bruh2).row();
 	}
 	keyboard.text("Go back", "back");
@@ -34,7 +36,7 @@ export async function makeEpKeyboard(
 }
 
 export const authchatEval = (ctx: MyContext) => {
-	if (ctx.chat.id != authchat) {
+	if (ctx.from.id != authchat) {
 		ctx.reply("Bot not yet available for public use (｡•́︿•̀｡)");
 		return false;
 	}
@@ -54,7 +56,7 @@ export function getPagination(current: number, maxpage: number, text: string) {
 		});
 	keys.push({
 		text: `-${current}-`,
-		callback_data: `${text}_${current.toString()}`
+		callback_data: `${text}_${current.toString()}_current`
 	});
 	if (current < maxpage - 1)
 		keys.push({
@@ -68,4 +70,62 @@ export function getPagination(current: number, maxpage: number, text: string) {
 		});
 
 	return new InlineKeyboard().add(...keys);
+}
+export const messageToHTMLMessage = (text: string, entities: MessageEntity[]) => {
+	if (!entities || !text) {
+		return text;
+	}
+	let tags: { index: number; tag: string | undefined }[] = [];
+	entities.forEach((entity) => {
+		const startTag = getTag(entity, text);
+		if (startTag == undefined) return;
+		let searchTag = tags.filter((tag) => tag.index === entity.offset);
+		if (searchTag.length > 0 && startTag) searchTag[0].tag += startTag;
+		else
+			tags.push({
+				index: entity.offset,
+				tag: startTag
+			});
+		const closeTag = startTag?.indexOf("<a ") === 0 ? "</a>" : "</" + startTag?.slice(1);
+		searchTag = tags.filter((tag) => tag.index === entity.offset + entity.length);
+		if (searchTag.length > 0) searchTag[0].tag = closeTag + searchTag[0].tag;
+		else
+			tags.push({
+				index: entity.offset + entity.length,
+				tag: closeTag
+			});
+	});
+	let html = "";
+	for (let i = 0; i < text.length; i++) {
+		const tag = tags.filter((tag) => tag.index === i);
+		tags = tags.filter((tag) => tag.index !== i);
+		if (tag.length > 0) html += tag[0].tag;
+		html += text[i];
+	}
+	if (tags.length > 0) html += tags[0].tag;
+	return html;
+};
+const getTag = (entity: MessageEntity, text: string) => {
+	const entityText = text.slice(entity.offset, entity.offset + entity.length);
+	switch (entity.type) {
+		case "bold":
+			return `<b>`;
+		case "text_link":
+			return `<a href="${entity.url}">`;
+		case "url":
+			return `<a href="${entityText}">`;
+		case "italic":
+			return `<i>`;
+		case "strikethrough":
+			return `<s>`;
+		case "underline":
+			return `<u>`;
+	}
+};
+
+export function HTMLMessageToMessage(msg: string) {
+	return msg
+		.replace(/<\/?i>/gi, ``)
+		.replace(/<\/?b>/gi, ``)
+		.replace(/<\/?u>/gi, ``);
 }

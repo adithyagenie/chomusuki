@@ -1,21 +1,16 @@
-12/5/2023, 1:16:45 am: *********************
-12/5/2023, 1:16:46 am: Cunnime has started!
-12/5/2023, 1:16:46 am: *********************
-12/5/2023, 1:16:46 am: Cunnime server listening on port 4000!
-12/5/2023, 1:17:14 am: REQUEST:: 833043806: undefined
-12/5/2023, 1:17:14 am: 833043806: undefined
-12/5/2023, 1:17:14 am: ye boi permit
-12/5/2023, 1:17:15 am: POSTGRES: Add subscription - Documents updated: 1: 16498
-12/5/2023, 1:17:19 am: REQUEST:: 833043806: 1
-12/5/2023, 1:17:19 am: 833043806: 1
-12/5/2023, 1:17:19 am: permit
-12/5/2023, 1:17:25 am: REQUEST:: 833043806: 1
-12/5/2023, 1:17:25 am: 833043806: 1
-12/5/2023, 1:17:25 am: permit
-12/5/2023, 1:17:45 am: REQUEST:: 833043806: 1
-12/5/2023, 1:17:45 am: 833043806: 1
-12/5/2023, 1:17:45 am: permit
-12/5/2023, 1:17:46 am: POSTGRES: Add subscription - Documents updated: 1: 16498
-12/5/2023, 1:17:53 am: REQUEST:: 833043806: 1
-12/5/2023, 1:17:53 am: 833043806: 1
-12/5/2023, 1:17:53 am: permit
+24/5/2023, 11:52:35 pm: *********************
+24/5/2023, 11:52:35 pm: Cunnime has started!
+24/5/2023, 11:52:35 pm: *********************
+24/5/2023, 11:52:36 pm: Refreshing all cron!
+24/5/2023, 11:52:36 pm: Scheduling job for [Oshi no Ko] - 7 at 24/5/2023, 11:53:05 pm
+24/5/2023, 11:52:36 pm: Cunnime server listening on port 4000!
+24/5/2023, 11:53:05 pm: Processing job for [Oshi no Ko] - 7.
+24/5/2023, 11:53:25 pm: checking anilist for updates
+24/5/2023, 11:53:25 pm: POSTGRES: Add anime - Documents inserted: 150672
+24/5/2023, 11:53:25 pm: Scheduling job for [Oshi no Ko] - 8 at 7/6/2023, 7:30:00 pm
+24/5/2023, 11:54:00 pm: Refreshing all cron!
+24/5/2023, 11:54:00 pm: Scheduling job for [Oshi no Ko] - 8 at 7/6/2023, 7:30:00 pm
+24/5/2023, 11:56:00 pm: Refreshing all cron!
+24/5/2023, 11:56:00 pm: Scheduling job for [Oshi no Ko] - 8 at 7/6/2023, 7:30:00 pm
+24/5/2023, 11:58:00 pm: Refreshing all cron!
+24/5/2023, 11:58:00 pm: Scheduling job for [Oshi no Ko] - 8 at 7/6/2023, 7:30:00 pm

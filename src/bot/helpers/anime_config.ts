@@ -19,7 +19,7 @@ async function getConfig(ctx: MyContext) {
 }
 
 export async function anime_config(ctx: MyContext) {
-	let argarray = ctx.message.text.split(" ");
+	let argarray = ctx.msg.text.split(" ");
 	argarray.splice(0, 1);
 	console.log(argarray);
 	const userid = ctx.session.userid;

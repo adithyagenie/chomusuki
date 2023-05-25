@@ -1,12 +1,14 @@
 // Unwatch anime command
 
-import { Keyboard } from "grammy";
+import { InlineKeyboard, Keyboard } from "grammy";
 import { getDecimal, markWatchedunWatched } from "../../../database/animeDB";
 import { MyContext, MyConversation } from "../../bot";
 import { Prisma, watchedepanime } from "@prisma/client";
-import { getPending } from "../../../api/pending";
+import { getPending, getSinglePending } from "../../../api/pending";
 import { db } from "../../..";
-import { getUpdaterAnimeIndex, makeEpKeyboard } from "./a_misc_helpers";
+import { getUpdaterAnimeIndex, makeEpKeyboard, messageToHTMLMessage } from "./a_misc_helpers";
+import { InlineKeyboardButton } from "@grammyjs/types";
+import aniep from "aniep";
 
 export async function anime_unwatch(ctx: MyContext) {
 	await ctx.conversation.enter("unwatchhelper");
@@ -68,18 +70,17 @@ export async function unwatchhelper(conversation: MyConversation, ctx: MyContext
 }
 
 export async function callback_mkwatch(ctx: MyContext) {
-	ctx.answerCallbackQuery();
+	ctx.answerCallbackQuery("Processing");
 	const userid = ctx.session.userid;
-	const updateobj = await getPending(userid);
-	const keyboard = await makeEpKeyboard(ctx.callbackQuery.message.caption, "mkwtch", updateobj);
+	const keyboard = await makeEpKeyboard(ctx.msg.caption, "mkwtch", userid);
 	ctx.editMessageReplyMarkup({ reply_markup: keyboard });
 }
 
 export async function callback_mkwatchep(ctx: MyContext) {
+	ctx.answerCallbackQuery(`Processing...`);
 	const userid = ctx.session.userid;
-	const updateobj = await getPending(userid);
-	const epnum = parseInt(ctx.callbackQuery.data.split("_")[1]);
-	let oldmsg = ctx.callbackQuery.message.caption;
+	const epnum = parseInt(ctx.match[1]);
+	let oldmsg = ctx.msg.caption;
 	let animename = oldmsg.split("Anime: ")[1].split("\n")[0].trim();
 
 	const alid = (
@@ -104,9 +105,13 @@ export async function callback_mkwatchep(ctx: MyContext) {
 	ep.push(getDecimal(epnum) as Prisma.Decimal);
 
 	const res = await markWatchedunWatched({ userid, alid, ep });
+	if (res === 1) {
+		ctx.reply("Failed to add to watched.");
+		return;
+	}
+	ctx.reply(`Episode: ${epnum} of ${animename} has been marked as watched!`);
 
 	// let oldwatch: { epnum: number; epname: string }[] = [];
-	let indexnum = await getUpdaterAnimeIndex(animename, updateobj);
 	// let toupdateanime: { epnum: number; epname: string };
 	// for (let j = 0; j < updateobj[indexnum].watched.length; j++)
 	// 	oldwatch.push(updateobj[indexnum].watched[j]);
@@ -130,31 +135,126 @@ export async function callback_mkwatchep(ctx: MyContext) {
 	// 	watched: oldwatch,
 	// });
 	// if (updres == 0) {
-	// 	const newkeyboard = makeEpKeyboard(ctx.callbackQuery.message.caption, "mkwtch", userid);
-	// 	const oldformatmsg = messageToHTMLMessage(
-	// 		ctx.callbackQuery.message.caption,
-	// 		ctx.callbackQuery.message.caption_entities
-	// 	);
-	// 	var newMsgArray = oldformatmsg.split("\n");
-	// 	for (let j = 0; j < newMsgArray.length; j++) {
-	// 		if (newMsgArray[j].startsWith(`Episode ${epnum}:`)) {
-	// 			newMsgArray.splice(j, 1);
-	// 			break;
-	// 		}
-	// 	}
-	// 	const newmsg = newMsgArray.join("\n");
-	// 	bot.api.editMessageCaption(
-	// 		ctx.callbackQuery.message.chat.id,
-	// 		ctx.callbackQuery.message.message_id,
-	// 		{
-	// 			caption: newmsg,
-	// 			parse_mode: "HTML",
-	// 			reply_markup: newkeyboard,
-	// 		}
-	// 	);
-	// 	ctx.answerCallbackQuery(`Marked ${epnum} as watched!`);
-	// } else {
-	// 	await ctx.reply(`Error occured while marking episode as watched.`);
-	// 	ctx.answerCallbackQuery(`Error occured.`);
-	// }
+
+	let newkeyboard = new InlineKeyboard();
+	//newkeyboard = newkeyboard.map((o1) => o1.filter((o) => !(o.text == `Episode ${epnum}`)));
+	/**TEST THIS PLEASEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE */
+	let tt: InlineKeyboardButton[] = [].concat(...ctx.msg.reply_markup.inline_keyboard);
+	tt = tt.filter((o) => !(o.text == `Episode ${epnum}`));
+	for (let i = 0; i < tt.length; i += 2) {
+		let bruh: InlineKeyboardButton = tt[i];
+		let bruh2: InlineKeyboardButton = tt[i + 1];
+		if (tt[i + 1] === undefined) newkeyboard.add(bruh).row();
+		else newkeyboard.add(bruh).add(bruh2).row();
+	}
+	//newkeyboard.text("Go back", "back");
+	const oldformatmsg = messageToHTMLMessage(ctx.msg.caption, ctx.msg.caption_entities);
+	var newMsgArray = oldformatmsg.split("\n");
+	for (let j = 0; j < newMsgArray.length; j++) {
+		if (aniep(newMsgArray[j])) {
+			newMsgArray.splice(j, 1);
+			break;
+		}
+	}
+	ctx.api.editMessageCaption(ctx.from.id, ctx.msg.message_id, {
+		caption: newMsgArray.join("\n"),
+		parse_mode: "HTML",
+		reply_markup: newkeyboard
+	});
+}
+
+const consecutiveRanges = (a: number[]) => {
+	let length = 1;
+	let list: string[] = [];
+	if (a.length == 0) return list;
+	for (let i = 1; i <= a.length; i++) {
+		if (i == a.length || a[i] - a[i - 1] != 1) {
+			if (length == 1) list.push(a[i - length].toString());
+			else list.push(`${a[i - length]} -> ${a[i - 1]}`);
+			length = 1;
+		} else length++;
+	}
+	return list;
+};
+
+export async function markWatchedRange(conversation: MyConversation, ctx: MyContext) {
+	const genkeyboard = new InlineKeyboard();
+	const watching = await conversation.external(
+		() =>
+			db.$queryRaw<
+				{ jpname: string; alid: number }[]
+			>`SELECT a.jpname, a.alid FROM anime a, watchinganime w, unnest(w.alid) s WHERE (a.alid IN (s)) AND (w.userid = ${conversation.session.userid});`
+	);
+	if (watching === null) return;
+	conversation.external(() => {
+		for (let i = 0; i < watching.length; i += 2) {
+			if (watching[i].alid != undefined)
+				genkeyboard.text(`${watching[i].jpname}`, `mkwr_${watching[i].alid}`);
+			if (watching[i + 1].alid != undefined)
+				genkeyboard.text(`${watching[i + 1].jpname}`, `mkwr_${watching[i + 1].alid}`);
+			genkeyboard.row();
+		}
+	});
+	const msgid = (
+		await ctx.reply("Which anime do you need to modify?", { reply_markup: genkeyboard })
+	).message_id;
+	let _ = await conversation.waitForCallbackQuery(/mkwr_(.+)/);
+	_.answerCallbackQuery("Processing...");
+	const alid = parseInt(_.match[1]);
+	if (Number.isNaN(alid)) return;
+	ctx.api.deleteMessage(ctx.from.id, msgid);
+	const aniname = watching.find((o) => o.alid == alid).jpname;
+	let data = await conversation.external(() =>
+		getSinglePending(conversation.session.userid, null, alid)
+	);
+	if (data.notwatched.length == 0) {
+		await ctx.reply(`You have already marked all the episodes of ${aniname} as watched!`);
+		return;
+	}
+	await ctx.reply(
+		`Give the episode range to mark as watched:\n<i>Possible ranges: ${consecutiveRanges(
+			data.notwatched
+		).toString()}.\nPlease give it in the form of <code>start-end</code></i>`,
+		{ parse_mode: "HTML" }
+	);
+	while (true) {
+		const range = (await conversation.waitForHears(/^((\d+)|((\d+)-(\d+)))$/)).match;
+		if (range[0] == null) {
+			await ctx.reply(
+				"Invalid range specified. Please give it in the form of <code>start-end</code>",
+				{ parse_mode: "HTML" }
+			);
+			continue;
+		}
+		const [start, end] = [parseInt(range[1]), parseInt(range[2])];
+		if (Number.isNaN(start) || Number.isNaN(end)) {
+			await ctx.reply("Please specify numbers in range :/");
+			continue;
+		}
+		if (start > end) {
+			await ctx.reply("How can the start be greater than end range?");
+			continue;
+		}
+		const arr = Array.from({ length: end - start + 1 }, (_, i) => start + i);
+		if (!arr.every((o) => data.notwatched.includes(o))) {
+			await ctx.reply("Given numbers out of range :/");
+			continue;
+		}
+		await conversation.external(async () => {
+			let id = (
+				await db.watchedepanime.findUnique({
+					where: { userid_alid: { userid: conversation.session.userid, alid: alid } },
+					select: { ep: true }
+				})
+			).ep;
+			id = id.concat(...(getDecimal(arr) as Prisma.Decimal[]));
+			await db.watchedepanime.update({
+				where: { userid_alid: { userid: conversation.session.userid, alid: alid } },
+				data: { ep: id }
+			});
+		});
+		break;
+	}
+	ctx.reply(`Marked selected episodes as watched!`);
+	return;
 }

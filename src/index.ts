@@ -19,6 +19,7 @@ import { PrismaClient } from "@prisma/client";
 import { setupCache } from "axios-cache-interceptor";
 import Axios from "axios";
 import { registerPendingHandler } from "./bot/helpers/anime/a_pending";
+import { initCron } from "./api/refreshAiring";
 
 export const axios = setupCache(Axios);
 var log_file = createWriteStream("./debug.log", { flags: "w" });
@@ -49,6 +50,7 @@ async function spinup() {
 	//await updater.updater()
 	registerPendingHandler(app);
 	await botinit();
+	await initCron();
 	app.post("/sync", async (req, res) => {
 		if (req.headers.calledby == "manualcall") {
 			console.log("Got manual sync request.");

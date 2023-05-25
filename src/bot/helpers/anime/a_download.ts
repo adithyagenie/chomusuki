@@ -14,7 +14,6 @@ import { getUpdaterAnimeIndex, makeEpKeyboard } from "./a_misc_helpers";
 export async function anime_dllist(ctx: MyContext) {
 	{
 		const userid = ctx.session.userid;
-
 		await ctx.replyWithChatAction("typing");
 		const pendingdl = (
 			await db.syncupd.findMany({
@@ -52,11 +51,11 @@ export async function anime_dllist(ctx: MyContext) {
 			}
 			if (msglist.length > 0) {
 				for (let i = 0; i < msglist.length; i++)
-					bot.api.sendMessage(ctx.message.chat.id, msglist[i], {
+					bot.api.sendMessage(ctx.from.id, msglist[i], {
 						parse_mode: "HTML"
 					});
 			} else
-				bot.api.sendMessage(ctx.message.chat.id, msg, {
+				bot.api.sendMessage(ctx.from.id, msg, {
 					parse_mode: "HTML"
 				});
 		}
@@ -67,8 +66,7 @@ export async function anime_dllist(ctx: MyContext) {
 export async function dl_cbq(ctx: MyContext) {
 	ctx.answerCallbackQuery();
 	const userid = ctx.session.userid;
-	const updateobj = await getPending(userid);
-	const keyboard = await makeEpKeyboard(ctx.callbackQuery.message.caption, "dlep", updateobj);
+	const keyboard = await makeEpKeyboard(ctx.msg.caption, "dlep", userid);
 	ctx.editMessageReplyMarkup({ reply_markup: keyboard });
 }
 
@@ -78,7 +76,7 @@ export async function dlep_cbq(ctx: MyContext) {
 	const userid = ctx.session.userid;
 	let epnum = parseInt(ctx.callbackQuery.data.split("_")[1]);
 	let updateobj = await getPending(userid);
-	let animename = ctx.callbackQuery.message.caption.split("Anime: ")[1].split("\n")[0].trim();
+	let animename = ctx.msg.caption.split("Anime: ")[1].split("\n")[0].trim();
 	const i = await getUpdaterAnimeIndex(animename, updateobj);
 	const j = updateobj[i].notwatched.indexOf(epnum);
 

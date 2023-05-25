@@ -23,9 +23,6 @@ export async function newUser(conversation: MyConversation, ctx: MyContext) {
 		await db.watchinganime.create({
 			data: { userid: res.userid, alid: [] }
 		});
-		await db.airingupdates.create({
-			data: { userid: res.userid, alid: [] }
-		});
 	});
 	await ctx.api.editMessageText(
 		ctx.from.id,

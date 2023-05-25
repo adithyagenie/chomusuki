@@ -21,7 +21,9 @@ export function startserver() {
 		res.status(200).json({ keepalive: true });
 	});
 	app.listen(port, async () => {
-		await bot.api.setWebhook(`${process.env.RENDER_EXTERNAL_URL}/${process.env.BOT_TOKEN}`);
+		await bot.api.setWebhook(`${process.env.RENDER_EXTERNAL_URL}/${process.env.BOT_TOKEN}`, {
+			drop_pending_updates: true
+		});
 		console.log(`Cunnime server listening on port ${port}!`);
 	});
 	return app;

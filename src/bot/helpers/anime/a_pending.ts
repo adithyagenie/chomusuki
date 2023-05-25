@@ -8,7 +8,7 @@ export async function animePendingMsgHandler(ctx: MyContext) {
 	const userid = ctx.session.userid;
 	try {
 		const res = await axios.get("http://localhost:4000/pending", {
-			params: { chatid: ctx.chat.id, userid: userid },
+			params: { chatid: ctx.from.id, userid: userid },
 			id: "_"
 		});
 		axios.storage.remove("_");
@@ -35,7 +35,10 @@ export async function animePending(chatid: number, userid: number) {
 		if (res[i].notwatched.length == 0) continue;
 		let [msg, msgheader] = ["", ""];
 		let imagelink = res[i].imagelink;
-		msgheader += `<b>Anime: ${res[i].jpname}</b>\n<i>(${res[i].enname})</i>\n\n`;
+		msgheader += `<b>Anime: ${res[i].jpname}</b>\n<i>(${res[i].enname})\n`;
+		if (res[i].status == "RELEASING") msgheader += "Currently airing.</i>\n\n";
+		else if (res[i].status == "FINISHED") msgheader += "Finished airing.</i>\n\n";
+		else msgheader += "</i>\n\n";
 		msgheader += `<b>Pending:</b>\n`;
 		for (let j = 0; j < res[i].notwatched.length; j++) {
 			if (j < 30) msg += `🔹${res[i].jpname} - ${res[i].notwatched[j]}\n`;
@@ -49,7 +52,7 @@ export async function animePending(chatid: number, userid: number) {
 		}
 
 		//Better logic
-		if ((msg + msgheader).length > 4096) {
+		if ((msg + msgheader).length > 1024) {
 			console.log("Trying to trim");
 			let lines = msg.split("\n");
 			msg = lines[0] + "\n";
