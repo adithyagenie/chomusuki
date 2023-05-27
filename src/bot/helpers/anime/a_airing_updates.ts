@@ -1,9 +1,3 @@
-/**You need to display the status of the show when /airingupdates. Get it from db else get it from alnilist.
- * Try to display it with search. I have no other way to retrive status with search. All I can think of while writing this is to do seperate 3 queries for finished, airing, not released. But thats kinda stupid as every page requires 3  calls.
- so either we do like 5 queries per page or do 3. but that 5 is like half might go with db but its a hard gamble.
- * If you can think of smth else do it bitch.
- */
-
 import { db } from "../../..";
 import { addAiringFollow, getUserWatchingAiring } from "../../../database/animeDB";
 import { MyContext } from "../../bot";

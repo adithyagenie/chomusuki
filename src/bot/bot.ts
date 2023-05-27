@@ -20,7 +20,7 @@ import {
 import { back_handle, cancel_handle, log_command } from "./helpers/anime/misc_handles";
 import { anime_config } from "./helpers/anime_config";
 import { animeSearchStart, search_startWatch_remindMe_cb } from "./helpers/anime/a_search";
-import { animePendingMsgHandler } from "./helpers/anime/a_pending";
+import { a_Pending } from "./helpers/anime/a_pending";
 import { deleteUser, newUser } from "./user_mgmt";
 import { stopWatching } from "./helpers/anime/a_watching";
 import {
@@ -30,7 +30,7 @@ import {
 	stopAiringUpdates
 } from "./helpers/anime/a_airing_updates";
 import { animeStartWatch } from "./helpers/anime/a_watching";
-import { watchingList, watchingListCBQ } from "./helpers/anime/a_watching";
+import { watching_pending_list, watchingListCBQ } from "./helpers/anime/a_watching";
 
 interface SessionData {
 	userid: number;
@@ -140,10 +140,9 @@ function botcommands() {
 		async (ctx) => await ctx.conversation.enter("stopWatching")
 	);
 	bot.hears(/\/start stopremindme_(\d+)/, (ctx) => stopAiringUpdates(ctx));
-
+	bot.hears(/\/start pending_(\d+)/, (ctx) => a_Pending(ctx));
 	bot.command("register", async (ctx) => await ctx.conversation.enter("newUser"));
 	bot.command("deleteaccount", async (ctx) => await ctx.conversation.enter("deleteUser"));
-	bot.command("pending", (ctx) => animePendingMsgHandler(ctx));
 	bot.command("startwatching", (ctx) => animeSearchStart(ctx, "startwatching"));
 	bot.command("remindme", (ctx) => animeSearchStart(ctx, "remindme"));
 	//bot.hears(/^\/startwatching_(\d+)/, (ctx) => animeStartWatch(ctx));
@@ -151,7 +150,7 @@ function botcommands() {
 	//bot.hears(/^\/remindme_(\d+)/, (ctx) => remindMe(ctx));
 	//bot.hears(/^\/stopairingupdates_(\d+)/, (ctx) => stopAiringUpdates(ctx));
 	bot.command("cancel", async (ctx) => await cancel_handle(ctx));
-	bot.command("watching", (ctx) => watchingList(ctx));
+	bot.hears(/^\/(pending|watching)/, (ctx) => watching_pending_list(ctx));
 	bot.command("airingupdates", (ctx) => airingUpdatesList(ctx));
 	bot.command("markwatched", async (ctx) => await ctx.conversation.enter("markWatchedRange"));
 	bot.command("unwatch", async (ctx) => await anime_unwatch(ctx));
@@ -160,17 +159,20 @@ function botcommands() {
 	bot.command("log", async (ctx) => await log_command(ctx));
 
 	bot.callbackQuery(/download/, async (ctx) => await dl_cbq(ctx));
-	bot.callbackQuery(/dlep_(\d+)/, async (ctx) => await dlep_cbq(ctx));
+	bot.callbackQuery(/dlep_(\d+)_(\d+)/, async (ctx) => await dlep_cbq(ctx));
 	bot.callbackQuery(/mark_watch/, async (ctx) => await callback_mkwatch(ctx));
-	bot.callbackQuery(/mkwtch_(\d+)/, async (ctx) => await callback_mkwatchep(ctx));
+	bot.callbackQuery(/mkwtch_(\d+)_(\d+)/, async (ctx) => await callback_mkwatchep(ctx));
 	bot.callbackQuery(/back/, async (ctx) => await back_handle(ctx));
 	bot.callbackQuery(
 		/(startwatching|remindme)_(\d+)(_current)?/,
 		async (ctx) => await search_startWatch_remindMe_cb(ctx)
 	);
-	bot.callbackQuery(/watch_(\d+)(_current)?/, async (ctx) => await watchingListCBQ(ctx));
+	bot.callbackQuery(
+		/(watch|pending)_(\d+)(_current)?/,
+		async (ctx) => await watchingListCBQ(ctx)
+	);
 	bot.callbackQuery(/airingupd_(\d+)(_current)?/, async (ctx) => await airingUpdatesListCBQ(ctx));
-
+	bot.on("callback_query:data", (ctx) => ctx.answerCallbackQuery("Invalid button?")); //sink
 	bot.command("start", (ctx) => ctx.reply("Sup boss?"));
 	bot.command("help", (ctx) => ctx.reply("Help me onii-chan I'm stuck~"));
 }

@@ -1,7 +1,6 @@
 import { InlineKeyboard, InputFile } from "grammy";
 import { MyContext } from "../../bot";
 import { createReadStream } from "fs-extra";
-import { authchatEval } from "./a_misc_helpers";
 
 // going back in a menu
 export async function back_handle(ctx: MyContext) {
@@ -22,7 +21,10 @@ export async function cancel_handle(ctx: MyContext) {
 
 // sends log file
 export async function log_command(ctx: MyContext) {
-	if (!authchatEval) return;
+	if (ctx.from.id != parseInt(process.env.AUTHORISED_CHAT)) {
+		ctx.reply("Logs available for admin only! (｡•́︿•̀｡)");
+		return;
+	}
 	const logfile = new InputFile(createReadStream("./debug.log"), "log.txt");
 	ctx.replyWithDocument(logfile);
 }

@@ -79,17 +79,8 @@ export async function callback_mkwatch(ctx: MyContext) {
 export async function callback_mkwatchep(ctx: MyContext) {
 	ctx.answerCallbackQuery(`Processing...`);
 	const userid = ctx.session.userid;
-	const epnum = parseInt(ctx.match[1]);
-	let oldmsg = ctx.msg.caption;
-	let animename = oldmsg.split("Anime: ")[1].split("\n")[0].trim();
-
-	const alid = (
-		await db.anime.findMany({
-			where: { jpname: animename },
-			select: { alid: true },
-			take: 1
-		})
-	)[0].alid;
+	const alid = parseInt(ctx.match[1]);
+	const epnum = parseInt(ctx.match[2]);
 
 	const ep = (
 		await db.watchedepanime.findUnique({
@@ -109,7 +100,16 @@ export async function callback_mkwatchep(ctx: MyContext) {
 		ctx.reply("Failed to add to watched.");
 		return;
 	}
-	ctx.reply(`Episode: ${epnum} of ${animename} has been marked as watched!`);
+	ctx.reply(
+		`Episode: ${epnum} of ${
+			(
+				await db.anime.findUnique({
+					where: { alid },
+					select: { jpname: true }
+				})
+			).jpname
+		} has been marked as watched!`
+	);
 
 	// let oldwatch: { epnum: number; epname: string }[] = [];
 	// let toupdateanime: { epnum: number; epname: string };

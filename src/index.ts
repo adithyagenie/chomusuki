@@ -18,7 +18,7 @@ import { format } from "util";
 import { PrismaClient } from "@prisma/client";
 import { setupCache } from "axios-cache-interceptor";
 import Axios from "axios";
-import { registerPendingHandler } from "./bot/helpers/anime/a_pending";
+import { pendingEndpoint } from "./bot/helpers/anime/a_pending";
 import { initCron } from "./api/refreshAiring";
 
 export const axios = setupCache(Axios);
@@ -43,12 +43,11 @@ console.error = function (d: any) {
 };
 
 export const app = startserver();
-export const authchat = parseInt(process.env.AUTHORISED_CHAT);
 export const db = new PrismaClient();
 
 async function spinup() {
 	//await updater.updater()
-	registerPendingHandler(app);
+	pendingEndpoint(app);
 	await botinit();
 	await initCron();
 	app.post("/sync", async (req, res) => {

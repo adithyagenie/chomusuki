@@ -2,10 +2,11 @@ import { axios, db } from "../../..";
 import { MyContext, bot } from "../../bot";
 import { getNumber, newDL } from "../../../database/animeDB";
 import aniep from "aniep";
-import { getPending } from "../../../api/pending";
+import { getSinglePending } from "../../../api/pending";
 import { getxdcc } from "../../../api/subsplease-xdcc";
 import { i_DlSync, i_NyaaResponse } from "../../../interfaces";
-import { getUpdaterAnimeIndex, makeEpKeyboard } from "./a_misc_helpers";
+import { makeEpKeyboard } from "./a_misc_helpers";
+import { CacheAxiosResponse } from "axios-cache-interceptor";
 
 /**
  ** Gives all the downloads queued for the user.
@@ -74,12 +75,14 @@ export async function dl_cbq(ctx: MyContext) {
 export async function dlep_cbq(ctx: MyContext) {
 	ctx.answerCallbackQuery("Download request recieved.");
 	const userid = ctx.session.userid;
-	let epnum = parseInt(ctx.callbackQuery.data.split("_")[1]);
-	let updateobj = await getPending(userid);
-	let animename = ctx.msg.caption.split("Anime: ")[1].split("\n")[0].trim();
-	const i = await getUpdaterAnimeIndex(animename, updateobj);
-	const j = updateobj[i].notwatched.indexOf(epnum);
-
+	const alid = parseInt(ctx.match[1]);
+	let epnum = parseInt(ctx.match[2]);
+	const pull1 = await db.anime.findFirst({
+		where: { alid },
+		select: { optnames: true }
+	});
+	if (pull1 === null) throw new Error(`Anime not found: ${alid}`);
+	let updateobj = await getSinglePending(userid, null, alid);
 	let pendingdl: i_DlSync[] = (
 		await db.syncupd.findMany({
 			where: { userid }
@@ -90,51 +93,67 @@ export async function dlep_cbq(ctx: MyContext) {
 	});
 	var flag = false;
 	for (let i = 0; i < pendingdl.length; i++) {
-		if (pendingdl[i].anime == animename && pendingdl[i].epnum == epnum) {
+		if (pendingdl[i].anime == updateobj.jpname && pendingdl[i].epnum == epnum) {
 			flag = true;
 			break;
 		}
 	}
 	if (flag == true) {
 		ctx.reply(
-			`*__Episode ${epnum}__* of *__${animename}__* already queued for download! Use /dllist to view your pending downloads.`,
-			{ parse_mode: "MarkdownV2" }
+			`Episode ${epnum} of ${updateobj.jpname} already queued for download! Use /dllist to view your pending downloads.`
 		);
 		return;
 	}
 	try {
-		const res = await axios.get<i_NyaaResponse[]>(
-			`${process.env.NYAA_API_URL}/user/SubsPlease?q="${updateobj[i].jpname}"|"${updateobj[i].enname} 1080p "- 0${epnum}"`
+		let query = `"${updateobj.jpname}"|"${updateobj.enname}"`;
+		if (pull1.optnames !== null) pull1.optnames.forEach((o) => (query += `|"${o}"`));
+		query += ` 1080p "- ${String(epnum).padStart(2, "0")}"`;
+		console.log(query);
+
+		let res: CacheAxiosResponse<i_NyaaResponse[], any> = undefined;
+		res = await axios.get<i_NyaaResponse[]>(
+			`${process.env.NYAA_API_URL}/user/SubsPlease?q=${query}`
 		);
 		var xdcclink: { packnum: number; botname: string };
 		var torrentlink: string;
-		if (res.status != 400) {
-			xdcclink = undefined;
-			torrentlink = undefined;
-		} else {
-			const dl = res.data.filter(
-				(o) => aniep(o.title) == epnum && o.title.includes(updateobj[i].jpname)
+		if (res.status === 400) throw new Error("Unable to reach nyaa endpoint.");
+		if (res.data.length == 0) {
+			res = await axios.get<i_NyaaResponse[]>(
+				`${process.env.NYAA_API_URL}/user/Erai-raws?q=${query}`
 			);
-			if (dl.length > 1 || dl.length == 0) throw new Error("multiple or no sites nyaa");
-			xdcclink = await getxdcc(res.data[0].title);
-			console.log(`Downloading: ${res.data[0].title}`);
+			if (res.status === 400 || res.data.length == 0) {
+				await ctx.reply(
+					`Unable to fetch downloads for ${updateobj.jpname}. Please contact @adithyagenie.`
+				);
+				return;
+			}
 		}
-		if (xdcclink.packnum != 0) {
+		const dl = res.data.filter((o) => {
+			o.title = o.title.toLowerCase();
+			return (
+				aniep(o.title) == epnum &&
+				(o.title.includes(updateobj.jpname.toLowerCase()) ||
+					o.title.includes(updateobj.enname.toLowerCase()) ||
+					pull1.optnames.map((p) => p.toLowerCase()).some((q) => o.title.includes(q)))
+			);
+		});
+		console.log(`DL::::: ${dl}`);
+		if (dl.length > 1 || dl.length == 0) throw new Error(`multiple or no sites nyaa:: ${dl}`);
+		xdcclink = await getxdcc(res.data[0].title);
+		console.log(`Downloading: ${res.data[0].title}`);
+		if (xdcclink !== undefined && xdcclink.packnum != 0) {
 			console.log(`startdl triggered @ ${xdcclink.botname}: ${xdcclink.packnum}`);
 			let sync_toupd: i_DlSync = {
 				userid: userid,
 				synctype: "dl",
-				anime: animename,
+				anime: updateobj.jpname,
 				epnum: epnum,
 				dltype: "xdcc",
 				xdccdata: [xdcclink.botname, xdcclink.packnum.toFixed()]
 			};
 			let returncode = await newDL(sync_toupd);
 			if (returncode !== 0) ctx.reply("Sending DL failed.");
-			else
-				ctx.reply(`*__Episode ${epnum}__* of *__${animename}__* queued for download!`, {
-					parse_mode: "MarkdownV2"
-				});
+			else ctx.reply(`Episode ${epnum} of ${updateobj.jpname} queued for download!`);
 			return;
 		} else {
 			torrentlink = res.data[0].file;
@@ -142,20 +161,18 @@ export async function dlep_cbq(ctx: MyContext) {
 			let sync_toupd: i_DlSync = {
 				userid: userid,
 				synctype: "dl",
-				anime: animename,
+				anime: updateobj.jpname,
 				epnum: epnum,
 				dltype: "torrent",
 				torrentdata: torrentlink
 			};
 			let returncode = await newDL(sync_toupd);
 			if (returncode !== 0) ctx.reply("Sending DL failed.");
-			else
-				ctx.reply(`*__Episode ${epnum}__* of *__${animename}__* queued for download!`, {
-					parse_mode: "MarkdownV2"
-				});
+			else ctx.reply(`Episode ${epnum} of ${updateobj.jpname} queued for download!`);
 			return;
 		}
 	} catch (error) {
 		console.error(`ERROR DL: ${error}`);
+		ctx.reply("Error occurred ;_;");
 	}
 }

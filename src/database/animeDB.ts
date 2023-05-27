@@ -103,14 +103,15 @@ export async function getUserWatchingAiring(
 		const amount = alidlist.length;
 		if (count !== undefined && offset !== undefined)
 			alidlist = alidlist.slice(offset - 1, count + offset - 1);
-		const animelist = (
-			await db.anime.findMany({
-				where: { alid: { in: alidlist } },
-				select: { jpname: true }
-			})
-		).map((o) => o.jpname);
+		const tosort = await db.anime.findMany({
+			where: { alid: { in: alidlist } },
+			select: { jpname: true, alid: true }
+		});
+		tosort.sort((a, b) => (alidlist.indexOf(a.alid) > alidlist.indexOf(b.alid) ? 1 : -1));
+		const animelist = tosort.map((o) => o.jpname);
 		if (alidlist.length !== animelist.length) throw new Error("Unequal fetch for anime: alid");
-		return { alidlist: alidlist, animelist, amount };
+		console.log(`${alidlist}:: ${animelist}`);
+		return { alidlist, animelist, amount };
 	} catch (err) {
 		console.error(`POSTGRES: get_Watching_Airing - ${err}`);
 		return undefined;
@@ -300,12 +301,20 @@ export function getDecimal(
 
 /** Adds anime details to anime table if not existing.*/
 export async function checkAnimeTable(alid: number, updatedata = false) {
-	var pull = await db.anime.findUnique({
-		where: { alid },
-		select: { alid: true, status: true, jpname: true, next_ep_air: true, next_ep_num: true }
-	});
+	var pull: {
+		alid: number;
+		jpname: string;
+		status: string;
+		next_ep_num: Prisma.Prisma.Decimal;
+		next_ep_air: number;
+	} = null;
+	if (updatedata === false)
+		pull = await db.anime.findUnique({
+			where: { alid },
+			select: { alid: true, status: true, jpname: true, next_ep_air: true, next_ep_num: true }
+		});
 	var airing = false;
-	if (pull === null || updatedata === true) {
+	if (pull === null) {
 		const res = await getAnimeDetails(alid);
 		if (res === undefined) {
 			return "invalid";

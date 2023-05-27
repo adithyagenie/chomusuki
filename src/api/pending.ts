@@ -32,12 +32,12 @@ export async function getPending(userid: number) {
 
 export async function getSinglePending(userid: number, animename?: string, alid?: number) {
 	let animeentry: anime;
-	let watched: number[];
 	try {
 		if (alid != undefined) {
 			animeentry = await db.anime.findUnique({
 				where: { alid }
 			});
+			if (animeentry === null) throw new Error(`No anime found: ${alid}`);
 		} else {
 			const _ = await db.anime.findMany({
 				where: {
@@ -48,17 +48,17 @@ export async function getSinglePending(userid: number, animename?: string, alid?
 			if (_.length == 0) throw new Error(`Unable to fetch anime with name ${animename}`);
 			animeentry = _[0];
 		}
-		watched = getNumber(
-			(
-				await db.watchedepanime.findUnique({
-					where: {
-						userid_alid: { userid: userid, alid: animeentry.alid }
-					},
-					select: { ep: true }
-				})
-			).ep
-		) as number[];
-		return await getPendingInAnime(watched, animeentry);
+		const watched = await db.watchedepanime.findUnique({
+			where: {
+				userid_alid: { userid: userid, alid: animeentry.alid }
+			},
+			select: { ep: true }
+		});
+		if (watched === null) {
+			console.error(`Got null when pulling watched - ${alid}: ${userid}`);
+			return null;
+		}
+		return await getPendingInAnime(getNumber(watched.ep) as number[], animeentry);
 	} catch (error) {
 		console.error(error);
 		return undefined;
@@ -90,7 +90,7 @@ async function getPendingInAnime(watchedep: number[], animeentry: anime) {
 		shortname: shortname,
 		watched: watchedep,
 		notwatched: [],
-		imagelink: animeentry.fileid,
+		image: animeentry.fileid,
 		status: status
 	};
 	resobj.notwatched = Array.from({ length: animeentry.last_ep }, (_, i) => i + 1)

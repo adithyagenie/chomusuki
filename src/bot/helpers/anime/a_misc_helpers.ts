@@ -1,8 +1,6 @@
 import { InlineKeyboardButton, MessageEntity } from "@grammyjs/types";
 import { InlineKeyboard } from "grammy";
 import { i_ProcessedObjV2 } from "../../../interfaces";
-import { authchat } from "../../..";
-import { MyContext } from "../../bot";
 import { getSinglePending } from "../../../api/pending";
 
 // Makes keyboard for download and mark watched
@@ -12,6 +10,7 @@ export async function makeEpKeyboard(
 	userid: number
 ) {
 	caption = caption.split("Anime: ")[1].split("\n")[0].trim();
+	if (caption == undefined) throw new Error("Unable to make keyboard.");
 	var updateobj = await getSinglePending(userid, caption);
 	if (updateobj == undefined) return undefined;
 	let keyboard = new InlineKeyboard();
@@ -22,11 +21,13 @@ export async function makeEpKeyboard(
 	) {
 		let bruh: InlineKeyboardButton.CallbackButton = {
 			text: `Episode ${updateobj.notwatched[i]}`,
-			callback_data: `${callback_data_string}_${updateobj.notwatched[i]}`
+			callback_data: `${callback_data_string}_${updateobj.alid}_${updateobj.notwatched[i]}`
 		};
 		let bruh2: InlineKeyboardButton.CallbackButton = {
 			text: `Episode ${updateobj.notwatched[i + 1]}`,
-			callback_data: `${callback_data_string}_${updateobj.notwatched[i + 1]}`
+			callback_data: `${callback_data_string}_${updateobj.alid}_${
+				updateobj.notwatched[i + 1]
+			}`
 		};
 		if (updateobj.notwatched[i + 1] === undefined) keyboard.add(bruh).row();
 		else keyboard.add(bruh).add(bruh2).row();
@@ -34,14 +35,6 @@ export async function makeEpKeyboard(
 	keyboard.text("Go back", "back");
 	return keyboard;
 }
-
-export const authchatEval = (ctx: MyContext) => {
-	if (ctx.from.id != authchat) {
-		ctx.reply("Bot not yet available for public use (｡•́︿•̀｡)");
-		return false;
-	}
-	return true;
-};
 
 export const getUpdaterAnimeIndex = async (name: string, pending: i_ProcessedObjV2[]) =>
 	pending.map((object) => object.jpname).indexOf(name);

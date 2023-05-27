@@ -12,16 +12,29 @@ async function cronn(alid: number, aniname: string, next_ep_air: number, next_ep
 	);
 	if (next_ep_air * 1000 < Date.now()) {
 		console.error("Time to schedule in past.");
+		const res2 = await checkAnimeTable(alid, true);
+		if (res2 == "err" || res2 == "invalid") throw new Error("Unable to fetch anime table.");
+		cronn(
+			alid,
+			res2.pull.jpname,
+			res2.pull.next_ep_air,
+			getNumber(res2.pull.next_ep_num) as number
+		);
 		return;
 	}
-	const job = cron.scheduleJob(`${alid}`, new Date(next_ep_air * 1000), async () =>
-		airhandle(alid, aniname, next_ep_num)
+	const job = cron.scheduleJob(
+		`${alid}`,
+		new Date(next_ep_air * 1000),
+		function (alid: number, aniname: string, next_ep_num: number) {
+			airhandle(alid, aniname, next_ep_num);
+		}.bind(null, alid, aniname, next_ep_num)
 	);
 	if (job !== null) job.on("error", (err) => console.log(err));
 }
 
 async function airhandle(alid: number, aniname: string, next_ep_num: number) {
 	console.log(`Processing job for ${aniname} - ${next_ep_num}.`);
+	await db.anime.update({ where: { alid }, data: { last_ep: next_ep_num } });
 	const sususers = await db.airingupdates.findUnique({
 		where: { alid },
 		select: { userid: true }
@@ -39,19 +52,29 @@ async function airhandle(alid: number, aniname: string, next_ep_num: number) {
 				parse_mode: "HTML"
 			})
 	);
-	cron.scheduleJob(`AL_${alid}`, new Date(Date.now() + 20000), async () => {
-		console.log(`checking anilist for updates`);
-		const res = await checkAnimeTable(alid, true);
-		if (res === "invalid" || res === "err") throw new Error("Can't fetch anime details.");
-		if (res.airing === true) {
-			cronn(
-				alid,
-				res.pull.jpname,
-				res.pull.next_ep_air,
-				getNumber(res.pull.next_ep_num) as number
-			);
-		}
-	});
+	console.log(
+		`CRON: I will check anilist for updates of ${alid} at ${new Date(
+			Date.now() + 20 * 60 * 1000
+		).toLocaleString()}`
+	);
+	cron.scheduleJob(
+		`AL_${alid}`,
+		new Date(Date.now() + 20 * 60 * 1000),
+		async function (alid: number) {
+			console.log(`Refreshing cron for ${alid}...`);
+			const res = await checkAnimeTable(alid, true);
+			if (res === "invalid" || res === "err") throw new Error("Can't fetch anime details.");
+			if (res.airing === true) {
+				res.pull.next_ep_air = Math.floor(Date.now() / 1000) + 25;
+				cronn(
+					alid,
+					res.pull.jpname,
+					res.pull.next_ep_air,
+					getNumber(res.pull.next_ep_num) as number
+				);
+			}
+		}.bind(null, alid)
+	);
 }
 
 async function reInitCron() {
@@ -75,10 +98,11 @@ async function reInitCron() {
 }
 
 export async function initCron() {
-	await db.anime.update({
-		where: { alid: 150672 },
-		data: { next_ep_air: Math.floor(Date.now() / 1000) + 30 }
-	});
+	// await db.anime.update({
+	// 	where: { alid: 150672 },
+	// 	data: { next_ep_air: Math.floor(Date.now() / 1000) - 30 }
+	// });
 	await reInitCron();
-	cron.scheduleJob("main", " */2 * * * *", () => reInitCron());
+	//cron.scheduleJob("main", "*/2 * * * *", () => reInitCron()); // EVERY 2 minute
+	cron.scheduleJob("main", "0 * * * *", () => reInitCron());
 }
