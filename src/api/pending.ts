@@ -1,13 +1,14 @@
 import { anime } from "@prisma/client";
-import { GetWatchedList, getNumber } from "../database/animeDB";
+import { getNumber, GetWatchedList } from "../database/animeDB";
 import { db } from "..";
 import { i_ProcessedObjV2 } from "../interfaces";
+
 //import { writeJSON } from "fs-extra";
 
 /** Returns all yet to watch episodes of user. */
 export async function getPending(userid: number) {
 	const t = new Date().getTime();
-	let alidlist = await db.watchinganime.findUnique({
+	const alidlist = await db.watchinganime.findUnique({
 		where: { userid },
 		select: { alid: true }
 	});
@@ -18,10 +19,10 @@ export async function getPending(userid: number) {
 	const watchedlist = await GetWatchedList(userid, alidlist.alid);
 	const reqQueue = [];
 	for (let i = 0; i < alidlist.alid.length; i++) {
-		let alid = alidlist.alid[i];
+		const alid = alidlist.alid[i];
 		let watched = watchedlist.find((o) => o.alid == alidlist.alid[i]);
 		if (watched === undefined) watched = { alid: alid, ep: [] };
-		let animeentry = animelist.find((o) => o.alid == alidlist.alid[i]);
+		const animeentry = animelist.find((o) => o.alid == alidlist.alid[i]);
 		reqQueue.push(getPendingInAnime(getNumber(watched.ep) as number[], animeentry));
 	}
 	const res: i_ProcessedObjV2[] = await Promise.all(reqQueue);
@@ -33,12 +34,7 @@ export async function getPending(userid: number) {
 export async function getSinglePending(userid: number, animename?: string, alid?: number) {
 	let animeentry: anime;
 	try {
-		if (alid != undefined) {
-			animeentry = await db.anime.findUnique({
-				where: { alid }
-			});
-			if (animeentry === null) throw new Error(`No anime found: ${alid}`);
-		} else {
+		if (alid == undefined) {
 			const _ = await db.anime.findMany({
 				where: {
 					jpname: animename.trim()
@@ -47,6 +43,11 @@ export async function getSinglePending(userid: number, animename?: string, alid?
 			});
 			if (_.length == 0) throw new Error(`Unable to fetch anime with name ${animename}`);
 			animeentry = _[0];
+		} else {
+			animeentry = await db.anime.findUnique({
+				where: { alid }
+			});
+			if (animeentry === null) throw new Error(`No anime found: ${alid}`);
 		}
 		const watched = await db.watchedepanime.findUnique({
 			where: {
@@ -70,8 +71,7 @@ export async function getSinglePending(userid: number, animename?: string, alid?
  ** Returns the 'res' obj for each watching anime.
  */
 async function getPendingInAnime(watchedep: number[], animeentry: anime) {
-	var resobj: i_ProcessedObjV2;
-	var shortname: string | undefined;
+	let shortname: string | undefined;
 	if (!(animeentry.optnames == null || animeentry.optnames.length == 0)) {
 		shortname = animeentry.optnames.reduce((a, b) => (a.length <= b.length ? a : b)); // returns shortest string in optname
 		if (animeentry.jpname.length <= shortname.length) {
@@ -83,7 +83,7 @@ async function getPendingInAnime(watchedep: number[], animeentry: anime) {
     also, old af anime dont have airing schedule, instead find the streaming thing and use aniep on it.*/
 	const status = animeentry.status;
 	if (!(status == "RELEASING" || status == "NOT_YET_RELEASED" || status == "FINISHED")) return;
-	resobj = {
+	const resobj = {
 		alid: animeentry.alid,
 		jpname: animeentry.jpname,
 		enname: animeentry.enname,

@@ -1,15 +1,13 @@
 import { db } from "../../..";
-import { addAiringFollow, getUserWatchingAiring } from "../../../database/animeDB";
+import { addAiringFollow, checkAnimeTable, getUserWatchingAiring } from "../../../database/animeDB";
 import { MyContext } from "../../bot";
-import { getPagination } from "./a_misc_helpers";
-import { checkAnimeTable } from "../../../database/animeDB";
-import { HTMLMessageToMessage } from "./a_misc_helpers";
+import { getPagination, HTMLMessageToMessage } from "./a_misc_helpers";
 
 /**
  ** Live updates for airing shit.
  ** Responds to "/remindme_alid". */
 export async function remindMe(ctx: MyContext) {
-	ctx.deleteMessage();
+	await ctx.deleteMessage();
 	const userid = ctx.session.userid;
 	const alid = parseInt(ctx.match[1]);
 	if (alid == undefined || Number.isNaN(alid)) {
@@ -18,18 +16,18 @@ export async function remindMe(ctx: MyContext) {
 	}
 	const _ = await checkAnimeTable(alid);
 	if (_ == "invalid") {
-		ctx.reply(`Invalid Anilist ID.`);
+		await ctx.reply(`Invalid Anilist ID.`);
 		return;
 	}
 	const __ = await db.airingupdates.findMany({
 		where: { userid: { has: userid } },
 		select: { alid: true }
 	});
-	let remindme: number[] = [];
+	let remindme: number[];
 	if (__ === null) remindme = [];
 	else remindme = __.map((o) => o.alid);
 	if (remindme.includes(alid)) {
-		ctx.reply("You are already following updates for this anime!");
+		await ctx.reply("You are already following updates for this anime!");
 		return;
 	}
 	const res = await addAiringFollow(alid, userid);
@@ -71,7 +69,7 @@ export async function airingUpdatesListHelper(userid: number, offset: number, us
 		5,
 		offset
 	);
-	var msg = "";
+	let msg: string;
 	if (amount == 0) {
 		msg = `<b>You have not subscribed to airing updates for any anime. </b>`;
 		return { msg: msg, keyboard: undefined };
@@ -110,33 +108,33 @@ export async function airingUpdatesListCBQ(ctx: MyContext) {
  ** Called by /stopairingupdates_alid.
  */
 export async function stopAiringUpdates(ctx: MyContext) {
-	ctx.deleteMessage();
+	await ctx.deleteMessage();
 	const remove = parseInt(ctx.match[1] as string);
-	const _ = await db.anime.findUnique({
+	const anideets = await db.anime.findUnique({
 		where: { alid: remove },
 		select: { jpname: true, status: true }
 	});
-	if (_ == undefined || !(_.status == "RELEASING" || _.status == "NOT_YET_RELEASED")) {
-		ctx.reply(`Invalid anime provided.`);
+	if (anideets == undefined || !(anideets.status == "RELEASING" || anideets.status == "NOT_YET_RELEASED")) {
+		await ctx.reply(`Invalid anime provided.`);
 		return;
 	}
-	const name = _.jpname;
-	let __ = await db.airingupdates.findMany({
+	const name = anideets.jpname;
+	const userau = await db.airingupdates.findMany({
 		where: { userid: { has: ctx.session.userid } }
 	});
 	let i = -1;
-	if (__ !== null) i = __.map((o) => o.alid).indexOf(remove);
+	if (userau !== null) i = userau.map((o) => o.alid).indexOf(remove);
 	if (i === -1) {
-		ctx.reply(`You are already not recieving the updates for <b>${name}</b>.`, {
+		await ctx.reply(`You are already not recieving the updates for <b>${name}</b>.`, {
 			parse_mode: "HTML"
 		});
 		return;
 	}
-	__[i].userid.splice(__[i].userid.indexOf(ctx.session.userid), 1);
+	userau[i].userid.splice(userau[i].userid.indexOf(ctx.session.userid), 1);
 	await db.airingupdates.update({
 		where: { alid: remove },
-		data: __[i]
+		data: userau[i]
 	});
-	ctx.reply(`You will no longer recieve updates for <b>${name}</b>.`, { parse_mode: "HTML" });
+	await ctx.reply(`You will no longer recieve updates for <b>${name}</b>.`, { parse_mode: "HTML" });
 	return;
 }

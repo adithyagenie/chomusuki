@@ -1,6 +1,16 @@
 // spins up everything
 
-require("dotenv").config();
+import { config } from "dotenv";
+import { botinit } from "./bot/bot";
+import { startserver } from "./api/server";
+import { createWriteStream } from "fs-extra";
+import { format } from "util";
+import { PrismaClient } from "@prisma/client";
+import { pendingEndpoint } from "./bot/helpers/anime/a_pending";
+import { initCron } from "./api/refreshAiring";
+import { MediaSearchEntry } from "anilist-node";
+
+config();
 if (
 	process.env.BOT_TOKEN === undefined ||
 	process.env.ANILIST_TOKEN === undefined ||
@@ -11,22 +21,12 @@ if (
 	console.log("ENV VARIABLE NOT SET!");
 	process.exit();
 }
-import { botinit } from "./bot/bot";
-import { startserver } from "./api/server";
-import { createWriteStream } from "fs-extra";
-import { format } from "util";
-import { PrismaClient } from "@prisma/client";
-import { setupCache } from "axios-cache-interceptor";
-import Axios from "axios";
-import { pendingEndpoint } from "./bot/helpers/anime/a_pending";
-import { initCron } from "./api/refreshAiring";
 
-export const axios = setupCache(Axios);
-var log_file = createWriteStream("./debug.log", { flags: "w" });
-var log_stdout = process.stdout;
-var log_stderr = process.stderr;
+const log_file = createWriteStream("./log.txt", { flags: "w" });
+const log_stdout = process.stdout;
+const log_stderr = process.stderr;
 
-console.log = function (d: any) {
+console.log = function(d: string) {
 	const time = new Date().toLocaleString("en-IN", {
 		timeZone: "Asia/Kolkata"
 	});
@@ -34,7 +34,7 @@ console.log = function (d: any) {
 	log_stdout.write(`${time}: ${format(d)}\n`);
 };
 
-console.error = function (d: any) {
+console.error = function(d: string) {
 	const time = new Date().toLocaleString("en-IN", {
 		timeZone: "Asia/Kolkata"
 	});
@@ -44,11 +44,16 @@ console.error = function (d: any) {
 
 export const app = startserver();
 export const db = new PrismaClient();
+export const requestCache: {
+	query: string;
+	pg: number;
+	response: MediaSearchEntry;
+	timestamp: number;
+}[] = [];
 
 async function spinup() {
-	//await updater.updater()
 	pendingEndpoint(app);
-	await botinit();
+	botinit();
 	await initCron();
 	app.post("/sync", async (req, res) => {
 		if (req.headers.calledby == "manualcall") {

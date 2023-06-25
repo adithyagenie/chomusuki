@@ -2,8 +2,7 @@ import { InlineKeyboard } from "grammy";
 import { db } from "../../..";
 import { addWatching, checkAnimeTable, getUserWatchingAiring } from "../../../database/animeDB";
 import { MyContext, MyConversation } from "../../bot";
-import { getPagination } from "./a_misc_helpers";
-import { HTMLMessageToMessage } from "./a_misc_helpers";
+import { getPagination, HTMLMessageToMessage } from "./a_misc_helpers";
 
 /**
  ** Sends the first page of the list of anime the user is currently watching.
@@ -38,13 +37,13 @@ async function watchingListHelper(
 		10,
 		offset
 	);
-	var msg = "";
+	let msg: string;
 	if (amount == 0) {
 		msg = `<b>You are currently not watching any anime. Add some with /startwatching to get started.</b>`;
 		return { msg: msg, keyboard: undefined };
 	} else msg = `<b>Displaying your currently watching list: </b>\n\n`;
 	for (let i = 0; i < alidlist.length; i++) {
-		msg += `${i + 1}. ${animelist[i]}\n`;
+		msg += `${i + 1}. <b>${animelist[i]}</b>\n`;
 		if (list === "watching") {
 			msg += `<i>Remove from watching list: <a href="t.me/${username}?start=stopwatching_${alidlist[i]}">Click here!</a></i>\n\n`;
 		} else if (list === "pending") {
@@ -81,7 +80,7 @@ export async function watchingListCBQ(ctx: MyContext) {
  ** Responds to "/startwatching_alid".
  */
 export async function animeStartWatch(ctx: MyContext) {
-	ctx.deleteMessage();
+	await ctx.deleteMessage();
 	const alid = parseInt(ctx.match[1]);
 	if (alid == undefined || Number.isNaN(alid)) {
 		await ctx.reply("Invalid.");
@@ -119,7 +118,7 @@ export async function animeStartWatch(ctx: MyContext) {
 	}
 	await ctx.reply(`Marked ${res.pull.jpname} as watching!`);
 	if (res.airing)
-		ctx.reply(
+		await ctx.reply(
 			`${res.pull.jpname} is currently airing. If you would like to follow its episode releases: <a href="t.me/${ctx.me.username}?start=remindme_${res.pull.alid}">Click here!</a>`,
 			{ parse_mode: "HTML" }
 		);
@@ -131,7 +130,7 @@ export async function animeStartWatch(ctx: MyContext) {
  ** Called with /stopwatching_alid.
  */
 export async function stopWatching(conversation: MyConversation, ctx: MyContext) {
-	ctx.deleteMessage();
+	await ctx.deleteMessage();
 	const match = parseInt(ctx.match[1]);
 	if (Number.isNaN(match[1])) {
 		await ctx.reply("Invalid command.");
@@ -164,8 +163,8 @@ export async function stopWatching(conversation: MyConversation, ctx: MyContext)
 			reply_markup: new InlineKeyboard().text("Yes.", "y").text("Hell no.", "n")
 		})
 	).message_id;
-	const cbq = await conversation.waitForCallbackQuery(/y|n/);
-	cbq.answerCallbackQuery("Processing...");
+	const cbq = await conversation.waitForCallbackQuery(/[yn]/);
+	await cbq.answerCallbackQuery("Processing...");
 	if (cbq.callbackQuery.data == "y") {
 		await conversation.external(async () => {
 			_.splice(

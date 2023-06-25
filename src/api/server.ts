@@ -1,6 +1,6 @@
 // exposes proper endpoint and handles api calls
 
-import express, { ErrorRequestHandler, NextFunction } from "express";
+import express, { ErrorRequestHandler } from "express";
 import { bot } from "../bot/bot";
 import { webhookCallback } from "grammy";
 
@@ -10,10 +10,10 @@ export function startserver() {
 	app.use(express.json());
 	const errorHandler: ErrorRequestHandler = (err, req, res, next) => {
 		console.error(err.stack);
-		res.status(200).send("Error!");
+		res.status(400).send("Error!");
 	};
+	app.use(`/${process.env.BOT_TOKEN}`, webhookCallback(bot, "express"));
 	app.use(errorHandler);
-	app.use(`/${process.env.BOT_TOKEN}`, webhookCallback(bot, "express", "throw", 20000));
 	app.get("/", (req, res) => {
 		res.status(200).send("Cunnime bot up and running ^_^");
 	});

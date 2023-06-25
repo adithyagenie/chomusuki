@@ -1,9 +1,7 @@
-node_modules*/
+node_modules/
 out/
 .env
-.eslintrc.js
-log*.*
-*.txt
+.eslintrc
 .vscode
 *.json
 !package.json

@@ -1,11 +1,11 @@
 import { InlineKeyboard } from "grammy";
-import { axios } from "../../..";
+import axios from "axios";
 import { getSinglePending } from "../../../api/pending";
-import { MyContext, bot } from "../../bot";
+import { bot, MyContext } from "../../bot";
 import { Application } from "express";
 
 export async function a_Pending(ctx: MyContext) {
-	ctx.deleteMessage();
+	await ctx.deleteMessage();
 	const userid = ctx.session.userid;
 	try {
 		const res = await axios.get("http://localhost:4000/pending", {
@@ -14,10 +14,8 @@ export async function a_Pending(ctx: MyContext) {
 				userid: userid,
 				alid: parseInt(ctx.match[1]),
 				is_bot: true
-			},
-			id: "_"
+			}
 		});
-		axios.storage.remove("_");
 		if (res.status == 200) {
 			return;
 		}
@@ -29,7 +27,7 @@ export async function a_Pending(ctx: MyContext) {
 
 /**Replies to /pending. Responds to localhost call. */
 async function animePendingBotHandle(chatid: number, userid: number, alid: number) {
-	var msgs: { image: string; msg: string }[] = [];
+	await bot.api.sendChatAction(chatid, "typing");
 	const res = await getSinglePending(userid, null, alid);
 	if (res === undefined) return undefined;
 	else if (res === null) return null;
@@ -60,7 +58,7 @@ async function animePendingBotHandle(chatid: number, userid: number, alid: numbe
 	//Better logic
 	if ((msg + msgheader).length > 1024) {
 		console.log("Trying to trim");
-		let lines = msg.split("\n");
+		const lines = msg.split("\n");
 		msg = lines[0] + "\n";
 		for (let j = 1; j < lines.length; j++) {
 			if ((msgheader + msg + lines[j]).length + 17 < 1024) msg += `${lines[j]}\n`;

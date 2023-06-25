@@ -28,8 +28,6 @@ model completedanime {
   userid    Int   @id
   completed Int[]
   users     users @relation(fields: [userid], references: [userid], onDelete: Cascade, map: "userid")
-
-  @@unique([userid, completed], map: "completedanime_user_anime_unique")
 }
 
 model config {
@@ -52,7 +50,7 @@ model syncupd {
 
 model users {
   userid         Int              @id @default(autoincrement()) @db.SmallInt
-  chatid         Int?             @unique(map: "unique_chatid")
+  chatid         BigInt?          @unique(map: "unique_chatid")
   username       String?          @db.VarChar(255)
   completedanime completedanime?
   config         config?
@@ -75,12 +73,11 @@ model watchedepanime {
 }
 
 model watchlists {
-  watchlistid    Int       @id @default(autoincrement()) @db.SmallInt
-  watchlist_name String?   @db.VarChar(255)
-  animeid        Int[]
-  status         Boolean[]
+  watchlistid    Int     @id @default(autoincrement()) @db.SmallInt
+  watchlist_name String? @db.VarChar(255)
+  alid           Int[]
   generated_by   Int
-  users          users     @relation(fields: [generated_by], references: [userid], onDelete: Cascade, map: "generated_by")
+  users          users   @relation(fields: [generated_by], references: [userid], onDelete: Cascade, map: "generated_by")
 }
 
 model airingupdates {

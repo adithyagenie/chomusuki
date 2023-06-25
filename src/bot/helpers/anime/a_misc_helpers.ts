@@ -11,19 +11,19 @@ export async function makeEpKeyboard(
 ) {
 	caption = caption.split("Anime: ")[1].split("\n")[0].trim();
 	if (caption == undefined) throw new Error("Unable to make keyboard.");
-	var updateobj = await getSinglePending(userid, caption);
+	const updateobj = await getSinglePending(userid, caption);
 	if (updateobj == undefined) return undefined;
-	let keyboard = new InlineKeyboard();
+	const keyboard = new InlineKeyboard();
 	for (
 		let i = 0;
 		i < (updateobj.notwatched.length > 30 ? 30 : updateobj.notwatched.length);
 		i += 2
 	) {
-		let bruh: InlineKeyboardButton.CallbackButton = {
+		const bruh: InlineKeyboardButton.CallbackButton = {
 			text: `Episode ${updateobj.notwatched[i]}`,
 			callback_data: `${callback_data_string}_${updateobj.alid}_${updateobj.notwatched[i]}`
 		};
-		let bruh2: InlineKeyboardButton.CallbackButton = {
+		const bruh2: InlineKeyboardButton.CallbackButton = {
 			text: `Episode ${updateobj.notwatched[i + 1]}`,
 			callback_data: `${callback_data_string}_${updateobj.alid}_${
 				updateobj.notwatched[i + 1]
@@ -40,7 +40,7 @@ export const getUpdaterAnimeIndex = async (name: string, pending: i_ProcessedObj
 	pending.map((object) => object.jpname).indexOf(name);
 
 export function getPagination(current: number, maxpage: number, text: string) {
-	var keys: InlineKeyboardButton[] = [];
+	const keys: InlineKeyboardButton[] = [];
 	if (current > 1) keys.push({ text: `«1`, callback_data: `${text}_1` });
 	if (current > 2)
 		keys.push({
@@ -64,6 +64,7 @@ export function getPagination(current: number, maxpage: number, text: string) {
 
 	return new InlineKeyboard().add(...keys);
 }
+
 export const messageToHTMLMessage = (text: string, entities: MessageEntity[]) => {
 	if (!entities || !text) {
 		return text;

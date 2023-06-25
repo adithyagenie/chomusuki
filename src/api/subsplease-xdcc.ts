@@ -1,4 +1,5 @@
-import { axios } from "..";
+import axios from "axios";
+
 //import { xdccInit } from "../downloader/xdcc-down"
 
 interface NIBLQuery {
@@ -10,6 +11,7 @@ interface NIBLQuery {
 	episodeNumber: number;
 	lastModified: string;
 }
+
 export interface SPSearch {
 	packnum: number;
 	botname: string;
@@ -22,16 +24,16 @@ export async function getxdcc(name: string) {
 		packnum: 0,
 		botname: ""
 	};
-	let botnames = {
+	const botnames = {
 		989: "CR-ARUTHA|NEW",
 		696: "CR-HOLLAND|NEW",
 		21: "Ginpachi-Sensei"
 	};
 	const baseURL = "https://api.nibl.co.uk/nibl";
 	const encodename = encodeURI(name);
-	let res = await axios.get(`${baseURL}/search/?query=${encodename}`);
+	const res = await axios.get(`${baseURL}/search/?query=${encodename}`);
 	if (res.status == 200) {
-		let resobj: NIBLQuery[] = res.data.content;
+		const resobj: NIBLQuery[] = res.data.content;
 
 		if (resobj.length > 0) {
 			for (let i = 0; i < resobj.length; i++) {
@@ -50,8 +52,7 @@ export async function getxdcc(name: string) {
 			}
 		} else console.log("No packs found");
 	} else {
-		console.error("err");
-		Promise.reject("axios err");
+		console.error("axios err");
 		return {
 			packnum: 0,
 			botname: ""

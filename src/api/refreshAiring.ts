@@ -2,6 +2,7 @@ import * as cron from "node-schedule";
 import { PrismaClient } from "@prisma/client";
 import { bot } from "../bot/bot";
 import { checkAnimeTable, getNumber } from "../database/animeDB";
+
 const db = new PrismaClient();
 
 async function cronn(alid: number, aniname: string, next_ep_air: number, next_ep_num: number) {
@@ -14,7 +15,7 @@ async function cronn(alid: number, aniname: string, next_ep_air: number, next_ep
 		console.error("Time to schedule in past.");
 		const res2 = await checkAnimeTable(alid, true);
 		if (res2 == "err" || res2 == "invalid") throw new Error("Unable to fetch anime table.");
-		cronn(
+		await cronn(
 			alid,
 			res2.pull.jpname,
 			res2.pull.next_ep_air,
@@ -25,7 +26,7 @@ async function cronn(alid: number, aniname: string, next_ep_air: number, next_ep
 	const job = cron.scheduleJob(
 		`${alid}`,
 		new Date(next_ep_air * 1000),
-		function (alid: number, aniname: string, next_ep_num: number) {
+		function(alid: number, aniname: string, next_ep_num: number) {
 			airhandle(alid, aniname, next_ep_num);
 		}.bind(null, alid, aniname, next_ep_num)
 	);
@@ -45,13 +46,12 @@ async function airhandle(alid: number, aniname: string, next_ep_num: number) {
 		where: { userid: { in: sususers.userid } },
 		select: { chatid: true }
 	});
-	chatid.forEach(
-		async (o) =>
-			await bot.api.sendPhoto(o.chatid, imglink.fileid, {
-				caption: `Episode ${next_ep_num} of <b>${aniname}</b> is airing now.\nDownload links will be available soon.`,
-				parse_mode: "HTML"
-			})
-	);
+	for (const o of chatid) {
+		await bot.api.sendPhoto(Number(o.chatid), imglink.fileid, {
+			caption: `Episode ${next_ep_num} of <b>${aniname}</b> is airing now.\nDownload links will be available soon.`,
+			parse_mode: "HTML"
+		});
+	}
 	console.log(
 		`CRON: I will check anilist for updates of ${alid} at ${new Date(
 			Date.now() + 20 * 60 * 1000
@@ -60,13 +60,13 @@ async function airhandle(alid: number, aniname: string, next_ep_num: number) {
 	cron.scheduleJob(
 		`AL_${alid}`,
 		new Date(Date.now() + 20 * 60 * 1000),
-		async function (alid: number) {
+		async function(alid: number) {
 			console.log(`Refreshing cron for ${alid}...`);
 			const res = await checkAnimeTable(alid, true);
 			if (res === "invalid" || res === "err") throw new Error("Can't fetch anime details.");
 			if (res.airing === true) {
 				res.pull.next_ep_air = Math.floor(Date.now() / 1000) + 25;
-				cronn(
+				await cronn(
 					alid,
 					res.pull.jpname,
 					res.pull.next_ep_air,
