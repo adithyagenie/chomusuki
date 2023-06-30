@@ -288,11 +288,15 @@ export async function getWatchlistAnime(
     wlid: number,
     currentpg?: number,
     amount?: number,
-    paginate = true
+    paginate = true,
+    maxpgreq = true
 ) {
-    const maxpg = (await db.$queryRaw<{
-        len: number
-    }[]>`SELECT array_length(alid, 1) AS len FROM watchlists WHERE watchlistid = ${wlid};`)[0].len;
+    let maxpg: number;
+    if (maxpgreq === true)
+        maxpg = Math.ceil((await db.$queryRaw<{
+            len: number
+        }[]>`SELECT array_length(alid, 1) AS len FROM watchlists WHERE watchlistid = ${wlid};`)[0].len / amount);
+    else maxpg = undefined;
     let wl: {
         jpname: string;
         alid: number
@@ -305,7 +309,7 @@ OFFSET ${(currentpg - 1) * amount} LIMIT ${amount};`;
     else
         wl = await db.$queryRaw`SELECT a.jpname, a.alid FROM anime a, watchlists w, unnest(w.alid) s 
 WHERE (a.alid IN (s)) AND (w.watchlistid = ${wlid})`;
-    
+
     if (wl === null) return undefined;
     return {wl, maxpg};
 

@@ -11,23 +11,53 @@
  -- Back
  */
 
-import {Menu, MenuRange} from "@grammyjs/menu";
-import {bot, MyContext} from "../../bot";
-import {db} from "../../..";
-import {selfyeet} from "../misc_handles";
-import {getWatchlistAnime, markDone, markNotDone, removeFromWatchlist} from "../../../database/animeDB";
+import { Menu, MenuRange } from "@grammyjs/menu";
+import { bot, MyContext } from "../../bot";
+import { db } from "../../..";
+import { selfyeet } from "../misc_handles";
+import {
+    getWatchlistAnime,
+    markDone,
+    markNotDone,
+    removeFromWatchlist
+} from "../../../database/animeDB";
+
+function getWlAlid(ctx: MyContext, w: boolean, a: boolean) {
+    if (w && !a) {
+        if (ctx.session.menudata.wlid === undefined) return "back";
+        return { wlid: ctx.session.menudata.wlid, alid: undefined };
+    } else if (!w && a) {
+        if (ctx.session.menudata.alid === undefined) return "back";
+        return { wlid: undefined, alid: ctx.session.menudata.alid };
+    } else if (w && a) {
+        if (ctx.session.menudata.wlid === undefined || ctx.session.menudata.alid === undefined) return "back";
+        return { wlid: ctx.session.menudata.wlid, alid: ctx.session.menudata.alid };
+    }
+}
+
+async function getWLName(ctx: MyContext, wlid: number) {
+    if (ctx.session.menudata.wlname !== undefined) return ctx.session.menudata.wlname;
+    else {
+        const wlname = (await db.watchlists.findUniqueOrThrow({
+            where: { watchlistid: wlid },
+            select: { watchlist_name: true }
+        })).watchlist_name;
+        ctx.session.menudata.wlname = wlname;
+        return wlname;
+    }
+}
 
 function WLMainMenu() {
-    return new Menu<MyContext>("wlmenu").dynamic(async (ctx) => {
+    return new Menu<MyContext>("wl_main").dynamic(async (ctx) => {
         const range = new MenuRange<MyContext>();
         const wllist = await db.watchlists.findMany({
-            where: {generated_by: ctx.session.userid},
-            select: {watchlist_name: true, watchlistid: true}
+            where: { generated_by: ctx.session.userid },
+            select: { watchlist_name: true, watchlistid: true }
         });
         if (wllist === null || wllist.length === 0) {
             range
-                .text("-No watchlists available-", (ctx) =>
-                    ctx.menu.update()
+                .text("-No watchlists available-", (ctx1) =>
+                    ctx1.menu.update()
                 )
                 .row();
             return range;
@@ -42,26 +72,29 @@ function WLMainMenu() {
         for (let i = 0; i < wllist.length; i += 2) {
             if (i === wllist.length - 1 && wllist.length % 2 !== 0) {
                 range
-                    .submenu(TextPayload(wllist.slice(-1)[0].watchlist_name, wllist.slice(-1)[0].watchlistid), `wlopts`, (ctx) => {
-                        ctx.editMessageText(
+                    .submenu(wllist.slice(-1)[0].watchlist_name, `wl_opts`, async (ctx1) => {
+                        await ctx1.editMessageText(
                             `Watchlist ${
                                 wllist.slice(-1)[0].watchlist_name
                             } chosen.\nWhat do you want to do with it?`
                         );
+                        ctx1.session.menudata.wlid = wllist.slice(-1)[0].watchlistid;
                     })
                     .row();
                 break;
             }
             range
-                .submenu(TextPayload(wllist[i].watchlist_name, wllist[i].watchlistid), `wlopts`, (ctx) => {
-                    ctx.editMessageText(
+                .submenu(wllist[i].watchlist_name, `wl_opts`, async (ctx1) => {
+                    await ctx1.editMessageText(
                         `Watchlist ${wllist[i].watchlist_name} chosen.\nWhat do you want to do with it?`
                     );
+                    ctx1.session.menudata.wlid = wllist[i].watchlistid;
                 })
-                .submenu(TextPayload(wllist[i + 1].watchlist_name, wllist[i + 1].watchlistid), `wlopts`, (ctx) => {
-                    ctx.editMessageText(
+                .submenu(wllist[i + 1].watchlist_name, `wl_opts`, async (ctx1) => {
+                    await ctx1.editMessageText(
                         `Watchlist ${wllist[i].watchlist_name} chosen.\nWhat do you want to do with it?`
                     );
+                    ctx1.session.menudata.wlid = wllist[i + 1].watchlistid;
                 })
                 .row();
         }
@@ -69,160 +102,95 @@ function WLMainMenu() {
     });
 }
 
-function getWlAlid(ctx: MyContext, w: boolean, a: boolean) {
-    if (ctx.match == undefined) return undefined;
-    if (w && !a)
-        return {
-            wlid: parseInt(ctx.match.toString()
-            )
-        };
-    else if (w && a) {
-        const matches = ctx.match.toString().match(/(\d+)_(\d+)/);
-        return {wlid: parseInt(matches[1]), alid: parseInt(matches[2])};
-    }
-}
-
-function TextPayload(text: string, payload: string | number) {
-    return {text: text, payload: `${payload}`};
-}
-
-async function getWLName(wlid: number) {
-    return (await db.watchlists.findUniqueOrThrow({
-        where: {watchlistid: wlid},
-        select: {watchlist_name: true}
-    })).watchlist_name;
-}
-
-// function getPaginatedMenu(current: number, maxpg: number, wlid: number, range: MenuRange<MyContext>) {
-//     if (current > 1) range.submenu({
-//         text: `«1`, payload: `${wlid}_1`
-//     }, "allist");
-//     if (current > 2)
-//         range.submenu({
-//             text: `‹${current - 1}`,
-//             payload: `${wlid}_${(current - 1).toString()}`
-//         }, "allist");
-//     range.submenu({
-//         text: `-${current}-`,
-//         payload: `${wlid}_${current.toString()}_c`
-//     }, "allist");
-//     if (current < maxpg - 1)
-//         range.submenu({
-//             text: `${current + 1}›`,
-//             payload: `${wlid}_${(current + 1).toString()}`
-//         }, "allist");
-//     if (current < maxpg)
-//         range.submenu({
-//             text: `${maxpg}»`,
-//             payload: `${wlid}_${maxpg.toString()}`
-//         }, "allist");
-//     range.row();
-// }
 
 function WLOptsMenu() {
-    return new Menu<MyContext>("wlopts")
-        .text({
-            text: "Add anime", payload: ctx => {
-                return `${(getWlAlid(ctx, true, false)).wlid}`;
-            }
-        }, async (ctx) => await ctx.conversation.enter("addWL"))
+    return new Menu<MyContext>("wl_opts")
+        .text("Add anime", async (ctx) => await ctx.conversation.enter("addWL"))
         .row()
 
-        .submenu({
-                text: "List all anime", payload: ctx => {
-                    return `${(getWlAlid(ctx, true, false)).wlid}_1`;
-                }
-            }, "allist"
-        )
+        .submenu("List all anime", "wl_allist", async (ctx1) => {
+            ctx1.session.menudata.l_page = 1;
+            await ctx1.editMessageText(`Chosen watchlist: ${await getWLName(ctx1, ctx1.session.menudata.wlid)}`);
+        })
 
-        .text({
-            text: "List to-watch anime", payload: ctx => {
-                return `${(getWlAlid(ctx, true, false)).wlid}`;
-            }
-        }, (ctx) => ctx.reply("Under construction."))
+        .text("List to-watch anime", (ctx) => ctx.reply("Under construction."))
         .row()
 
-        .text({
-            text: "Rename watchlist", payload: ctx => {
-                return `${(getWlAlid(ctx, true, false)).wlid}`;
-            }
-        }, (ctx) => ctx.reply("Under construction."))
+        .text("Rename watchlist", (ctx) => ctx.reply("Under construction."))
 
-        .text(
-            {
-                text: "Delete watchlist", payload: ctx => {
-                    return `${(getWlAlid(ctx, true, false)).wlid}`;
-                }
-            },
-            async (ctx) => {
+        .text("Delete watchlist", async (ctx) => {
                 await ctx.conversation.enter("deleteWL");
             }
         )
         .row()
 
-        .back("Go back", (ctx) => ctx.editMessageText("Choose the watchlist from the menu below:"));
+        .back("Go back", async (ctx) => {
+            await ctx.editMessageText("Choose the watchlist from the menu below:");
+            // noinspection AssignmentResultUsedJS
+            Object.keys(ctx.session.menudata).forEach(o => ctx.session.menudata[o] = undefined);
+        });
 }
 
-function listAnimeMenuStart() {
-    return new Menu<MyContext>("allist").dynamic(async (ctx) => {
+function animeList() {
+    return new Menu<MyContext>("wl_allist").dynamic(async (ctx) => {
         const range = new MenuRange<MyContext>();
-        console.log(`GEN PAYLOAD::: ${ctx.match}::: ${ctx.callbackQuery.data}`);
-        const payload = ctx.match.toString().match(/(\d+)_(\d+)(_c)?/);
-        let movepg: number;
-        let wlid: number;
-        if (payload === null) {
-            const payload2 = parseInt(ctx.match.toString());
-            if (payload2 === null) return;
-            wlid = parseInt(payload2[1]);
-            movepg = 1;
+        //const payload = ctx.match.toString().match(/(\d+)_(\d+)(_c)?/);
+        const movepg = ctx.session.menudata.l_page;
+        const temp = getWlAlid(ctx, true, false);
+        if (temp === "back") {
+            range.text("-Menu too old. Generate a new one.-");
+            return range;
+        }
+        const wlid = temp.wlid;
+        const wlname = await getWLName(ctx, wlid);
+        let maxpg: number;
+        let wl: { jpname: string, alid: number }[];
+        if (ctx.session.menudata.maxpg === undefined) {
+            ({ wl, maxpg } = await getWatchlistAnime(wlid, movepg, 5, true));
+            ctx.session.menudata.maxpg = maxpg;
         } else {
-            movepg = parseInt(payload[2]);
-            wlid = parseInt(payload[1]);
-            if (payload[3] === "_c") return;
+            ({ wl, maxpg } = await getWatchlistAnime(wlid, movepg, 5, true, false));
+            maxpg = ctx.session.menudata.maxpg;
         }
-        if (Number.isNaN(wlid) || Number.isNaN(movepg)) return;
-        //const wlid = parseInt(ctx.match.toString());
-        const wlname = await getWLName(wlid);
-        const {wl, maxpg} = await getWatchlistAnime(wlid, movepg, 5, true);
-        for (const item of wl) {
-            range.submenu({text: item.jpname, payload: `${wlid}_${item.alid}`}, "alopts", (ctx1) => {
-                ctx1.editMessageText(`Chosen watchlist: ${wlname}\n` +
-                    `Chosen anime: ${item.alid}\n` +
-                    `What do you wanna do with it?`);
-            }).row();
+        if (wl.length === 0) {
+            range.text("Watchlist is empty").row();
+        } else {
+            for (const item of wl) {
+                range.submenu(item.jpname, "wl_alopts", async (ctx1) => {
+                    await ctx1.editMessageText(`Chosen watchlist: <b>${wlname}</b>\n` +
+                        `Chosen anime: <b>${(await db.anime.findUniqueOrThrow({
+                            where: { alid: item.alid },
+                            select: { jpname: true }
+                        })).jpname}</b>\n` +
+                        `What do you wanna do with it?`, { parse_mode: "HTML" });
+                    ctx1.session.menudata.alid = item.alid;
+                }).row();
+            }
+            // if (maxpg === 1) return range;
+            // range.add(...(getPaginatedMenu(movepg, maxpg, wlid)));
+            if (maxpg !== 1) {
+                if (movepg > 1) range.submenu(`«1`, "wl_allist", (ctx1) => {
+                    ctx1.session.menudata.l_page = 1;
+                });
+                if (movepg > 2) range.submenu(`‹${movepg - 1}`, "wl_allist", (ctx1) => {
+                    ctx1.session.menudata.l_page = movepg - 1;
+                });
+                range.text(`-${movepg}-`);
+                if (movepg < maxpg - 1) range.submenu(`${movepg + 1}›`, "wl_allist", (ctx1) => {
+                    ctx1.session.menudata.l_page = movepg + 1;
+                });
+                if (movepg < maxpg) range.submenu(`${maxpg}»`, "wl_allist", (ctx1) => {
+                    ctx1.session.menudata.l_page = maxpg;
+                });
+                range.row();
+            }
         }
-        // if (maxpg === 1) return range;
-        // range.add(...(getPaginatedMenu(movepg, maxpg, wlid)));
-
-        if (movepg > 1) range.submenu({
-            text: `«1`, payload: `${wlid}_1`
-        }, "allist");
-        if (movepg > 2)
-            range.submenu({
-                text: `‹${movepg - 1}`,
-                payload: `${wlid}_${(movepg - 1).toString()}`
-            }, "allist");
-        range.submenu({
-            text: `-${movepg}-`,
-            payload: `${wlid}_${movepg.toString()}_c`
-        }, "allist");
-        if (movepg < maxpg - 1)
-            range.submenu({
-                text: `${movepg + 1}›`,
-                payload: `${wlid}_${(movepg + 1).toString()}`
-            }, "allist");
-        if (movepg < maxpg)
-            range.submenu({
-                text: `${maxpg}»`,
-                payload: `${wlid}_${maxpg.toString()}`
-            }, "allist");
-        range.row();
-
-        range.back({
-            text: "Go back",
-            payload: `${wlid}`
-        }, (ctx1) => ctx1.editMessageText(`Watchlist ${wlname} chosen.\nWhat do you want to do with it?`));
-
+        range.back("Go back", async (ctx1) => {
+            await ctx1.editMessageText(`Watchlist ${wlname} chosen.\nWhat do you want to do with it?`);
+            ctx1.session.menudata.l_page = undefined;
+            ctx1.session.menudata.maxpg = undefined;
+            ctx1.session.menudata.alid = undefined;
+        });
         return range;
     });
 }
@@ -237,28 +205,36 @@ function listAnimeMenuStart() {
 // 	await;
 // }
 
-function animeListMenu() {
-    return new Menu<MyContext>("alopts")
+function animeListOpts() {
+    return new Menu<MyContext>("wl_alopts")
         .dynamic(async (ctx) => {
             console.log("building aniopts");
             const range = new MenuRange<MyContext>();
-            const {wlid, alid} = getWlAlid(ctx, true, true);
-            const name = (await db.anime.findUniqueOrThrow({where: {alid}, select: {jpname: true}})).jpname;
+            const temp = getWlAlid(ctx, true, true);
+            if (temp === "back") {
+                range.text("-Menu too old. Generate a new one.-");
+                return range;
+            }
+            const { wlid, alid } = temp;
+            const name = (await db.anime.findUniqueOrThrow({
+                where: { alid },
+                select: { jpname: true }
+            })).jpname;
             const is_watched = await db.completedanime.count({
                 where: {
                     userid: ctx.session.userid,
-                    completed: {has: alid}
+                    completed: { has: alid }
                 }
             });
             if (is_watched === 0) {
-                range.text({text: "Mark as watched", payload: `${alid}`}, async (ctx1) => {
-                    await markDone(ctx.session.userid, parseInt(ctx1.match));
+                range.text("Mark as watched", async (ctx1) => {
+                    await markDone(ctx.session.userid, alid);
                     selfyeet(ctx.from.id, (await ctx.reply(`${name} has been marked as completed.`)).message_id, 5000);
                     ctx1.menu.update();
                 });
             } else {
-                range.text({text: "Mark as not watched", payload: `${alid}`}, async (ctx1) => {
-                    const result = await markNotDone(ctx.session.userid, parseInt(ctx1.match));
+                range.text("Mark as not watched", async (ctx1) => {
+                    const result = await markNotDone(ctx.session.userid, alid);
                     if (result === "missing") {
                         await ctx1.reply("Outdated menu.");
                         await ctx1.menu.update();
@@ -275,8 +251,16 @@ function animeListMenu() {
 
                 });
             }
-            range.text({text: "Remove from watchlist", payload: `${wlid}_${alid}`}, async (ctx1) => {
-                const {wlid, alid} = getWlAlid(ctx, true, true);
+            range.text({
+                text: "Remove from watchlist",
+                payload: `${wlid}_${alid}`
+            }, async (ctx1) => {
+                const temp = getWlAlid(ctx, true, true);
+                if (temp === "back") {
+                    range.text("-Menu too old. Generate a new one.-");
+                    return range;
+                }
+                const { wlid, alid } = temp;
                 const result = await removeFromWatchlist(wlid, alid);
                 if (result === "wlmissing") {
                     await ctx1.reply("Watchlist missing?");
@@ -291,16 +275,20 @@ function animeListMenu() {
                     await ctx1.reply(`${name} removed from watchlist.`);
                 }
             });
+            return range;
         });
 }
+
 
 export function initWLMenu() {
     const wl_main = WLMainMenu();
     wl_main.register(WLOptsMenu());
-    wl_main.register(listAnimeMenuStart());
-    wl_main.register(animeListMenu());
+    wl_main.register(animeList(), "wl_opts");
+    wl_main.register(animeListOpts(), "wl_allist");
     bot.use(wl_main);
     bot.command("mywatchlists", (ctx) =>
-        ctx.reply("Choose the watchlist from the menu below:", {reply_markup: wl_main})
+        ctx.reply("Choose the watchlist from the menu below:", { reply_markup: wl_main })
     );
 }
+
+

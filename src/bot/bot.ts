@@ -1,24 +1,40 @@
 // telegram bot endpoint
 
-import {type Conversation, type ConversationFlavor} from "@grammyjs/conversations";
-import {apiThrottler} from "@grammyjs/transformer-throttler";
-import {Bot, Context, NextFunction, session, SessionFlavor} from "grammy";
-import {db} from "..";
-import {anime_dllist, dl_cbq, dlep_cbq} from "./helpers/anime/a_download";
-import {anime_unwatch, callback_mkwatch, callback_mkwatchep} from "./helpers/anime/a_watch_unwatch_ep";
-import {back_handle, cancel_handle, initConvos, log_command} from "./helpers/misc_handles";
-import {anime_config} from "./helpers/anime_config";
-import {animeSearchStart, search_startWatch_remindMe_cb} from "./helpers/anime/a_search";
-import {a_Pending} from "./helpers/anime/a_pending";
-import {airingUpdatesList, airingUpdatesListCBQ, remindMe, stopAiringUpdates} from "./helpers/anime/a_airing_updates";
-import {animeStartWatch, watching_pending_list, watchingListCBQ} from "./helpers/anime/a_watching";
-import {limit} from "@grammyjs/ratelimiter";
-import {initWLMenu} from "./helpers/watchlist/w_menu";
+import { type Conversation, type ConversationFlavor } from "@grammyjs/conversations";
+import { apiThrottler } from "@grammyjs/transformer-throttler";
+import { Bot, Composer, Context, MemorySessionStorage, session, SessionFlavor } from "grammy";
+import { anime_dllist, dl_cbq, dlep_cbq } from "./helpers/anime/a_download";
+import {
+    anime_unwatch,
+    callback_mkwatch,
+    callback_mkwatchep
+} from "./helpers/anime/a_watch_unwatch_ep";
+import { back_handle, cancel_handle, initConvos, log_command } from "./helpers/misc_handles";
+import { anime_config } from "./helpers/anime_config";
+import { animeSearchStart, search_startWatch_remindMe_cb } from "./helpers/anime/a_search";
+import { a_Pending } from "./helpers/anime/a_pending";
+import {
+    airingUpdatesList,
+    airingUpdatesListCBQ,
+    remindMe,
+    stopAiringUpdates
+} from "./helpers/anime/a_airing_updates";
+import {
+    animeStartWatch,
+    watching_pending_list,
+    watchingListCBQ
+} from "./helpers/anime/a_watching";
+import { limit } from "@grammyjs/ratelimiter";
+import { initWLMenu } from "./helpers/watchlist/w_menu";
+import { registerUser, userMiddleware } from "./user_mgmt";
+import { RedisAdapter } from "@grammyjs/storage-redis";
+import { redis } from "../index";
 
 interface SessionData {
     userid: number;
-    config?: { pause_airing_updates: boolean };
-    activemenuopt?: number;
+    config: { pause_airing_updates: boolean };
+    activemenuopt: number;
+    menudata: { wlid: number, wlname: string, alid: number, l_page: number, maxpg: number };
 }
 
 export type MyContext = Context & ConversationFlavor & SessionFlavor<SessionData>;
@@ -38,6 +54,7 @@ export const bot = new Bot<MyContext>(`${process.env.BOT_TOKEN}`, {
 
 export function botinit() {
     const throttler = apiThrottler();
+    const storage = new RedisAdapter<SessionData>({ instance: redis, ttl: 10 });
     bot.api.config.use(throttler);
     bot.use(
         limit({
@@ -54,7 +71,31 @@ export function botinit() {
     );
     bot.use(
         session({
-            initial: () => ({userid: undefined, config: undefined, temp: {wlopt: undefined}})
+            type: "multi",
+            userid: {
+                storage: new MemorySessionStorage(60 * 60 * 1000),
+                initial: () => ({ userid: undefined })
+            },
+            config: {
+                storage: new MemorySessionStorage(60 * 60 * 1000),
+                initial: () => ({ config: { pause_airing_updates: undefined } })
+            },
+            activemenuopt: {
+                storage,
+                initial: () => ({ activemenuopt: undefined })
+            },
+            menudata: {
+                storage,
+                initial: () => ({
+                    menudata: {
+                        wlid: undefined,
+                        wlname: undefined,
+                        alid: undefined,
+                        l_page: undefined,
+                        maxpg: undefined
+                    }
+                })
+            }
         })
     );
     initConvos();
@@ -96,45 +137,36 @@ export function botinit() {
  * Note to self: implement sessions and user not registered.
  */
 function botcommands() {
-    bot.use(async (ctx: MyContext, next: NextFunction) => {
-        if (ctx.has(["::bot_command", "callback_query:data"])) {
-            if (ctx.session.userid == undefined) {
-                const userid = await db.users.findUnique({
-                    where: {chatid: ctx.from.id},
-                    select: {userid: true}
-                });
-                if (userid === null) {
-                    if (ctx.hasCommand("register")) {
-                        await next();
-                        return;
-                    } else {
-                        await ctx.reply("New user? Register with /register.");
-                        return;
-                    }
-                } else if (userid != undefined) {
-                    ctx.session.userid = userid.userid;
-                    if (ctx.hasCommand("register")) {
-                        await ctx.reply("You have already created an account!");
-                        return;
-                    } else {
-                        console.log("processing db check user");
-                        await next();
-                        return;
-                    }
-                }
-            } else {
-                if (ctx.hasCommand("register")) {
-                    await ctx.reply("You have already created an account!");
-                    return;
-                }
-                console.log("processing");
+    const middleware = new Composer<MyContext>();
+    middleware.filter(ctx => ctx.session.userid === undefined).on(["::bot_command", "callback_query:data"], userMiddleware);
+    middleware
+        .filter(ctx => ctx.hasCallbackQuery(/wl_(.+)/))
+        .use(async (ctx, next) => {
+            if (ctx.session.activemenuopt === undefined) ctx.session.activemenuopt = ctx.msg.message_id;
+            if (ctx.session.activemenuopt === ctx.msg.message_id) {
                 await next();
                 return;
+            } else {
+                await ctx.editMessageText("*Menu disabled as a newer one exists\.*", { parse_mode: "MarkdownV2" });
+                return;
             }
+        });
+    middleware.filter(ctx => ctx.hasCommand("mywatchlists")).use(async (ctx, next) => {
+        if (ctx.session.activemenuopt === undefined) {
+            ctx.session.activemenuopt = ctx.message.message_id;
+        } else {
+            try {
+                await ctx.api.editMessageText(ctx.from.id, ctx.session.activemenuopt, "*Menu" +
+                    " disabled as a newer one exists\.*", { parse_mode: "MarkdownV2" });
+            } catch {
+                console.error(`Unable to edit old menu message:: ${ctx.from.id}::${ctx.session.activemenuopt}`);
+            }
+            ctx.session.activemenuopt = ctx.message.message_id;
         }
         await next();
         return;
     });
+    bot.use(middleware);
     bot.hears(/\/start startwatching_(\d+)/, (ctx) => animeStartWatch(ctx));
     bot.hears(/\/start remindme_(\d+)/, (ctx) => remindMe(ctx));
     bot.hears(
@@ -143,14 +175,14 @@ function botcommands() {
     );
     bot.hears(/\/start stopremindme_(\d+)/, (ctx) => stopAiringUpdates(ctx));
     bot.hears(/\/start pending_(\d+)/, (ctx) => a_Pending(ctx));
-    bot.command("register", async (ctx) => await ctx.conversation.enter("newUser"));
+    bot.command("register", async (ctx) => await registerUser(ctx));
     bot.command("deleteaccount", async (ctx) => await ctx.conversation.enter("deleteUser"));
     bot.command("startwatching", (ctx) => animeSearchStart(ctx, "startwatching"));
     bot.command("remindme", (ctx) => animeSearchStart(ctx, "remindme"));
     //bot.hears(/^\/startwatching_(\d+)/, (ctx) => animeStartWatch(ctx));
-    //bot.hears(/^\/stopwatching_(\d+)/, async (ctx) => await ctx.conversation.enter("stopWatching"));
-    //bot.hears(/^\/remindme_(\d+)/, (ctx) => remindMe(ctx));
-    //bot.hears(/^\/stopairingupdates_(\d+)/, (ctx) => stopAiringUpdates(ctx));
+    //bot.hears(/^\/stopwatching_(\d+)/, async (ctx) => await
+    // ctx.conversation.enter("stopWatching")); bot.hears(/^\/remindme_(\d+)/, (ctx) =>
+    // remindMe(ctx)); bot.hears(/^\/stopairingupdates_(\d+)/, (ctx) => stopAiringUpdates(ctx));
     bot.command("cancel", async (ctx) => await cancel_handle(ctx));
     bot.hears(/^\/(pending|watching)/, (ctx) => watching_pending_list(ctx));
     bot.command("airingupdates", (ctx) => airingUpdatesList(ctx));
@@ -179,6 +211,7 @@ function botcommands() {
     bot.callbackQuery(/airingupd_(\d+)(_current)?/, async (ctx) => await airingUpdatesListCBQ(ctx));
     bot.on("callback_query:data", (ctx) => ctx.answerCallbackQuery("Invalid button?")); //sink
     bot.hears(/\/start (.+)/);
-    bot.hears(/^\/start$/, (ctx) => ctx.reply("Sup boss?"));
+    bot.hears(/^\/start$/, (ctx) => ctx.reply(`Sup boss?`));
     bot.command("help", (ctx) => ctx.reply("Help me onii-chan I'm stuck~"));
+    bot.command("yo", () => {throw new Error("err");});
 }
