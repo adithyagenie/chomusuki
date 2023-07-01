@@ -213,5 +213,4 @@ function botcommands() {
     bot.hears(/\/start (.+)/);
     bot.hears(/^\/start$/, (ctx) => ctx.reply(`Sup boss?`));
     bot.command("help", (ctx) => ctx.reply("Help me onii-chan I'm stuck~"));
-    bot.command("yo", () => {throw new Error("err");});
 }

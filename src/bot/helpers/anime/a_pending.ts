@@ -2,7 +2,8 @@ import { InlineKeyboard } from "grammy";
 import axios from "axios";
 import { getSinglePending } from "../../../api/pending";
 import { bot, MyContext } from "../../bot";
-import { Application } from "express";
+import { FastifyInstance } from "fastify";
+
 
 export async function a_Pending(ctx: MyContext) {
     await ctx.deleteMessage();
@@ -153,8 +154,15 @@ async function animePendingBotHandle(chatid: number, userid: number, alid: numbe
 // 	);
 // }
 
-export function pendingEndpoint(app: Application) {
-    app.get("/pending", async (req, res) => {
+export function pendingEndpoint(server: FastifyInstance) {
+    interface customreq {
+        chatid: number,
+        userid: number,
+        alid: number,
+        is_bot: boolean
+    }
+
+    server.get<{ Querystring: customreq }>("/pending", async (req, res) => {
         if (req.query == undefined) return res.status(400);
         try {
             const chatid = parseInt(req.query.chatid.toString());
@@ -166,21 +174,21 @@ export function pendingEndpoint(app: Application) {
             if (!is_bot) {
                 const res2 = await getSinglePending(userid, null, alid);
                 if (res2 === undefined) {
-                    res.status(400).json([]);
+                    await res.status(400).send([]);
                     return;
                 } else if (res2 === null) {
-                    res.status(200).send("UserID is not currently watching specified anime.");
-                    return;
+                    return ("UserID is not currently watching specified anime.");
                 }
-                res.json(res2).status(200);
+                await res.send(res2);
                 return;
             }
             if (is_bot && chatid === undefined) return null;
             const res2 = await animePendingBotHandle(chatid, userid, alid);
-            if (res2) res.status(200).json({ status: 200 });
+            if (res2) await res.send({ status: 200 });
         } catch (error) {
             console.error(`ERROR: /pending: ${error}`);
-            return res.status(400).json({ status: 400, error: error });
+            await res.status(400).send({ status: 400, error: error });
+            return;
         }
     });
 }
