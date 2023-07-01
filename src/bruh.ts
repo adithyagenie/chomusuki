@@ -1,14 +1,32 @@
-// // import { PrismaClient } from "@prisma/client";
-
-// // const db = new PrismaClient();
-
-// // async function main() {
-// // 	const a = await db.users.findUnique({
-// // 		where: { userid: 1 }
-// // 	});
-// // 	console.log(a);
-// // }
-// // main();
+// import { PrismaClient } from "@prisma/client";
+// import { Decimal } from "@prisma/client/runtime";
+//
+// const db = new PrismaClient();
+//
+// async function main() {
+//     const a = await db.watchinganime.findMany({});
+//     console.log(a);
+//     await db.anime.create({
+//         data: {
+//             alid: 5,
+//             jpname: "a",
+//             enname: "a",
+//             optnames: undefined,
+//             excludenames: undefined,
+//             status: "AIRING",
+//             next_ep_num: new Decimal(5),
+//             next_ep_air: 223671631,
+//             last_ep: 4,
+//             ep_extras: undefined,
+//             imglink: "aghshahys",
+//             fileid: "ashjasb"
+//         }
+//     });
+//     console.log(await db.anime.findMany({}));
+//
+// }
+//
+// void main();
 
 // import anilist from "anilist-node";
 // require("dotenv").config();

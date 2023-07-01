@@ -1,19 +1,19 @@
-import {db} from "..";
+import { db } from "..";
 import * as Prisma from "@prisma/client";
 import * as types from "../interfaces";
 import aniep from "aniep";
-import {getAnimeDetails, imageGet} from "../api/anilist_api";
-import {bot} from "../bot/bot";
+import { getAnimeDetails, imageGet } from "../api/anilist_api";
+import { bot } from "../bot/bot";
 
 export async function addAnimeNames(obj: Prisma.anime) {
     try {
         const insertres = await db.anime.upsert({
-            where: {alid: obj.alid},
+            where: { alid: obj.alid },
             update: obj,
             create: obj
         });
         await db.airingupdates.upsert({
-            where: {alid: obj.alid},
+            where: { alid: obj.alid },
             update: {
                 alid: undefined,
                 userid: undefined
@@ -56,11 +56,11 @@ export async function markWatchedunWatched(obj: Prisma.watchedepanime) {
 export async function addWatching(userid: number, alid: number) {
     try {
         const add = await db.watchinganime.update({
-            where: {userid: userid},
-            data: {alid: {push: alid}}
+            where: { userid: userid },
+            data: { alid: { push: alid } }
         });
         await db.watchedepanime.create({
-            data: {userid: userid, alid: alid, ep: []}
+            data: { userid: userid, alid: alid, ep: [] }
         });
         console.log(`POSTGRES: Add subscription - Documents updated: ${add.userid}: ${alid}`);
     } catch (err) {
@@ -71,8 +71,8 @@ export async function addWatching(userid: number, alid: number) {
 /**Takes user id and list of alid as parameter and returns the ep status of them for the user */
 export async function GetWatchedList(userid: number, alidlist: number[]) {
     return db.watchedepanime.findMany({
-        where: {userid: userid, alid: {in: alidlist}},
-        select: {alid: true, ep: true}
+        where: { userid: userid, alid: { in: alidlist } },
+        select: { alid: true, ep: true }
     });
 }
 
@@ -86,36 +86,40 @@ export async function getUserWatchingAiring(
         let alidlist: number[] = [];
         let amount: number;
         if (table == "airingupdates") {
-            amount = await db.airingupdates.count({where: {userid: {has: userid}}});
+            amount = await db.airingupdates.count({ where: { userid: { has: userid } } });
             console.log(amount);
-            if (amount == 0) return {alidlist: [], animelist: [], amount: 0};
+            if (amount == 0) return { alidlist: [], animelist: [], amount: 0 };
             const _ = await db.airingupdates.findMany({
-                where: {userid: {has: userid}},
-                select: {alid: true},
+                where: { userid: { has: userid } },
+                select: { alid: true },
                 take: count,
                 skip: offset
             });
             alidlist = _.map((o) => o.alid);
         } else {
             const _ = await db.watchinganime.findUnique({
-                where: {userid},
-                select: {alid: true}
+                where: { userid },
+                select: { alid: true }
             });
-            if (_ === null) return {alidlist: [], animelist: [], amount: 0};
+            if (_ === null) return { alidlist: [], animelist: [], amount: 0 };
             else alidlist = _.alid;
             amount = alidlist.length;
             if (count !== undefined && offset !== undefined)
                 alidlist = alidlist.slice(offset - 1, count + offset - 1);
         }
         const tosort = await db.anime.findMany({
-            where: {alid: {in: alidlist}},
-            select: {jpname: true, alid: true}
+            where: { alid: { in: alidlist } },
+            select: { jpname: true, alid: true }
         });
         tosort.sort((a, b) => (alidlist.indexOf(a.alid) > alidlist.indexOf(b.alid) ? 1 : -1));
         const animelist = tosort.map((o) => o.jpname);
-        if (alidlist.length !== animelist.length) throw new Error("Unequal fetch for anime: alid");
+        if (alidlist.length !== animelist.length) {
+            console.error(`POSTGRES: get_Watching_Airing - "Unequal fetch for anime: alid"`);
+            return undefined;
+        }
+
         console.log(`${alidlist}:: ${animelist}`);
-        return {alidlist, animelist, amount};
+        return { alidlist, animelist, amount };
     } catch (err) {
         console.error(`POSTGRES: get_Watching_Airing - ${err}`);
         return undefined;
@@ -125,7 +129,7 @@ export async function getUserWatchingAiring(
 export async function removeWatching(obj: Prisma.watchinganime) {
     try {
         const del = await db.watchinganime.update({
-            where: {userid: obj.userid},
+            where: { userid: obj.userid },
             data: obj
         });
         console.log(`POSTGRES: Unsubscribed anime - Deletion success: ${del.userid}`);
@@ -138,8 +142,8 @@ export async function removeWatching(obj: Prisma.watchinganime) {
 export async function addAiringFollow(alid: number, userid: number) {
     try {
         await db.airingupdates.update({
-            where: {alid},
-            data: {userid: {push: userid}}
+            where: { alid },
+            data: { userid: { push: userid } }
         });
         return 0;
     } catch (err) {
@@ -163,7 +167,7 @@ export async function newDL(obj: types.i_DlSync) {
 export async function changeConfig(newconfig: Prisma.config) {
     try {
         const res = await db.config.update({
-            where: {userid: newconfig.userid},
+            where: { userid: newconfig.userid },
             data: newconfig
         });
         console.log(`POSTGRES: UPDATE CONFIG: ${res.userid}`);
@@ -192,13 +196,16 @@ export async function newWatchlist(watchlist_name: string, generated_by: number)
 export async function addToWatchlist(watchlistid: number, addAlID: number) {
     try {
         const anime = await checkAnimeTable(addAlID);
-        if (anime == "err") throw new Error(`addToWatchlist: Unable to find anime ${addAlID}`);
+        if (anime == "err") {
+            console.error(`POSTGRES: addToWatchList - Unable to find anime ${addAlID}`);
+            return "err";
+        }
         if (anime == "invalid") return "invalid";
         const is_present =
             (
                 await db.watchlists.findUniqueOrThrow({
-                    where: {watchlistid},
-                    select: {alid: true}
+                    where: { watchlistid },
+                    select: { alid: true }
                 })
             ).alid.filter((o) => o === addAlID).length > 0;
         if (is_present === true) return "present";
@@ -207,7 +214,7 @@ export async function addToWatchlist(watchlistid: number, addAlID: number) {
                 watchlistid: watchlistid
             },
             data: {
-                alid: {push: addAlID}
+                alid: { push: addAlID }
             }
         });
         console.log(`POSTGRES: Watchlist item added - ${res.watchlistid}`);
@@ -221,8 +228,8 @@ export async function addToWatchlist(watchlistid: number, addAlID: number) {
 export async function markDone(userid: number, AlID: number) {
     try {
         const res = await db.completedanime.update({
-            where: {userid},
-            data: {completed: {push: AlID}}
+            where: { userid },
+            data: { completed: { push: AlID } }
         });
         console.log(`POSTGRES: Marking anime as done - ${res.userid}:${AlID}`);
         return 0;
@@ -234,14 +241,14 @@ export async function markDone(userid: number, AlID: number) {
 export async function markNotDone(userid: number, AlID: number) {
     try {
         const completed = (await db.completedanime.findUniqueOrThrow({
-            where: {userid: userid},
-            select: {completed: true}
+            where: { userid: userid },
+            select: { completed: true }
         })).completed;
         const i = completed.indexOf(AlID);
         if (i === -1)
             return "missing";
         completed.splice(i, 1);
-        await db.completedanime.update({where: {userid}, data: {completed}});
+        await db.completedanime.update({ where: { userid }, data: { completed } });
         console.log(`POSTGRES: Marking anime as done - ${userid}:${AlID}`);
         return 0;
     } catch (err) {
@@ -253,7 +260,7 @@ export async function markNotDone(userid: number, AlID: number) {
 export async function removeFromWatchlist(watchlistid: number, AlID: number) {
     try {
         const old = await db.watchlists.findUnique({
-            where: {watchlistid: watchlistid}
+            where: { watchlistid: watchlistid }
         });
         if (old === null) return "wlmissing";
         const index = old.alid.indexOf(AlID);
@@ -311,7 +318,7 @@ OFFSET ${(currentpg - 1) * amount} LIMIT ${amount};`;
 WHERE (a.alid IN (s)) AND (w.watchlistid = ${wlid})`;
 
     if (wl === null) return undefined;
-    return {wl, maxpg};
+    return { wl, maxpg };
 
 }
 
@@ -360,8 +367,8 @@ export async function checkAnimeTable(alid: number, updatedata = false) {
     } = null;
     if (updatedata === false)
         pull = await db.anime.findUnique({
-            where: {alid},
-            select: {alid: true, status: true, jpname: true, next_ep_air: true, next_ep_num: true}
+            where: { alid },
+            select: { alid: true, status: true, jpname: true, next_ep_air: true, next_ep_num: true }
         });
     let airing = false;
     if (pull === null) {
@@ -405,7 +412,7 @@ export async function checkAnimeTable(alid: number, updatedata = false) {
                 res.streamingEpisodes.length == 0 &&
                 res.episodes != null
             ) {
-                _ = Array.from({length: res.episodes}, (_, i) => i + 1);
+                _ = Array.from({ length: res.episodes }, (_, i) => i + 1);
             }
             obj.last_ep = Math.max(..._);
             obj.ep_extras = getDecimal(_.filter((o) => o % 1 !== 0)) as Prisma.Prisma.Decimal[];
@@ -417,5 +424,5 @@ export async function checkAnimeTable(alid: number, updatedata = false) {
     }
     airing = pull.status === "RELEASING";
 
-    return {pull, airing};
+    return { pull, airing };
 }

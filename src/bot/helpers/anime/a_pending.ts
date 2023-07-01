@@ -169,7 +169,12 @@ export function pendingEndpoint(server: FastifyInstance) {
             const userid = parseInt(req.query.userid.toString());
             const alid = parseInt(req.query.alid.toString());
             const is_bot = Boolean(req.query.is_bot.toString());
-            if (Number.isNaN(userid) || Number.isNaN(alid)) throw new Error("Incorrect URL params");
+            if (Number.isNaN(userid) || Number.isNaN(alid)) {
+                console.error("ERROR: /pending: Incorrect URL params");
+                await res.status(400).send({ status: 400, error: "Incorrect URL parameters" });
+                return;
+            }
+
             //await animePending(chatid, userid);
             if (!is_bot) {
                 const res2 = await getSinglePending(userid, null, alid);

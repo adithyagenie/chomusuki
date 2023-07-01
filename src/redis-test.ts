@@ -10,13 +10,8 @@
 // 	console.log("connected!");
 // 	await client.del("143064");
 // 	await client.hSet("143064", {
-// 		name: "Tsundere Akuyaku Reijou Liselotte to Jikkyou no Endou-kun to Kaisetsu no Kobayashi-san",
-// 		genre: "Comedy,Fantasy,Romance",
-// 	});
-// 	console.log("added!");
-// 	const res = await client.hGetAll("143064");
-// 	console.log(res.name, res.genre);
-// 	await client.disconnect();
-// }
+// 		name: "Tsundere Akuyaku Reijou Liselotte to Jikkyou no Endou-kun to Kaisetsu no
+// Kobayashi-san", genre: "Comedy,Fantasy,Romance", }); console.log("added!"); const res = await
+// client.hGetAll("143064"); console.log(res.name, res.genre); await client.disconnect(); }
 
 // startRedis();
