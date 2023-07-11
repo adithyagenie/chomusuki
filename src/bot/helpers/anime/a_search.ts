@@ -4,6 +4,7 @@ import { db } from "../../..";
 import { searchAnime } from "../../../api/anilist_api";
 import { MyContext } from "../../bot";
 import { getPagination } from "./a_misc_helpers";
+import { MediaSearchEntry } from "anilist-node";
 
 // export async function anime_add(ctx: MyContext) {
 // 	if (ctx.chat.id != authchat) {
@@ -121,40 +122,51 @@ export async function animeSearchHandler(
     watchlistid?: number
 ) {
     let command = cmd;
-    const pages = await searchAnime(query, currentpg, command == "remindme");
-    if (pages === undefined) return { msg: undefined, keyboard: undefined };
-    let maxpg: number;
-    if (currentpg != 1 && currentpg != 2)
-        maxpg = pages.pageInfo.lastPage > 5 ? 5 : pages.pageInfo.lastPage;
-    else if (currentpg == 1 || currentpg == 2) {
-        const temp = await searchAnime(query, 2, command == "remindme");
-        if (temp == undefined) {
-            maxpg = 1;
-        } else {
-            const temp2 = await searchAnime(query, 3, command == "remindme");
-            if (temp2 == undefined) {
-                maxpg = 2;
-            } else maxpg = temp2.pageInfo.lastPage > 5 ? 5 : temp2.pageInfo.lastPage;
-        }
-    }
+    // const page = await searchAnime(query, currentpg, command == "remindme");
+    // if (page === undefined) return { msg: undefined, keyboard: undefined };
+    const searchArray: Promise<MediaSearchEntry>[] = [];
+    for (let i = currentpg; i <= 5; i++)
+        searchArray.push(searchAnime(query, i, command === "remindme"));
+    const t = await Promise.all(searchArray);
+    const pages = t.filter(o => o !== undefined);
+    if (pages.find(o => o.pageInfo.currentPage === currentpg) === undefined) return {
+        msg: undefined,
+        keyboard: undefined
+    };
+    const maxpg = Math.max(...pages.map(o => o.pageInfo.currentPage));
+    const page = pages.find(o => o.pageInfo.currentPage === currentpg);
+    // if (currentpg != 1 && currentpg != 2)
+    //     maxpg = pages.pageInfo.lastPage > 5 ? 5 : pages.pageInfo.lastPage;
+    // else if (currentpg == 1 || currentpg == 2) {
+    //     const temp = await searchAnime(query, 2, command == "remindme");
+    //     if (temp == undefined) {
+    //         maxpg = 1;
+    //     } else {
+    //         const temp2 = await searchAnime(query, 3, command == "remindme");
+    //         if (temp2 == undefined) {
+    //             maxpg = 2;
+    //         } else maxpg = temp2.pageInfo.lastPage > 5 ? 5 : temp2.pageInfo.lastPage;
+    //     }
+    // }
+
     if (command == "addwl") command += `_${watchlistid}`;
     const keyboard = getPagination(currentpg, maxpg, command);
     let msg = `<b>Search results for '${query}</b>'\n\n`;
     const dbidlist = await getStatusFromDB(command, userid, watchlistid);
-    for (let i = 0; i < pages.media.length; i++) {
-        msg += `<b>${pages.media[i].title.romaji}</b>\n${
-            (pages.media[i].title.english === null ? pages.media[i].title.userPreferred : pages.media[i].title.english)
+    for (let i = 0; i < page.media.length; i++) {
+        msg += `<b>${page.media[i].title.romaji}</b>\n${
+            (page.media[i].title.english === null ? page.media[i].title.userPreferred : page.media[i].title.english)
         }\n`;
         if (command == "startwatching" && userid !== undefined) {
             // let old = await db.watchinganime.findUnique({
             // 	where: { userid }
             // });
             // if (old.alid === undefined) old.alid = [];
-            if (dbidlist.includes(pages.media[i].id))
+            if (dbidlist.includes(page.media[i].id))
                 msg += `<i>(Anime already marked as watching!)</i>\n\n`;
             //else msg += `<i>Start Watching:</i> /startwatching_${pages.media[i].id}\n\n`;
             else
-                msg += `<i>Start Watching: <a href="t.me/${username}?start=startwatching_${pages.media[i].id}">Click here!</a></i>\n\n`;
+                msg += `<i>Start Watching: <a href="t.me/${username}?start=startwatching_${page.media[i].id}">Click here!</a></i>\n\n`;
         } else if (command == "remindme" && userid !== undefined) {
             // let old: number[] = [];
             // let _ = await db.airingupdates.findMany({
@@ -163,11 +175,11 @@ export async function animeSearchHandler(
             // });
             //if (_ === null) old = [];
             //else old = _.map((o) => o.alid);
-            if (dbidlist.includes(pages.media[i].id))
+            if (dbidlist.includes(page.media[i].id))
                 msg += `<i>(Already sending airing updates for anime!)</i>\n\n`;
             //else msg += `<i>Send Airing Updates:</i> /remindme_${pages.media[i].id}\n\n`;
             else
-                msg += `<i>Send Airing Updates: <a href="t.me/${username}?start=remindme_${pages.media[i].id}">Click here!</a></i>\n\n`;
+                msg += `<i>Send Airing Updates: <a href="t.me/${username}?start=remindme_${page.media[i].id}">Click here!</a></i>\n\n`;
         } else if (command.startsWith("addwl") && watchlistid !== undefined) {
             // let old: number[] = [];
             // let _ = await db.watchlists.findUnique({
@@ -175,10 +187,10 @@ export async function animeSearchHandler(
             // 	select: { alid: true }
             // });
             // old = _ === null ? [] : _.alid;
-            if (dbidlist.includes(pages.media[i].id))
+            if (dbidlist.includes(page.media[i].id))
                 msg += `<i>(Already present in watchlist!)</i>\n\n`;
             else
-                msg += `<i>Add to watchlist: <a href = "t.me/${username}?start=wl_${pages.media[i].id}">Click here!</a></i>\n\n`;
+                msg += `<i>Add to watchlist: <a href = "t.me/${username}?start=wl_${page.media[i].id}">Click here!</a></i>\n\n`;
         } else msg += "\n";
     }
     return { msg, keyboard };

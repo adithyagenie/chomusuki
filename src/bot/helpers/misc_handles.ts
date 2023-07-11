@@ -1,13 +1,13 @@
-import { InlineKeyboard, InputFile } from "grammy";
+import { Bot, BotError, HttpError, InlineKeyboard, InputFile } from "grammy";
 import { bot, MyContext } from "../bot";
 import { createReadStream } from "fs-extra";
 import { conversations, createConversation } from "@grammyjs/conversations";
-import { deleteUser, newUser } from "../user_mgmt";
+import { deleteUser, newUser } from "./user_mgmt";
 import { markWatchedRange, unwatchhelper } from "./anime/a_watch_unwatch_ep";
 import { stopWatching } from "./anime/a_watching";
-import { addWL } from "./watchlist/w_add";
-import { createWL, deleteWL } from "./watchlist/w_wlmgmt";
-import { requestCache } from "../../index";
+import { addWL } from "./watchlist/w_addanime";
+import { createWL, renameWL } from "./watchlist/w_wlmgmt";
+import { redis } from "../../index";
 
 // going back in a menu
 export async function back_handle(ctx: MyContext) {
@@ -20,6 +20,12 @@ export async function back_handle(ctx: MyContext) {
 
 // Handles cancel calls
 export async function cancel_handle(ctx: MyContext) {
+    const active = await ctx.conversation.active();
+    if (Object.keys(active).length === 0) {
+        await ctx.reply("No running operations.");
+        return;
+    }
+    console.log(`Terminating convo ${JSON.stringify(active)} for ${ctx.from.id}`);
     await ctx.conversation.exit();
     await ctx.reply("Cancelling operation...", {
         reply_markup: { remove_keyboard: true }
@@ -44,14 +50,41 @@ export function initConvos() {
     bot.use(createConversation(stopWatching));
     bot.use(createConversation(markWatchedRange));
     bot.use(createConversation(createWL));
-    bot.use(createConversation(deleteWL));
+    // bot.use(createConversation(deleteWLold));
     bot.use(createConversation(addWL));
+    bot.use(createConversation(renameWL));
 }
 
-export function cacheWiper() {
-    const del = requestCache.filter(o => (new Date().getTime() / 1000) - o.timestamp > 60 * 60);
-    for (const item of del)
-        requestCache.splice(requestCache.indexOf(item), 1);
+export function setCommands(bot: Bot<MyContext>) {
+    void bot.api.setMyCommands([
+        { command: "start", description: "Heyo!" },
+        { command: "help", description: "Help menu." },
+        { command: "register", description: "Create a new user!" },
+        {
+            command: "startwatching",
+            description: "Start watching an anime! Use /startwatching 'search query'."
+        },
+        {
+            command: "remindme",
+            description: "Subscribe to updates of an anime! Use /remindme 'search query'."
+        },
+        {
+            command: "watching",
+            description: "Get a list of all the anime you are currently watching."
+        },
+        {
+            command: "airingupdates",
+            description: "Get a list of all the anime you have subscribed for updates."
+        },
+        { command: "markwatched", description: "Mark a range of episodes of anime as watched." },
+        { command: "unwatch", description: "Un-mark an episode of an anime as watched." },
+        //{command: "config", description: "Don't worry abt this for now..."}
+        { command: "mywatchlists", description: "Handle your watchlists." },
+        { command: "createwl", description: "Create a watchlist." },
+        { command: "dllist", description: "Get your queued downloads. Under development." },
+        { command: "cancel", description: "Cancel any currently going operations." },
+        { command: "deleteaccount", description: "Delete your account." }
+    ]);
     return;
 }
 
@@ -65,3 +98,17 @@ export function selfyeet(chatid: number, mid: number, time: number) {
     }, time);
 }
 
+export async function botErrorHandle(err: BotError<MyContext>) {
+    if (err.error instanceof TypeError && err.stack.includes("_replayApi")) {
+        console.error(`Encountered error: ${err.error} at context \n${JSON.stringify(err.ctx.msg)}\nStack trace: ${err.stack}`);
+        console.log(`Found conversation error. Deleting conversation session data for ${err.ctx.chat.id}`);
+        await err.ctx.conversation.exit();
+        await redis.del(`${err.ctx.chat.id}_c`);
+        await err.ctx.reply("Error occured and the current operation has been cancelled." +
+            " Please retry.");
+        return;
+    }
+    console.error(`Encountered error: ${err.error} at context \n${JSON.stringify(err.ctx.msg)}\nStack trace: ${err.stack}`);
+    if (!(err.error instanceof HttpError))
+        await err.ctx.reply("Internal error occured :/");
+}

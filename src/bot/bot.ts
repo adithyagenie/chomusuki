@@ -2,42 +2,33 @@
 
 import { type Conversation, type ConversationFlavor } from "@grammyjs/conversations";
 import { apiThrottler } from "@grammyjs/transformer-throttler";
-import { Bot, Composer, Context, MemorySessionStorage, session, SessionFlavor } from "grammy";
-import { anime_dllist, dl_cbq, dlep_cbq } from "./helpers/anime/a_download";
-import {
-    anime_unwatch,
-    callback_mkwatch,
-    callback_mkwatchep
-} from "./helpers/anime/a_watch_unwatch_ep";
-import { back_handle, cancel_handle, initConvos, log_command } from "./helpers/misc_handles";
-import { anime_config } from "./helpers/anime_config";
-import { animeSearchStart, search_startWatch_remindMe_cb } from "./helpers/anime/a_search";
-import { a_Pending } from "./helpers/anime/a_pending";
-import {
-    airingUpdatesList,
-    airingUpdatesListCBQ,
-    remindMe,
-    stopAiringUpdates
-} from "./helpers/anime/a_airing_updates";
-import {
-    animeStartWatch,
-    watching_pending_list,
-    watchingListCBQ
-} from "./helpers/anime/a_watching";
-import { limit } from "@grammyjs/ratelimiter";
+import { Bot, Context, MemorySessionStorage, session, SessionFlavor } from "grammy";
 import { initWLMenu } from "./helpers/watchlist/w_menu";
-import { registerUser, userMiddleware } from "./user_mgmt";
 import { RedisAdapter } from "@grammyjs/storage-redis";
 import { redis } from "../index";
+import { botcommands } from "./handlers/commands";
+import { middleware } from "./handlers/middleware";
+import { botErrorHandle, initConvos, setCommands } from "./helpers/misc_handles";
+import { limit } from "@grammyjs/ratelimiter";
 
 interface SessionData {
     userid: number;
     config: { pause_airing_updates: boolean };
-    activemenuopt: number;
-    menudata: { wlid: number, wlname: string, alid: number, l_page: number, maxpg: number };
+    menudata: {
+        activemenuopt: number,
+        wlid: number,
+        wlname: string,
+        alid: number,
+        l_page: number,
+        maxpg: number,
+        listmethod: "all" | "towatch" | undefined
+    };
 }
 
-export type MyContext = Context & ConversationFlavor & SessionFlavor<SessionData>;
+export type MyContext =
+    Context
+    & ConversationFlavor
+    & SessionFlavor<SessionData>
 export type MyConversation = Conversation<MyContext>;
 
 export const bot = new Bot<MyContext>(`${process.env.BOT_TOKEN}`, {
@@ -54,8 +45,38 @@ export const bot = new Bot<MyContext>(`${process.env.BOT_TOKEN}`, {
 
 export function botinit() {
     const throttler = apiThrottler();
-    const storage = new RedisAdapter<SessionData>({ instance: redis, ttl: 10 });
     bot.api.config.use(throttler);
+    const storage = new RedisAdapter<SessionData>({ instance: redis, ttl: 24 * 60 * 60 });
+    // noinspection JSUnusedGlobalSymbols
+    bot.use(
+        session({
+            type: "multi",
+            userid: {
+                storage: new MemorySessionStorage(60 * 60 * 1000),
+                initial: () => undefined
+            },
+            config: {
+                storage: new MemorySessionStorage(60 * 60 * 1000),
+                initial: () => ({ pause_airing_updates: undefined })
+            },
+            menudata: {
+                storage: storage,
+                initial: () => ({
+                    activemenuopt: undefined,
+                    wlid: undefined,
+                    wlname: undefined,
+                    alid: undefined,
+                    l_page: undefined,
+                    maxpg: undefined,
+                    listmethod: undefined
+                })
+            },
+            conversation: {
+                getSessionKey: (ctx) => `${ctx.chat?.id}_c`,
+                storage: storage
+            }
+        })
+    );
     bot.use(
         limit({
             timeFrame: 30000,
@@ -69,148 +90,17 @@ export function botinit() {
             }
         })
     );
-    bot.use(
-        session({
-            type: "multi",
-            userid: {
-                storage: new MemorySessionStorage(60 * 60 * 1000),
-                initial: () => ({ userid: undefined })
-            },
-            config: {
-                storage: new MemorySessionStorage(60 * 60 * 1000),
-                initial: () => ({ config: { pause_airing_updates: undefined } })
-            },
-            activemenuopt: {
-                storage,
-                initial: () => ({ activemenuopt: undefined })
-            },
-            menudata: {
-                storage,
-                initial: () => ({
-                    menudata: {
-                        wlid: undefined,
-                        wlname: undefined,
-                        alid: undefined,
-                        l_page: undefined,
-                        maxpg: undefined
-                    }
-                })
-            }
-        })
-    );
+    bot.use(middleware());
     initConvos();
     initWLMenu();
-    // bot.api.setMyCommands([
-    // 	{ command: "register", description: "Create a new user!" },
-    // 	{
-    // 		command: "startwatching",
-    // 		description: "Start watching an anime! Use /startwatching 'search query'."
-    // 	},
-    // 	{
-    // 		command: "remindme",
-    // 		description: "Subscribe to updates of an anime! Use /remindme 'search query'."
-    // 	},
-    // 	{
-    // 		command: "watching",
-    // 		description: "Get a list of all the anime you are currently watching."
-    // 	},
-    // 	{
-    // 		command: "airingupdates",
-    // 		description: "Get a list of all the anime you have subscribed for updates."
-    // 	},
-    // 	{ command: "markwatched", description: "Mark a range of episodes of anime as watched." },
-    // 	{ command: "unwatch", description: "Un-mark an episode of an anime as watched." },
-    // 	//{command: "config", description: "Don't worry abt this for now..."}
-    // 	{ command: "mywatchlists", description: "Handle your watchlists." },
-    // 	{ command: "createwl", description: "Create a watchlist." },
-    // 	{ command: "dllist", description: "Get your queued downloads. Under development." },
-    // 	{ command: "cancel", description: "Cancel any currently going operations." },
-    // 	{ command: "deleteaccount", description: "Delete your account." }
-    // ]);
+    void setCommands(bot);
     botcommands();
     console.log("*********************");
     console.log("Cunnime has started!");
     console.log("*********************");
+    if (process.env.RUN_METHOD === "POLLING") {
+        bot.catch((err) => botErrorHandle(err));
+        void bot.start();
+    }
 }
 
-/**
- * Note to self: implement sessions and user not registered.
- */
-function botcommands() {
-    const middleware = new Composer<MyContext>();
-    middleware.filter(ctx => ctx.session.userid === undefined).on(["::bot_command", "callback_query:data"], userMiddleware);
-    middleware
-        .filter(ctx => ctx.hasCallbackQuery(/wl_(.+)/))
-        .use(async (ctx, next) => {
-            if (ctx.session.activemenuopt === undefined) ctx.session.activemenuopt = ctx.msg.message_id;
-            if (ctx.session.activemenuopt === ctx.msg.message_id) {
-                await next();
-                return;
-            } else {
-                await ctx.editMessageText("*Menu disabled as a newer one exists\.*", { parse_mode: "MarkdownV2" });
-                return;
-            }
-        });
-    middleware.filter(ctx => ctx.hasCommand("mywatchlists")).use(async (ctx, next) => {
-        if (ctx.session.activemenuopt === undefined) {
-            ctx.session.activemenuopt = ctx.message.message_id;
-        } else {
-            try {
-                await ctx.api.editMessageText(ctx.from.id, ctx.session.activemenuopt, "*Menu" +
-                    " disabled as a newer one exists\.*", { parse_mode: "MarkdownV2" });
-            } catch {
-                console.error(`Unable to edit old menu message:: ${ctx.from.id}::${ctx.session.activemenuopt}`);
-            }
-            ctx.session.activemenuopt = ctx.message.message_id;
-        }
-        await next();
-        return;
-    });
-    bot.use(middleware);
-    bot.hears(/\/start startwatching_(\d+)/, (ctx) => animeStartWatch(ctx));
-    bot.hears(/\/start remindme_(\d+)/, (ctx) => remindMe(ctx));
-    bot.hears(
-        /\/start stopwatching_(\d+)/,
-        async (ctx) => await ctx.conversation.enter("stopWatching")
-    );
-    bot.hears(/\/start stopremindme_(\d+)/, (ctx) => stopAiringUpdates(ctx));
-    bot.hears(/\/start pending_(\d+)/, (ctx) => a_Pending(ctx));
-    bot.command("register", async (ctx) => await registerUser(ctx));
-    bot.command("deleteaccount", async (ctx) => await ctx.conversation.enter("deleteUser"));
-    bot.command("startwatching", (ctx) => animeSearchStart(ctx, "startwatching"));
-    bot.command("remindme", (ctx) => animeSearchStart(ctx, "remindme"));
-    //bot.hears(/^\/startwatching_(\d+)/, (ctx) => animeStartWatch(ctx));
-    //bot.hears(/^\/stopwatching_(\d+)/, async (ctx) => await
-    // ctx.conversation.enter("stopWatching")); bot.hears(/^\/remindme_(\d+)/, (ctx) =>
-    // remindMe(ctx)); bot.hears(/^\/stopairingupdates_(\d+)/, (ctx) => stopAiringUpdates(ctx));
-    bot.command("cancel", async (ctx) => await cancel_handle(ctx));
-    bot.hears(/^\/(pending|watching)/, (ctx) => watching_pending_list(ctx));
-    bot.command("airingupdates", (ctx) => airingUpdatesList(ctx));
-    bot.command("markwatched", async (ctx) => await ctx.conversation.enter("markWatchedRange"));
-    bot.command("unwatch", async (ctx) => await anime_unwatch(ctx));
-    bot.command("dllist", async (ctx) => await anime_dllist(ctx));
-    bot.command("config", async (ctx) => await anime_config(ctx));
-    bot.command("log", async (ctx) => await log_command(ctx));
-
-    bot.command("createwl", async (ctx) => await ctx.conversation.enter("createWL"));
-    bot.command("deletewl", async (ctx) => await ctx.conversation.enter("deleteWL"));
-
-    bot.callbackQuery(/download/, async (ctx) => await dl_cbq(ctx));
-    bot.callbackQuery(/dlep_(\d+)_(\d+)/, async (ctx) => await dlep_cbq(ctx));
-    bot.callbackQuery(/mark_watch/, async (ctx) => await callback_mkwatch(ctx));
-    bot.callbackQuery(/mkwtch_(\d+)_(\d+)/, async (ctx) => await callback_mkwatchep(ctx));
-    bot.callbackQuery(/back/, async (ctx) => await back_handle(ctx));
-    bot.callbackQuery(
-        /(startwatching|remindme)_(\d+)(_current)?/,
-        async (ctx) => await search_startWatch_remindMe_cb(ctx)
-    );
-    bot.callbackQuery(
-        /(watch|pending)_(\d+)(_current)?/,
-        async (ctx) => await watchingListCBQ(ctx)
-    );
-    bot.callbackQuery(/airingupd_(\d+)(_current)?/, async (ctx) => await airingUpdatesListCBQ(ctx));
-    bot.on("callback_query:data", (ctx) => ctx.answerCallbackQuery("Invalid button?")); //sink
-    bot.hears(/\/start (.+)/);
-    bot.hears(/^\/start$/, (ctx) => ctx.reply(`Sup boss?`));
-    bot.command("help", (ctx) => ctx.reply("Help me onii-chan I'm stuck~"));
-}

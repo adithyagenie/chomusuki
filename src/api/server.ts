@@ -4,21 +4,20 @@ import { bot } from "../bot/bot";
 import { BotError, webhookCallback } from "grammy";
 import fastify from "fastify";
 import { pendingEndpoint } from "../bot/helpers/anime/a_pending";
+import { botErrorHandle } from "../bot/helpers/misc_handles";
 
 export async function startserver() {
     const port = parseInt(process.env.PORT) || 4000;
     const server = fastify({ logger: false });
-    const errorHandler = async (err, req, res) => {
-        if (err instanceof BotError) {
-            console.error(`Encountered error: ${err.error} at context \n` +
-                `${JSON.stringify(err.ctx.msg, null, "\t")}`);
-            await err.ctx.reply("Error occured :/");
-        }
-        await res.status(200).send({});
-    };
-
-    server.post(`/${process.env.BOT_TOKEN}`, webhookCallback(bot, "fastify"));
-    server.setErrorHandler(errorHandler);
+    if (process.env.RUN_METHOD === "WEBHOOK") {
+        server.post(`/${process.env.BOT_TOKEN}`, webhookCallback(bot, "fastify"));
+        server.setErrorHandler(async (err, req, res) => {
+            if (err instanceof BotError) {
+                await botErrorHandle(err);
+                await res.status(200).send({});
+            } else await res.status(500).send({});
+        });
+    }
     server.get("/", async () => {
         return "Cunnime bot up and running ^_^";
     });
@@ -38,7 +37,8 @@ export async function startserver() {
     });
     pendingEndpoint(server);
     await server.listen({ port: port });
-    await bot.api.setWebhook(`${process.env.RENDER_EXTERNAL_URL}/${process.env.BOT_TOKEN}`);
+    if (process.env.RUN_METHOD === "WEBHOOK")
+        await bot.api.setWebhook(`${process.env.RENDER_EXTERNAL_URL}/${process.env.BOT_TOKEN}`);
     console.log(`Cunnime server listening on port ${port}!`);
 
     return server;

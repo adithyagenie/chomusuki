@@ -126,18 +126,18 @@ export async function getUserWatchingAiring(
     }
 }
 
-export async function removeWatching(obj: Prisma.watchinganime) {
-    try {
-        const del = await db.watchinganime.update({
-            where: { userid: obj.userid },
-            data: obj
-        });
-        console.log(`POSTGRES: Unsubscribed anime - Deletion success: ${del.userid}`);
-        return 0;
-    } catch (err) {
-        console.error(`POSTGRES: removeWatching - ${err}`);
-    }
-}
+// export async function removeWatching(obj: Prisma.watchinganime) {
+//     try {
+//         const del = await db.watchinganime.update({
+//             where: { userid: obj.userid },
+//             data: obj
+//         });
+//         console.log(`POSTGRES: Unsubscribed anime - Deletion success: ${del.userid}`);
+//         return 0;
+//     } catch (err) {
+//         console.error(`POSTGRES: removeWatching - ${err}`);
+//     }
+// }
 
 export async function addAiringFollow(alid: number, userid: number) {
     try {
@@ -296,30 +296,74 @@ export async function getWatchlistAnime(
     currentpg?: number,
     amount?: number,
     paginate = true,
-    maxpgreq = true
+    needmaxpg = true,
+    towatch = { towatch: false, userid: undefined }
 ) {
     let maxpg: number;
-    if (maxpgreq === true)
-        maxpg = Math.ceil((await db.$queryRaw<{
-            len: number
-        }[]>`SELECT array_length(alid, 1) AS len FROM watchlists WHERE watchlistid = ${wlid};`)[0].len / amount);
+    if (needmaxpg === true)
+        if (towatch.towatch === true)
+            maxpg = Math.ceil(Number((await db.$queryRaw<{
+                    len: bigint
+                }[]>
+                    `SELECT count(a) as len\
+                    FROM watchlists w, completedanime c, unnest(w.alid) a \
+                    WHERE (c.userid = ${towatch.userid}) and (NOT (a) = any(c.completed));`
+            )[0].len) / amount);
+        else
+            maxpg = Math.ceil(Number((await db.$queryRaw<{
+                    len: bigint
+                }[]>
+                    `SELECT array_length(alid, 1) AS len \
+                    FROM watchlists \
+                    WHERE watchlistid = ${wlid};`
+            )[0].len) / amount);
+
     else maxpg = undefined;
     let wl: {
         jpname: string;
+        enname: string;
         alid: number
     }[];
-    if (paginate)
-        wl = await db.$queryRaw`SELECT a.jpname, a.alid FROM anime a, watchlists w, unnest(w.alid) s
-WHERE (a.alid IN (s)) AND (w.watchlistid = ${wlid}) 
-OFFSET ${(currentpg - 1) * amount} LIMIT ${amount};`;
-
-    else
-        wl = await db.$queryRaw`SELECT a.jpname, a.alid FROM anime a, watchlists w, unnest(w.alid) s 
-WHERE (a.alid IN (s)) AND (w.watchlistid = ${wlid})`;
-
+    if (towatch.towatch) {
+        if (paginate)
+            wl = await db.$queryRaw`SELECT a.jpname, a.enname, a.alid \
+                                    FROM watchlists w, completedanime c, anime a, unnest(w.alid) u \
+                                    WHERE (c.userid = ${towatch.userid}) AND (NOT (u) = any(c.completed)) AND (a.alid in (u)) \
+                                    OFFSET ${(currentpg - 1) * amount} \
+                                    LIMIT ${amount};`;
+        else
+            wl = await db.$queryRaw`SELECT a.jpname, a.enname, a.alid \
+                                    FROM watchlists w, completedanime c, anime a, unnest(w.alid) u \
+                                    WHERE (c.userid = ${towatch.userid}) AND (NOT (u) = any(c.completed)) AND ((a.alid) in (u))`;
+    } else {
+        if (paginate)
+            wl = await db.$queryRaw`SELECT a.jpname, a.enname, a.alid \
+                                    FROM anime a, watchlists w, unnest(w.alid) s \
+                                    WHERE (a.alid IN (s)) AND (w.watchlistid = ${wlid}) \
+                                    OFFSET ${(currentpg - 1) * amount} \
+                                    LIMIT ${amount};`;
+        else
+            wl = await db.$queryRaw`SELECT a.jpname, a.enname, a.alid \
+                                    FROM anime a, watchlists w, unnest(w.alid) s \
+                                    WHERE (a.alid IN (s)) AND (w.watchlistid = ${wlid})`;
+    }
     if (wl === null) return undefined;
     return { wl, maxpg };
 
+}
+
+export async function renameWatchlist(watchlistid: number, wlname: string) {
+    try {
+        await db.watchlists.update({
+            where: { watchlistid },
+            data: { watchlist_name: wlname }
+        });
+        console.log(`POSTGRES: Renaming watchlist - ${watchlistid} -> ${wlname}`);
+        return 0;
+    } catch (e) {
+        console.error(`POSTGRES: renameWatchlist - ${e}`);
+        return 1;
+    }
 }
 
 export async function deleteWatchlist(watchlistid: number) {

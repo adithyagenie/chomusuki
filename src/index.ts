@@ -6,10 +6,9 @@ import { createWriteStream } from "fs-extra";
 import { format } from "util";
 import { PrismaClient } from "@prisma/client";
 import { initCron, terminateCron } from "./api/refreshAiring";
-import { MediaSearchEntry } from "anilist-node";
-import IORedis from "ioredis";
 import { FastifyInstance } from "fastify";
 import { startserver } from "./api/server";
+import IORedis from "ioredis";
 
 config();
 if (
@@ -17,10 +16,11 @@ if (
     process.env.ANILIST_TOKEN === undefined ||
     process.env.AUTHORISED_CHAT === undefined ||
     process.env.DATABASE_URL === undefined ||
-    process.env.RENDER_EXTERNAL_URL === undefined
+    (process.env.RUN_METHOD !== "WEBHOOK" && process.env.RUN_METHOD !== "POLLING") ||
+    (process.env.RENDER_EXTERNAL_URL === undefined && process.env.RUN_METHOD === "WEBHOOK")
 ) {
     console.log("ENV VARIABLE NOT SET!");
-    process.exit();
+    process.exit(1);
 }
 
 const log_file = createWriteStream("./log.txt", { flags: "w" });
@@ -47,13 +47,8 @@ console.error = function (...d: unknown[]) {
 export let server: FastifyInstance;
 startserver().then((serv) => {server = serv;}).catch(e => console.error(e));
 export const db = new PrismaClient();
-export const redis = new IORedis("redis://localhost:6379/0");
-export const requestCache: {
-    query: string;
-    pg: number;
-    response: MediaSearchEntry;
-    timestamp: number;
-}[] = [];
+export const redis = new IORedis(process.env.REDIS_URL);
+redis.on("error", err => console.error(`REDIS ERROR: ${err}`));
 
 async function spinup() {
     botinit();

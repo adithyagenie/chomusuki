@@ -1,6 +1,5 @@
 import anilist, { AnimeEntry, MediaFilterTypes, MediaSearchEntry } from "anilist-node";
-import { requestCache } from "..";
-import { cacheWiper } from "../bot/helpers/misc_handles";
+import { addReqCache, fetchReqCache } from "../database/redis";
 
 const al = new anilist(process.env.ANILIST_TOKEN);
 
@@ -31,23 +30,15 @@ export async function imageGet(id: number) {
 
 export async function searchAnime(query: string, pagenum: number, releasingonly = false) {
     try {
-        cacheWiper();
-        const cached = requestCache.find((o) => o.query == query.toLowerCase() && o.pg == pagenum);
+        const cached = await fetchReqCache(query.toLowerCase(), pagenum);
         if (cached !== undefined) {
-            console.log(`Returning cached response: ${query}:${pagenum}`);
-            return cached.response;
+            return cached;
         }
-        console.log(`Can't find cache:: ${query}:${pagenum}`);
         let filter: MediaFilterTypes = null;
         if (releasingonly == true) filter = { status_in: ["RELEASING", "NOT_YET_RELEASED"] };
         const res: MediaSearchEntry = await al.searchEntry.anime(query, filter, pagenum, 5);
         if (res.media.length > 0) {
-            requestCache.push({
-                query: query.toLowerCase(),
-                pg: pagenum,
-                response: res,
-                timestamp: Math.floor(new Date().getTime() / 1000)
-            });
+            await addReqCache(query.toLowerCase(), pagenum, res);
             return res;
         } else return undefined;
     } catch (err) {

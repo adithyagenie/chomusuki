@@ -7,7 +7,6 @@ import { Prisma, watchedepanime } from "@prisma/client";
 import { getPending, getSinglePending } from "../../../api/pending";
 import { db } from "../../..";
 import { getUpdaterAnimeIndex, makeEpKeyboard, messageToHTMLMessage } from "./a_misc_helpers";
-import { InlineKeyboardButton } from "@grammyjs/types";
 import aniep from "aniep";
 
 export async function anime_unwatch(ctx: MyContext) {
@@ -139,11 +138,14 @@ export async function callback_mkwatchep(ctx: MyContext) {
     const newkeyboard = new InlineKeyboard();
     //newkeyboard = newkeyboard.map((o1) => o1.filter((o) => !(o.text == `Episode ${epnum}`)));
     /**TEST THIS PLEASEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE */
-    let tt: InlineKeyboardButton[] = [].concat(...ctx.msg.reply_markup.inline_keyboard);
+    let tt: {
+        text: string,
+        callback_data: string
+    }[] = [].concat(...ctx.msg.reply_markup.inline_keyboard);
     tt = tt.filter((o) => !(o.text == `Episode ${epnum}`));
     for (let i = 0; i < tt.length; i += 2) {
-        const bruh: InlineKeyboardButton = tt[i];
-        const bruh2: InlineKeyboardButton = tt[i + 1];
+        const bruh: { text: string, callback_data: string } = tt[i];
+        const bruh2: { text: string, callback_data: string } = tt[i + 1];
         if (tt[i + 1] === undefined) newkeyboard.add(bruh).row();
         else newkeyboard.add(bruh).add(bruh2).row();
     }

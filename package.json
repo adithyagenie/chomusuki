@@ -16,7 +16,6 @@
     "@grammyjs/ratelimiter": "1.1.6",
     "@grammyjs/storage-redis": "2.3.0",
     "@grammyjs/transformer-throttler": "1.2.1",
-    "@grammyjs/types": "3.1.1",
     "@prisma/client": "4.14.0",
     "aniep": "0.5.0",
     "anilist-node": "1.13.2",
@@ -24,17 +23,17 @@
     "dotenv": "16.0.3",
     "fastify": "4.19.0",
     "fs-extra": "11.1.1",
-    "grammy": "1.16.0",
+    "grammy": "1.17.0",
     "ioredis": "5.3.2",
     "node-schedule": "2.1.1"
   },
   "devDependencies": {
     "@types/fs-extra": "11.0.1",
-    "@types/ioredis": "5.0.0",
     "@types/node-fetch": "2.6.4",
     "@types/node-schedule": "2.1.0",
     "@typescript-eslint/eslint-plugin": "5.59.0",
     "@typescript-eslint/parser": "5.59.0",
+    "@grammyjs/types": "3.1.1",
     "eslint": "8.39.0",
     "prisma": "4.14.0",
     "typescript": "5.0.4"

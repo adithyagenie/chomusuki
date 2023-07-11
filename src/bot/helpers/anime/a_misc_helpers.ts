@@ -1,6 +1,5 @@
-import { InlineKeyboardButton, MessageEntity } from "@grammyjs/types";
+import { i_ProcessedObjV2, MessageEntity } from "../../../interfaces";
 import { InlineKeyboard } from "grammy";
-import { i_ProcessedObjV2 } from "../../../interfaces";
 import { getSinglePending } from "../../../api/pending";
 
 // Makes keyboard for download and mark watched
@@ -19,11 +18,11 @@ export async function makeEpKeyboard(
         i < (updateobj.notwatched.length > 30 ? 30 : updateobj.notwatched.length);
         i += 2
     ) {
-        const bruh: InlineKeyboardButton.CallbackButton = {
+        const bruh: { text: string, callback_data: string } = {
             text: `Episode ${updateobj.notwatched[i]}`,
             callback_data: `${callback_data_string}_${updateobj.alid}_${updateobj.notwatched[i]}`
         };
-        const bruh2: InlineKeyboardButton.CallbackButton = {
+        const bruh2: { text: string, callback_data: string } = {
             text: `Episode ${updateobj.notwatched[i + 1]}`,
             callback_data: `${callback_data_string}_${updateobj.alid}_${
                 updateobj.notwatched[i + 1]
@@ -40,7 +39,7 @@ export const getUpdaterAnimeIndex = async (name: string, pending: i_ProcessedObj
     pending.map((object) => object.jpname).indexOf(name);
 
 export function getPagination(current: number, maxpage: number, text: string) {
-    const keys: InlineKeyboardButton[] = [];
+    const keys: { text: string, callback_data: string }[] = [];
     if (current > 1) keys.push({ text: `«1`, callback_data: `${text}_1` });
     if (current > 2)
         keys.push({
