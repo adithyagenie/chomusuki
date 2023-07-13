@@ -9,6 +9,7 @@ import { initCron, terminateCron } from "./api/refreshAiring";
 import { FastifyInstance } from "fastify";
 import { startserver } from "./api/server";
 import IORedis from "ioredis";
+import Redis from "ioredis";
 
 config();
 if (
@@ -47,7 +48,13 @@ console.error = function (...d: unknown[]) {
 export let server: FastifyInstance;
 startserver().then((serv) => {server = serv;}).catch(e => console.error(e));
 export const db = new PrismaClient();
-export const redis = new IORedis(process.env.REDIS_URL);
+
+class RedisClient extends Redis {
+    constructor(redisUrl: string) {
+        super(redisUrl);
+    }
+}
+export const redis = new RedisClient(process.env.REDIS_URL);
 redis.on("error", err => console.error(`REDIS ERROR: ${err}`));
 
 async function spinup() {

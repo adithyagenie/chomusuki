@@ -1,9 +1,7 @@
 import * as cron from "node-schedule";
-import { PrismaClient } from "@prisma/client";
 import { bot } from "../bot/bot";
 import { checkAnimeTable, getNumber } from "../database/animeDB";
-
-const db = new PrismaClient();
+import { db } from "../index";
 
 async function cronn(alid: number, aniname: string, next_ep_air: number, next_ep_num: number) {
     console.log(
@@ -104,11 +102,6 @@ export function terminateCron(callback: () => void) {
 }
 
 export async function initCron() {
-    // await db.anime.update({
-    // 	where: { alid: 150672 },
-    // 	data: { next_ep_air: Math.floor(Date.now() / 1000) - 30 }
-    // });
     await reInitCron();
-    //cron.scheduleJob("main", "*/2 * * * *", () => reInitCron()); // EVERY 2 minute
     cron.scheduleJob("main", "0 * * * *", () => reInitCron());
 }
