@@ -3,6 +3,7 @@ import { db } from "../../..";
 import { addWatching, checkAnimeTable, getUserWatchingAiring } from "../../../database/animeDB";
 import { MyContext, MyConversation } from "../../bot";
 import { getPagination, HTMLMessageToMessage } from "./a_misc_helpers";
+import { selfyeet } from "../misc_handles";
 
 /**
  ** Sends the first page of the list of anime the user is currently watching.
@@ -18,8 +19,8 @@ export async function watching_pending_list(ctx: MyContext) {
         return;
     }
     if (res.keyboard == undefined || res.keyboard.inline_keyboard.length == 0)
-        await ctx.reply(res.msg, { parse_mode: "HTML" });
-    else await ctx.reply(res.msg, { reply_markup: res.keyboard, parse_mode: "HTML" });
+        await ctx.reply(res.msg);
+    else await ctx.reply(res.msg, { reply_markup: res.keyboard });
 }
 
 /**
@@ -69,7 +70,7 @@ export async function watchingListCBQ(ctx: MyContext) {
     );
     try {
         if (ctx.msg.text.trim() !== HTMLMessageToMessage(msg).trim())
-            await ctx.editMessageText(msg, { reply_markup: keyboard, parse_mode: "HTML" });
+            await ctx.editMessageText(msg, { reply_markup: keyboard });
     } catch (e) {
         console.log(e);
     }
@@ -79,33 +80,37 @@ export async function watchingListCBQ(ctx: MyContext) {
  ** This function adds anime to the anime table.
  ** Responds to "/startwatching_alid".
  */
-export async function animeStartWatch(ctx: MyContext) {
-    await ctx.deleteMessage();
-    const alid = parseInt(ctx.match[1]);
+export async function animeStartWatch(ctx: MyContext, menu = false) {
+    let alid: number;
+    if (menu === false) {
+        await ctx.deleteMessage();
+        alid = parseInt(ctx.match[1]);
+    } else
+        alid = ctx.session.menudata.alid;
     if (alid == undefined || Number.isNaN(alid)) {
         await ctx.reply("Invalid.");
         return;
     }
     const userid = ctx.session.userid;
-
-    const old = (
-        await db.watchinganime.findUnique({
-            where: { userid }
-        })
-    ).alid;
-    if (old.includes(alid)) {
-        await ctx.reply(
-            `You have already marked <b>${
-                (
-                    await db.anime.findUnique({
-                        where: { alid },
-                        select: { jpname: true }
-                    })
-                ).jpname
-            }</b> as watching.`,
-            { parse_mode: "HTML" }
-        );
-        return;
+    if (menu === false) {
+        const old = (
+            await db.watchinganime.findUnique({
+                where: { userid }
+            })
+        ).alid;
+        if (old.includes(alid)) {
+            await ctx.reply(
+                `You have already marked <b>${
+                    (
+                        await db.anime.findUnique({
+                            where: { alid },
+                            select: { jpname: true }
+                        })
+                    ).jpname
+                }</b> as watching.`
+            );
+            return;
+        }
     }
     const res = await checkAnimeTable(alid);
     if (res == "err") {
@@ -116,13 +121,16 @@ export async function animeStartWatch(ctx: MyContext) {
         await ctx.reply("Cannot find any anime with given alid.");
         return;
     }
-    await ctx.reply(`Marked ${res.pull.jpname} as watching!`);
+    await addWatching(userid, alid);
+    if (menu)
+        selfyeet(ctx.chat?.id, (await ctx.reply(`Marked ${res.pull.jpname} as watching!`)).message_id, 5000);
+    else await ctx.reply(`Marked ${res.pull.jpname} as watching!`);
     if (res.airing)
         await ctx.reply(
-            `${res.pull.jpname} is currently airing. If you would like to follow its episode releases: <a href="t.me/${ctx.me.username}?start=remindme_${res.pull.alid}">Click here!</a>`,
-            { parse_mode: "HTML" }
+            `${res.pull.jpname} is currently airing.` +
+            `If you would like to follow its episode releases: ` +
+            `<a href="t.me/${ctx.me.username}?start=remindme_${res.pull.alid}">Click here!</a>`
         );
-    await addWatching(userid, alid);
 }
 
 /**

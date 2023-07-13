@@ -160,7 +160,6 @@ export async function callback_mkwatchep(ctx: MyContext) {
     }
     await ctx.api.editMessageCaption(ctx.from.id, ctx.msg.message_id, {
         caption: newMsgArray.join("\n"),
-        parse_mode: "HTML",
         reply_markup: newkeyboard
     });
 }
@@ -217,15 +216,13 @@ export async function markWatchedRange(conversation: MyConversation, ctx: MyCont
     await ctx.reply(
         `Give the episode range to mark as watched:\n<i>Possible ranges: ${consecutiveRanges(
             data.notwatched
-        ).toString()}.\nPlease give it in the form of <code>start-end</code></i>`,
-        { parse_mode: "HTML" }
+        ).toString()}.\nPlease give it in the form of <code>start-end</code></i>`
     );
     while (true) {
         const range = (await conversation.waitForHears(/^((\d+)|((\d+)-(\d+)))$/)).match;
         if (range[0] == null) {
             await ctx.reply(
-                "Invalid range specified. Please give it in the form of <code>start-end</code>",
-                { parse_mode: "HTML" }
+                "Invalid range specified. Please give it in the form of <code>start-end</code>"
             );
             continue;
         }

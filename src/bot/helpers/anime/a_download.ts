@@ -51,13 +51,9 @@ export async function anime_dllist(ctx: MyContext) {
         }
         if (msglist.length > 0) {
             for (let i = 0; i < msglist.length; i++)
-                await bot.api.sendMessage(ctx.from.id, msglist[i], {
-                    parse_mode: "HTML"
-                });
+                await bot.api.sendMessage(ctx.from.id, msglist[i]);
         } else
-            await bot.api.sendMessage(ctx.from.id, msg, {
-                parse_mode: "HTML"
-            });
+            await bot.api.sendMessage(ctx.from.id, msg);
     }
 }
 

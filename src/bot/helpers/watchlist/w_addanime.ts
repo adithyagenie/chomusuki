@@ -21,6 +21,7 @@ export async function addWL(convo: MyConversation, ctx: MyContext) {
     }
     const wlname = await getWLName(convo);
     await ctx.reply("Send the name of anime or /done to stop adding.");
+    let msgid = 0;
     while (1) {
         const name = await convo.waitUntil((ctx1) =>
             ctx1.hasCallbackQuery(/^addwl_(\d+)_(\d+)(_current)?/) ||
@@ -28,8 +29,12 @@ export async function addWL(convo: MyConversation, ctx: MyContext) {
         if (name.hasCallbackQuery(/addwl_(\d+)_(\d+)(_current)?/)) {
             await searchCB(convo, name);
         } else if (name.message != undefined) {
-            if (name.message.text === "/done") {
+            if (name.hasCommand("done")) {
                 await ctx.reply("Alright wrapping up.");
+                try {
+                    if (msgid !== 0 && msgid !== undefined)
+                        await ctx.api.deleteMessage(ctx.chat?.id, msgid);
+                } catch {}
                 return;
             } else if (name.message.text.match(/\/start wl_(\d+)/) !== null) {
                 convo.log(`Adding ${name.message.text}`);
@@ -50,13 +55,17 @@ export async function addWL(convo: MyConversation, ctx: MyContext) {
                     await ctx.reply("Anime not found.");
                 } else {
                     const todel = await ctx.reply(
-                        `<b>${result}</b> has been added to ${wlname}.\nTo add another, simply send the anime name to search or /done to finish adding.`,
-                        { parse_mode: "HTML" }
+                        `<b>${result}</b> has been added to ${wlname}.\nTo add another, simply send the anime name to search or /done to finish adding.`
                     );
                     selfyeet(ctx.chat?.id, todel.message_id, 5000);
                 }
             } else {
-                await startSearchWL(convo, ctx, name.message.text, convo.session.menudata.wlid);
+                if (msgid !== undefined && msgid !== 0) {
+                    try {
+                        await ctx.api.deleteMessage(ctx.chat?.id, msgid);
+                    } catch {}
+                }
+                msgid = await startSearchWL(convo, ctx, name.message.text, convo.session.menudata.wlid);
             }
         }
     }
@@ -89,7 +98,7 @@ async function searchCB(convo: MyConversation, ctx: MyContext) {
         return;
     }
     //console.log(`${msg}, ${JSON.stringify(keyboard)}`);
-    await ctx.editMessageText(msg, { reply_markup: keyboard, parse_mode: "HTML" });
+    await ctx.editMessageText(msg, { reply_markup: keyboard });
 }
 
 async function startSearchWL(
@@ -113,7 +122,7 @@ async function startSearchWL(
     if (keyboard.inline_keyboard.length == 0)
         await ctx.api.editMessageText(ctx.from.id, msgid, msg);
     await ctx.api.editMessageText(ctx.from.id, msgid, msg, {
-        reply_markup: keyboard,
-        parse_mode: "HTML"
+        reply_markup: keyboard
     });
+    return msgid;
 }

@@ -71,7 +71,6 @@ async function animePendingBotHandle(chatid: number, userid: number, alid: numbe
     }
     await bot.api.sendPhoto(chatid, res.image, {
         caption: msgheader + msg,
-        parse_mode: "HTML",
         reply_markup: new InlineKeyboard()
             .text("Mark watched", "mark_watch")
             .text("Download", "download")

@@ -78,8 +78,7 @@ export async function animeSearchStart(ctx: MyContext, command: "startwatching" 
     if (keyboard.inline_keyboard.length == 0)
         await ctx.api.editMessageText(ctx.from.id, msgid, msg);
     await ctx.api.editMessageText(ctx.from.id, msgid, msg, {
-        reply_markup: keyboard,
-        parse_mode: "HTML"
+        reply_markup: keyboard
     });
     return;
 }
@@ -220,5 +219,5 @@ export async function search_startWatch_remindMe_cb(ctx: MyContext) {
         return;
     }
     //console.log(`${msg}, ${JSON.stringify(keyboard)}`);
-    await ctx.editMessageText(msg, { reply_markup: keyboard, parse_mode: "HTML" });
+    await ctx.editMessageText(msg, { reply_markup: keyboard });
 }

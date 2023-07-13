@@ -36,7 +36,7 @@ export function WLMainMenu() {
                         await ctx1.editMessageText(
                             `Watchlist <code>${
                                 wllist.slice(-1)[0].watchlist_name
-                            }</code> chosen.\nWhat do you want to do with it?`, { parse_mode: "HTML" }
+                            }</code> chosen.\nWhat do you want to do with it?`
                         );
                         ctx1.session.menudata.wlid = wllist.slice(-1)[0].watchlistid;
                     })
@@ -46,13 +46,13 @@ export function WLMainMenu() {
             range
                 .submenu(wllist[i].watchlist_name, `wl_opts`, async (ctx1) => {
                     await ctx1.editMessageText(
-                        `Watchlist <code>${wllist[i].watchlist_name}</code> chosen.\nWhat do you want to do with it?`, { parse_mode: "HTML" }
+                        `Watchlist <code>${wllist[i].watchlist_name}</code> chosen.\nWhat do you want to do with it?`
                     );
                     ctx1.session.menudata.wlid = wllist[i].watchlistid;
                 })
                 .submenu(wllist[i + 1].watchlist_name, `wl_opts`, async (ctx1) => {
                     await ctx1.editMessageText(
-                        `Watchlist <code>${wllist[i].watchlist_name}</code> chosen.\nWhat do you want to do with it?`, { parse_mode: "HTML" }
+                        `Watchlist <code>${wllist[i].watchlist_name}</code> chosen.\nWhat do you want to do with it?`
                     );
                     ctx1.session.menudata.wlid = wllist[i + 1].watchlistid;
                 })
@@ -106,8 +106,7 @@ export function animeList() {
                         `<a href = "${(await db.anime.findUniqueOrThrow({
                             where: { alid: item.alid },
                             select: { imglink: true }
-                        })).imglink}">​</a>`,
-                        { parse_mode: "HTML" }
+                        })).imglink}">​</a>`
                     );
                 }).row();
             }
@@ -129,7 +128,7 @@ export function animeList() {
             }
         }
         range.back("Go back", async (ctx1) => {
-            await ctx1.editMessageText(`Watchlist <code>${wlname}</code> chosen.\nWhat do you want to do with it?`, { parse_mode: "HTML" });
+            await ctx1.editMessageText(`Watchlist <code>${wlname}</code> chosen.\nWhat do you want to do with it?`);
             ctx1.session.menudata.l_page = undefined;
             ctx1.session.menudata.maxpg = undefined;
             ctx1.session.menudata.alid = undefined;

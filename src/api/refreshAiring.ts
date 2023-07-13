@@ -48,8 +48,7 @@ async function airhandle(alid: number, aniname: string, next_ep_num: number) {
     });
     for (const o of chatid) {
         await bot.api.sendPhoto(Number(o.chatid), imglink.fileid, {
-            caption: `Episode ${next_ep_num} of <b>${aniname}</b> is airing now.\nDownload links will be available soon.`,
-            parse_mode: "HTML"
+            caption: `Episode ${next_ep_num} of <b>${aniname}</b> is airing now.\nDownload links will be available soon.`
         });
     }
     console.log(

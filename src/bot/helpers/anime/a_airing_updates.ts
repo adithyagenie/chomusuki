@@ -40,8 +40,7 @@ export async function remindMe(ctx: MyContext) {
                         select: { jpname: true }
                     })
                 ).jpname
-            }.</b>`,
-            { parse_mode: "HTML" }
+            }.</b>`
         );
     else await ctx.reply("Error encountered ;_;");
     return;
@@ -55,8 +54,8 @@ export async function airingUpdatesList(ctx: MyContext) {
     const userid = ctx.session.userid;
     const { msg, keyboard } = await airingUpdatesListHelper(userid, 1, ctx.me.username);
     if (keyboard == undefined || keyboard.inline_keyboard[0].length == 1)
-        await ctx.reply(msg, { parse_mode: "HTML" });
-    else await ctx.reply(msg, { reply_markup: keyboard, parse_mode: "HTML" });
+        await ctx.reply(msg);
+    else await ctx.reply(msg, { reply_markup: keyboard });
 }
 
 /**
@@ -97,7 +96,7 @@ export async function airingUpdatesListCBQ(ctx: MyContext) {
     );
     try {
         if (ctx.msg.text.trim() !== HTMLMessageToMessage(msg).trim())
-            await ctx.editMessageText(msg, { reply_markup: keyboard, parse_mode: "HTML" });
+            await ctx.editMessageText(msg, { reply_markup: keyboard });
     } catch (e) {
         console.log(e);
     }
@@ -125,9 +124,7 @@ export async function stopAiringUpdates(ctx: MyContext) {
     let i = -1;
     if (userau !== null) i = userau.map((o) => o.alid).indexOf(remove);
     if (i === -1) {
-        await ctx.reply(`You are already not recieving the updates for <b>${name}</b>.`, {
-            parse_mode: "HTML"
-        });
+        await ctx.reply(`You are already not recieving the updates for <b>${name}</b>.`);
         return;
     }
     userau[i].userid.splice(userau[i].userid.indexOf(ctx.session.userid), 1);
@@ -135,6 +132,6 @@ export async function stopAiringUpdates(ctx: MyContext) {
         where: { alid: remove },
         data: userau[i]
     });
-    await ctx.reply(`You will no longer recieve updates for <b>${name}</b>.`, { parse_mode: "HTML" });
+    await ctx.reply(`You will no longer recieve updates for <b>${name}</b>.`);
     return;
 }

@@ -3,8 +3,6 @@ import { getNumber, GetWatchedList } from "../database/animeDB";
 import { db } from "..";
 import { i_ProcessedObjV2 } from "../interfaces";
 
-//import { writeJSON } from "fs-extra";
-
 /** Returns all yet to watch episodes of user. */
 export async function getPending(userid: number) {
     const t = new Date().getTime();
@@ -88,9 +86,6 @@ async function getPendingInAnime(watchedep: number[], animeentry: anime) {
             shortname = undefined;
         }
     }
-    /*Im trying really hard not to query anilist for every anime, the problem being there can be .5 episodes/episode 0.
-     So for now, im planning to put that on an array in db.
-     also, old af anime dont have airing schedule, instead find the streaming thing and use aniep on it.*/
     const status = animeentry.status;
     if (!(status == "RELEASING" || status == "NOT_YET_RELEASED" || status == "FINISHED")) return;
     const resobj = {

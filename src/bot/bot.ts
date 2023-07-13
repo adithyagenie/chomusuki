@@ -1,7 +1,6 @@
 // telegram bot endpoint
 
 import { type Conversation, type ConversationFlavor } from "@grammyjs/conversations";
-import { apiThrottler } from "@grammyjs/transformer-throttler";
 import { Bot, Context, MemorySessionStorage, session, SessionFlavor } from "grammy";
 import { initWLMenu } from "./helpers/watchlist/w_menu";
 import { RedisAdapter } from "@grammyjs/storage-redis";
@@ -10,6 +9,7 @@ import { botcommands } from "./handlers/commands";
 import { middleware } from "./handlers/middleware";
 import { botErrorHandle, initConvos, setCommands } from "./helpers/misc_handles";
 import { limit } from "@grammyjs/ratelimiter";
+import { parseMode, ParseModeFlavor } from "@grammyjs/parse-mode";
 
 interface SessionData {
     userid: number;
@@ -31,7 +31,7 @@ export type MyContext =
     & SessionFlavor<SessionData>
 export type MyConversation = Conversation<MyContext>;
 
-export const bot = new Bot<MyContext>(`${process.env.BOT_TOKEN}`, {
+export const bot = new Bot<ParseModeFlavor<MyContext>>(`${process.env.BOT_TOKEN}`, {
     botInfo: {
         id: 6104968853,
         is_bot: true,
@@ -44,8 +44,9 @@ export const bot = new Bot<MyContext>(`${process.env.BOT_TOKEN}`, {
 });
 
 export function botinit() {
-    const throttler = apiThrottler();
-    bot.api.config.use(throttler);
+    //const throttler = apiThrottler();
+    //bot.api.config.use(throttler);
+    bot.api.config.use(parseMode("HTML"));
     const storage = new RedisAdapter<SessionData>({ instance: redis, ttl: 24 * 60 * 60 });
     // noinspection JSUnusedGlobalSymbols
     bot.use(

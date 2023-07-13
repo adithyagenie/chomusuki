@@ -19,7 +19,7 @@ export function middleware() {
             if (ctx.session.menudata.activemenuopt === ctx.msg.message_id) {
                 await next();
             } else {
-                await ctx.editMessageText("<b>Menu disabled as a newer one exists.</b>", { parse_mode: "HTML" });
+                await ctx.editMessageText("<b>Menu disabled as a newer one exists.</b>");
             }
         });
     middleware.command("mywatchlists",
@@ -27,7 +27,7 @@ export function middleware() {
             if (ctx.session.menudata.activemenuopt !== undefined) {
                 try {
                     await ctx.api.editMessageText(ctx.from.id, ctx.session.menudata.activemenuopt, "<b>Menu" +
-                        " disabled as a newer one exists.</b>", { parse_mode: "HTML" });
+                        " disabled as a newer one exists.</b>");
                 } catch {
                     console.error(`Unable to edit old menu message:: ${ctx.from.id}::${JSON.stringify(ctx.session.menudata.activemenuopt)}`);
                 }

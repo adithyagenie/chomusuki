@@ -16,9 +16,7 @@ export async function newUser(conversation: MyConversation, ctx: MyContext) {
     });
     const username = (await conversation.waitForReplyTo(msgid.message_id)).message?.text;
     const msgid2 = (
-        await ctx.reply(`Your username will be set as <code>${username}</code>!`, {
-            parse_mode: "HTML"
-        })
+        await ctx.reply(`Your username will be set as <code>${username}</code>!`)
     ).message_id;
     const res = await conversation.external(() =>
         db.users.create({
@@ -39,10 +37,7 @@ export async function newUser(conversation: MyConversation, ctx: MyContext) {
     await ctx.api.editMessageText(
         ctx.from.id,
         msgid2,
-        `Your username has been set as <code>${username}</code>!\n\nUser created!`,
-        {
-            parse_mode: "HTML"
-        }
+        `Your username has been set as <code>${username}</code>!\n\nUser created!`
     );
     conversation.session.userid = res.userid;
     return;
@@ -70,8 +65,7 @@ export async function deleteUser(conversation: MyConversation, ctx: MyContext) {
     await ctx.reply(
         `Deleting your account will remove all your data from this data. <b>This cannot be reversed.</b>\n
 If you are absolutely sure you want to delete - Please type in <code>Yes, I'm sure.</code>\n
-or cancel by typing <code>cancel</code>.`,
-        { parse_mode: "HTML" }
+or cancel by typing <code>cancel</code>.`
     );
     while (1) {
         const msg = await conversation.waitFrom(ctx.from.id);
@@ -87,8 +81,7 @@ or cancel by typing <code>cancel</code>.`,
                 })
             );
             await ctx.reply(
-                `Account has been deleted! <code>${res.username}</code> is now dead...\n(っ˘̩╭╮˘̩)っ`,
-                { parse_mode: "HTML" }
+                `Account has been deleted! <code>${res.username}</code> is now dead...\n(っ˘̩╭╮˘̩)っ`
             );
             conversation.session = undefined;
             return;

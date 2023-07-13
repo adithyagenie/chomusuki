@@ -18,10 +18,7 @@ export async function createWL(conversation: MyConversation, ctx: MyContext) {
         return;
     }
     await ctx.reply(
-        `Watchlist <code>${name}</code> created successfully. Use /mywatchlists to manage your watchlists.`,
-        {
-            parse_mode: "HTML"
-        }
+        `Watchlist <code>${name}</code> created successfully. Use /mywatchlists to manage your watchlists.`
     );
     return;
 }
@@ -44,7 +41,7 @@ export function deleteWL() {
             await ctx1.editMessageText(
                 `Watchlist <code>${
                     await getWLName(ctx1)
-                }</code> chosen.\nWhat do you want to do with it?`, { parse_mode: "HTML" }
+                }</code> chosen.\nWhat do you want to do with it?`
             );
         });
 }
@@ -52,13 +49,13 @@ export function deleteWL() {
 export async function renameWL(convo: MyConversation, ctx: MyContext) {
     const wlid = convo.session.menudata.wlid;
     const wlname = await getWLName(convo);
-    await ctx.reply(`Enter the new name for watchlist <code>${wlname}</code>.\n(Or /cancel to cancel renaming.)`, { parse_mode: "HTML" });
+    await ctx.reply(`Enter the new name for watchlist <code>${wlname}</code>.\n(Or /cancel to cancel renaming.)`);
     const newname = await convo.waitFor(":text");
     if (newname.hasCommand("cancel")) {
         await ctx.reply("Cancelling rename.");
         await ctx.conversation.exit("renameWL");
     }
-    await ctx.reply(`Alright, setting <code>${newname.msg.text}</code> as the new name.`, { parse_mode: "HTML" });
+    await ctx.reply(`Alright, setting <code>${newname.msg.text}</code> as the new name.`);
     await convo.external(() => renameWatchlist(wlid, newname.msg.text));
     convo.session.menudata.wlname = undefined;
     return;
