@@ -9,6 +9,7 @@ import { makeEpKeyboard } from "./a_misc_helpers";
 import axios, { AxiosResponse } from "axios";
 import { syncupd, anime } from "../../../database/schema";
 import { eq } from "drizzle-orm";
+import { b, code, fmt } from "@grammyjs/parse-mode";
 
 /**
  ** Gives all the downloads queued for the user.
@@ -41,20 +42,26 @@ export async function anime_dllist(ctx: MyContext) {
             }
         }
 
-        let msg = "<code>DOWNLOAD QUEUE:</code>\n\n";
+        const header = fmt`${code}DOWNLOAD QUEUE:${code}\n\n`;
+        let msg = header.text;
         const msglist: string[] = [];
         for (let i = 0; i < resser.length; i++) {
-            const tmpmsg = `<b>${resser[i].anime}</b> - Episode ${resser[i].epnum.join(", ")}\n`;
+            const titleMsg = fmt`${b}${resser[i].anime}${b} - Episode ${resser[i].epnum.join(", ")}\n`;
+            const tmpmsg = titleMsg.text;
             if (msg.length + tmpmsg.length > 1024) {
                 msglist.push(msg);
                 msg = tmpmsg;
             } else msg += tmpmsg;
         }
         if (msglist.length > 0) {
-            for (let i = 0; i < msglist.length; i++)
-                await bot.api.sendMessage(ctx.from.id, msglist[i]);
-        } else
-            await bot.api.sendMessage(ctx.from.id, msg);
+            for (let i = 0; i < msglist.length; i++) {
+                const message = fmt`${msglist[i]}`;
+                await bot.api.sendMessage(ctx.from.id, message.text, { entities: message.entities });
+            }
+        } else {
+            const message = fmt`${msg}`;
+            await bot.api.sendMessage(ctx.from.id, message.text, { entities: message.entities });
+        }
     }
 }
 

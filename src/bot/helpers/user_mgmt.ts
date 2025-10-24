@@ -3,6 +3,7 @@ import { MyContext, MyConversation, MyConversationContext } from "../bot";
 import { NextFunction } from "grammy";
 import { users, config, watchinganime, completedanime } from "../../database/schema";
 import { eq, and } from "drizzle-orm";
+import { b, code, fmt } from "@grammyjs/parse-mode";
 
 export async function registerUser(ctx: MyContext) {
     if (ctx.session.userid !== undefined) {
@@ -17,8 +18,9 @@ export async function newUser(conversation: MyConversation, ctx: MyConversationC
         reply_markup: { force_reply: true }
     });
     const username = (await conversation.waitForReplyTo(msgid.message_id)).message?.text;
+    const message1 = fmt`Your username will be set as ${code}${username}${code}!`;
     const msgid2 = (
-        await ctx.reply(`Your username will be set as <code>${username}</code>!`)
+        await ctx.reply(message1.text, { entities: message1.entities })
     ).message_id;
     const res = await conversation.external(async () => {
         const result = await db.insert(users).values({
@@ -40,10 +42,12 @@ export async function newUser(conversation: MyConversation, ctx: MyConversationC
             completed: []
         });
     });
+    const message2 = fmt`Your username has been set as ${code}${username}${code}!\n\nUser created!`;
     await ctx.api.editMessageText(
         ctx.from.id,
         msgid2,
-        `Your username has been set as <code>${username}</code>!\n\nUser created!`
+        message2.text,
+        { entities: message2.entities }
     );
     // Set session via external access to outside context
     await conversation.external((outsideCtx) => {
@@ -71,11 +75,10 @@ export async function userMiddleware(ctx: MyContext, next: NextFunction) {
 }
 
 export async function deleteUser(conversation: MyConversation, ctx: MyConversationContext) {
-    await ctx.reply(
-        `Deleting your account will remove all your data from this data. <b>This cannot be reversed.</b>\n
-If you are absolutely sure you want to delete - Please type in <code>Yes, I'm sure.</code>\n
-or cancel by typing <code>cancel</code>.`
-    );
+    const message = fmt`Deleting your account will remove all your data from this data. ${b}This cannot be reversed.${b}\n
+If you are absolutely sure you want to delete - Please type in ${code}Yes, I'm sure.${code}\n
+or cancel by typing ${code}cancel${code}.`;
+    await ctx.reply(message.text, { entities: message.entities });
     while (1) {
         const msg = await conversation.waitFrom(ctx.from.id);
         if (msg.message?.text === "cancel") {
@@ -92,9 +95,8 @@ or cancel by typing <code>cancel</code>.`
                     .returning();
                 return result[0];
             });
-            await ctx.reply(
-                `Account has been deleted! <code>${res.username}</code> is now dead...\n(っ˘̩╭╮˘̩)っ`
-            );
+            const deleteMessage = fmt`Account has been deleted! ${code}${res.username}${code} is now dead...\n(っ˘̩╭╮˘̩)っ`;
+            await ctx.reply(deleteMessage.text, { entities: deleteMessage.entities });
             await conversation.external((ctx) => {
                 ctx.session.userid = undefined;
             });

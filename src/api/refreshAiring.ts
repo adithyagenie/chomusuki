@@ -4,6 +4,7 @@ import { checkAnimeTable, getNumber } from "../database/animeDB";
 import { db } from "../index";
 import { anime, airingupdates, users } from "../database/schema";
 import { eq, inArray } from "drizzle-orm";
+import { b, fmt } from "@grammyjs/parse-mode";
 
 async function cronn(alid: number, aniname: string, next_ep_air: number, next_ep_num: number) {
     console.log(
@@ -56,9 +57,11 @@ async function airhandle(alid: number, aniname: string, next_ep_num: number) {
         .from(users)
         .where(inArray(users.userid, sususers.userid));
     
+    const message = fmt`Episode ${next_ep_num} of ${b}${aniname}${b} is airing now.\nDownload links will be available soon.`;
     for (const o of chatid) {
         await bot.api.sendPhoto(Number(o.chatid), imglink.fileid, {
-            caption: `Episode ${next_ep_num} of <b>${aniname}</b> is airing now.\nDownload links will be available soon.`
+            caption: message.text,
+            caption_entities: message.caption_entities
         });
     }
     console.log(

@@ -6,6 +6,7 @@ import { getWLName } from "./w_helpers";
 import { selfyeet } from "../misc_handles";
 import { watchlists } from "../../../database/schema";
 import { eq, count } from "drizzle-orm";
+import { b, fmt } from "@grammyjs/parse-mode";
 
 
 /**
@@ -69,9 +70,8 @@ export async function addWL(convo: MyConversation, ctx: MyConversationContext) {
                 } else if (result === "invalid") {
                     await ctx.reply("Anime not found.");
                 } else {
-                    const todel = await ctx.reply(
-                        `<b>${result}</b> has been added to ${wlname}.\nTo add another, simply send the anime name to search or /done to finish adding.`
-                    );
+                    const message = fmt`${b}${result}${b} has been added to ${wlname}.\nTo add another, simply send the anime name to search or /done to finish adding.`;
+                    const todel = await ctx.reply(message.text, { entities: message.entities });
                     selfyeet(ctx.chat?.id, todel.message_id, 5000);
                 }
             } else {
@@ -96,9 +96,12 @@ export async function addWL(convo: MyConversation, ctx: MyConversationContext) {
                     msgid = 0;
                 } else {
                     if (searchResult.keyboard.inline_keyboard.length == 0)
-                        await ctx.api.editMessageText(ctx.from.id, searchMsgId, searchResult.msg);
+                        await ctx.api.editMessageText(ctx.from.id, searchMsgId, searchResult.msg, {
+                            entities: searchResult.msgEntities
+                        });
                     else
                         await ctx.api.editMessageText(ctx.from.id, searchMsgId, searchResult.msg, {
+                            entities: searchResult.msgEntities,
                             reply_markup: searchResult.keyboard
                         });
                     msgid = searchMsgId;
@@ -123,7 +126,7 @@ async function searchCB(convo: MyConversation, ctx: MyConversationContext) {
     )[0];
     //console.log(`${command}, ${movepg}, ${query}`);
     const userid = await convo.external((ctx) => ctx.session.userid);
-    const { msg, keyboard } = await animeSearchHandler(
+    const { msg, msgEntities, keyboard } = await animeSearchHandler(
         query,
         "addwl",
         movepg,
@@ -136,6 +139,6 @@ async function searchCB(convo: MyConversation, ctx: MyConversationContext) {
         return;
     }
     //console.log(`${msg}, ${JSON.stringify(keyboard)}`);
-    await ctx.editMessageText(msg, { reply_markup: keyboard });
+    await ctx.editMessageText(msg, { entities: msgEntities, reply_markup: keyboard });
 }
 

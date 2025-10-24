@@ -5,6 +5,7 @@ import { getWlAlid, getWLName } from "./w_helpers";
 import { getWatchlistAnime } from "../../../database/animeDB";
 import { watchlists, anime } from "../../../database/schema";
 import { eq } from "drizzle-orm";
+import { b, code, fmt, i as italic, link } from "@grammyjs/parse-mode";
 
 /**
  * - The main menu builder for /mywatchlists command.
@@ -37,11 +38,8 @@ export function WLMainMenu() {
             if (i === wllist.length - 1 && wllist.length % 2 !== 0) {
                 range
                     .submenu(wllist.slice(-1)[0].watchlist_name, `wl_opts`, async (ctx1) => {
-                        await ctx1.editMessageText(
-                            `Watchlist <code>${
-                                wllist.slice(-1)[0].watchlist_name
-                            }</code> chosen.\nWhat do you want to do with it?`
-                        );
+                        const message = fmt`Watchlist ${code}${wllist.slice(-1)[0].watchlist_name}${code} chosen.\nWhat do you want to do with it?`;
+                        await ctx1.editMessageText(message.text, { entities: message.entities });
                         ctx1.session.menudata.wlid = wllist.slice(-1)[0].watchlistid;
                     })
                     .row();
@@ -49,15 +47,13 @@ export function WLMainMenu() {
             }
             range
                 .submenu(wllist[i].watchlist_name, `wl_opts`, async (ctx1) => {
-                    await ctx1.editMessageText(
-                        `Watchlist <code>${wllist[i].watchlist_name}</code> chosen.\nWhat do you want to do with it?`
-                    );
+                    const message = fmt`Watchlist ${code}${wllist[i].watchlist_name}${code} chosen.\nWhat do you want to do with it?`;
+                    await ctx1.editMessageText(message.text, { entities: message.entities });
                     ctx1.session.menudata.wlid = wllist[i].watchlistid;
                 })
                 .submenu(wllist[i + 1].watchlist_name, `wl_opts`, async (ctx1) => {
-                    await ctx1.editMessageText(
-                        `Watchlist <code>${wllist[i].watchlist_name}</code> chosen.\nWhat do you want to do with it?`
-                    );
+                    const message = fmt`Watchlist ${code}${wllist[i].watchlist_name}${code} chosen.\nWhat do you want to do with it?`;
+                    await ctx1.editMessageText(message.text, { entities: message.entities });
                     ctx1.session.menudata.wlid = wllist[i + 1].watchlistid;
                 })
                 .row();
@@ -110,11 +106,8 @@ export function animeList() {
                     
                     if (imgResult.length === 0) throw new Error("Anime not found");
                     
-                    await ctx1.editMessageText(`Chosen watchlist: <b>${wlname}</b>\n\n` +
-                        `Chosen anime: \n<b>${item.jpname}</b>\n<i>(${item.enname})</i>\n\n` +
-                        `What do you wanna do with it?` +
-                        `<a href = "${imgResult[0].imglink}">​</a>`
-                    );
+                    const message = fmt`Chosen watchlist: ${b}${wlname}${b}\n\nChosen anime: \n${b}${item.jpname}${b}\n${italic}(${item.enname})${italic}\n\nWhat do you wanna do with it?${link(imgResult[0].imglink)}​${link(imgResult[0].imglink)}`;
+                    await ctx1.editMessageText(message.text, { entities: message.entities });
                 }).row();
             }
             if (maxpg !== 1) {
@@ -135,7 +128,8 @@ export function animeList() {
             }
         }
         range.back("Go back", async (ctx1) => {
-            await ctx1.editMessageText(`Watchlist <code>${wlname}</code> chosen.\nWhat do you want to do with it?`);
+            const message = fmt`Watchlist ${code}${wlname}${code} chosen.\nWhat do you want to do with it?`;
+            await ctx1.editMessageText(message.text, { entities: message.entities });
             ctx1.session.menudata.l_page = undefined;
             ctx1.session.menudata.maxpg = undefined;
             ctx1.session.menudata.alid = undefined;

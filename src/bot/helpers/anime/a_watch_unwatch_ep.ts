@@ -9,6 +9,7 @@ import { getUpdaterAnimeIndex, makeEpKeyboard, messageToHTMLMessage } from "./a_
 import aniep from "aniep";
 import { watchedepanime, anime } from "../../../database/schema";
 import { eq, and, sql } from "drizzle-orm";
+import { code, fmt, i as italic } from "@grammyjs/parse-mode";
 
 export async function anime_unwatch(ctx: MyContext) {
     await ctx.conversation.enter("unwatchhelper");
@@ -210,17 +211,14 @@ export async function markWatchedRange(conversation: MyConversation, ctx: MyConv
         await ctx.reply(`You have already marked all the episodes of ${aniname} as watched!`);
         return;
     }
-    await ctx.reply(
-        `Give the episode range to mark as watched:\n<i>Possible ranges: ${consecutiveRanges(
-            data.notwatched
-        ).toString()}.\nPlease give it in the form of <code>start-end</code></i>`
-    );
+    const possibleRanges = consecutiveRanges(data.notwatched).toString();
+    const message1 = fmt`Give the episode range to mark as watched:\n${italic}Possible ranges: ${possibleRanges}.\nPlease give it in the form of ${code}start-end${code}${italic}`;
+    await ctx.reply(message1.text, { entities: message1.entities });
     while (true) {
         const range = (await conversation.waitForHears(/^((\d+)|((\d+)-(\d+)))$/)).match;
         if (range[0] == null) {
-            await ctx.reply(
-                "Invalid range specified. Please give it in the form of <code>start-end</code>"
-            );
+            const message2 = fmt`Invalid range specified. Please give it in the form of ${code}start-end${code}`;
+            await ctx.reply(message2.text, { entities: message2.entities });
             continue;
         }
         const [start, end] = [parseInt(range[1]), parseInt(range[2])];

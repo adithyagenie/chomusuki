@@ -7,6 +7,7 @@ import { watchinganime, airingupdates, watchlists } from "../../../database/sche
 import { eq, sql } from "drizzle-orm";
 import { getPagination } from "./a_misc_helpers";
 import { MediaSearchEntry } from "anilist-node";
+import { b, fmt, i as italic, link } from "@grammyjs/parse-mode";
 
 // export async function anime_add(ctx: MyContext) {
 // 	if (ctx.chat.id != authchat) {
@@ -66,7 +67,7 @@ export async function animeSearchStart(ctx: MyContext, command: "startwatching" 
         return;
     }
     const msgid = (await ctx.reply("Searching...")).message_id;
-    const { msg, keyboard } = await animeSearchHandler(
+    const { msg, msgEntities, keyboard } = await animeSearchHandler(
         query,
         command,
         1,
@@ -78,8 +79,9 @@ export async function animeSearchStart(ctx: MyContext, command: "startwatching" 
         return;
     }
     if (keyboard.inline_keyboard.length == 0)
-        await ctx.api.editMessageText(ctx.from.id, msgid, msg);
+        await ctx.api.editMessageText(ctx.from.id, msgid, msg, { entities: msgEntities });
     await ctx.api.editMessageText(ctx.from.id, msgid, msg, {
+        entities: msgEntities,
         reply_markup: keyboard
     });
     return;
@@ -151,22 +153,27 @@ export async function animeSearchHandler(
 
     if (command == "addwl") command += `_${watchlistid}`;
     const keyboard = getPagination(currentpg, maxpg, command);
-    let msg = `<b>Search results for '${query}</b>'\n\n`;
+    let formattedMsg = fmt`${b}Search results for '${query}'${b}\n\n`;
     const dbidlist = await getStatusFromDB(command, userid, watchlistid);
     for (let i = 0; i < page.media.length; i++) {
-        msg += `<b>${page.media[i].title.romaji}</b>\n${
-            (page.media[i].title.english === null ? page.media[i].title.userPreferred : page.media[i].title.english)
-        }\n`;
+        const title = page.media[i].title.romaji;
+        const subtitle = page.media[i].title.english === null ? page.media[i].title.userPreferred : page.media[i].title.english;
+        
+        formattedMsg = fmt`${formattedMsg}${b}${title}${b}\n${subtitle}\n`;
+        
         if (command == "startwatching" && userid !== undefined) {
             // let old = await db.watchinganime.findUnique({
             // 	where: { userid }
             // });
             // if (old.alid === undefined) old.alid = [];
-            if (dbidlist.includes(page.media[i].id))
-                msg += `<i>(Anime already marked as watching!)</i>\n\n`;
+            if (dbidlist.includes(page.media[i].id)) {
+                formattedMsg = fmt`${formattedMsg}${italic}(Anime already marked as watching!)${italic}\n\n`;
+            }
             //else msg += `<i>Start Watching:</i> /startwatching_${pages.media[i].id}\n\n`;
-            else
-                msg += `<i>Start Watching: <a href="t.me/${username}?start=startwatching_${page.media[i].id}">Click here!</a></i>\n\n`;
+            else {
+                const url = `t.me/${username}?start=startwatching_${page.media[i].id}`;
+                formattedMsg = fmt`${formattedMsg}${italic}Start Watching: ${link(url)}Click here!${link(url)}${italic}\n\n`;
+            }
         } else if (command == "remindme" && userid !== undefined) {
             // let old: number[] = [];
             // let _ = await db.airingupdates.findMany({
@@ -175,11 +182,14 @@ export async function animeSearchHandler(
             // });
             //if (_ === null) old = [];
             //else old = _.map((o) => o.alid);
-            if (dbidlist.includes(page.media[i].id))
-                msg += `<i>(Already sending airing updates for anime!)</i>\n\n`;
+            if (dbidlist.includes(page.media[i].id)) {
+                formattedMsg = fmt`${formattedMsg}${italic}(Already sending airing updates for anime!)${italic}\n\n`;
+            }
             //else msg += `<i>Send Airing Updates:</i> /remindme_${pages.media[i].id}\n\n`;
-            else
-                msg += `<i>Send Airing Updates: <a href="t.me/${username}?start=remindme_${page.media[i].id}">Click here!</a></i>\n\n`;
+            else {
+                const url = `t.me/${username}?start=remindme_${page.media[i].id}`;
+                formattedMsg = fmt`${formattedMsg}${italic}Send Airing Updates: ${link(url)}Click here!${link(url)}${italic}\n\n`;
+            }
         } else if (command.startsWith("addwl") && watchlistid !== undefined) {
             // let old: number[] = [];
             // let _ = await db.watchlists.findUnique({
@@ -187,13 +197,18 @@ export async function animeSearchHandler(
             // 	select: { alid: true }
             // });
             // old = _ === null ? [] : _.alid;
-            if (dbidlist.includes(page.media[i].id))
-                msg += `<i>(Already present in watchlist!)</i>\n\n`;
-            else
-                msg += `<i>Add to watchlist: <a href = "t.me/${username}?start=wl_${page.media[i].id}">Click here!</a></i>\n\n`;
-        } else msg += "\n";
+            if (dbidlist.includes(page.media[i].id)) {
+                formattedMsg = fmt`${formattedMsg}${italic}(Already present in watchlist!)${italic}\n\n`;
+            }
+            else {
+                const url = `t.me/${username}?start=wl_${page.media[i].id}`;
+                formattedMsg = fmt`${formattedMsg}${italic}Add to watchlist: ${link(url)}Click here!${link(url)}${italic}\n\n`;
+            }
+        } else {
+            formattedMsg = fmt`${formattedMsg}\n`;
+        }
     }
-    return { msg, keyboard };
+    return { msg: formattedMsg.text, msgEntities: formattedMsg.entities, keyboard };
 }
 
 /**This function helps manage page scrolling for search results.
@@ -208,7 +223,7 @@ export async function search_startWatch_remindMe_cb(ctx: MyContext) {
         (o) => o[1]
     )[0];
     //console.log(`${command}, ${movepg}, ${query}`);
-    const { msg, keyboard } = await animeSearchHandler(
+    const { msg, msgEntities, keyboard } = await animeSearchHandler(
         query,
         command,
         movepg,
@@ -220,5 +235,5 @@ export async function search_startWatch_remindMe_cb(ctx: MyContext) {
         return;
     }
     //console.log(`${msg}, ${JSON.stringify(keyboard)}`);
-    await ctx.editMessageText(msg, { reply_markup: keyboard });
+    await ctx.editMessageText(msg, { entities: msgEntities, reply_markup: keyboard });
 }

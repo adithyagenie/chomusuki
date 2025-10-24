@@ -1,6 +1,7 @@
 import { Composer } from "grammy";
 import { MyContext } from "../bot";
 import { userMiddleware } from "../helpers/user_mgmt";
+import { b, fmt } from "@grammyjs/parse-mode";
 
 export function middleware() {
     const middleware = new Composer<MyContext>();
@@ -19,15 +20,16 @@ export function middleware() {
             if (ctx.session.menudata.activemenuopt === ctx.msg.message_id) {
                 await next();
             } else {
-                await ctx.editMessageText("<b>Menu disabled as a newer one exists.</b>");
+                const message = fmt`${b}Menu disabled as a newer one exists.${b}`;
+                await ctx.editMessageText(message.text, { entities: message.entities });
             }
         });
     middleware.command("mywatchlists",
         async (ctx, next) => {
             if (ctx.session.menudata.activemenuopt !== undefined) {
                 try {
-                    await ctx.api.editMessageText(ctx.from.id, ctx.session.menudata.activemenuopt, "<b>Menu" +
-                        " disabled as a newer one exists.</b>");
+                    const message = fmt`${b}Menu disabled as a newer one exists.${b}`;
+                    await ctx.api.editMessageText(ctx.from.id, ctx.session.menudata.activemenuopt, message.text, { entities: message.entities });
                 } catch {
                     console.error(`Unable to edit old menu message:: ${ctx.from.id}::${JSON.stringify(ctx.session.menudata.activemenuopt)}`);
                 }

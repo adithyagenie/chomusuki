@@ -40,13 +40,6 @@ export function botinit() {
     bot = new Bot<MyContext>(`${process.env.BOT_TOKEN}`);
     //const throttler = apiThrottler();
     //bot.api.config.use(throttler);
-    // Set default parse_mode to HTML for all text messages
-    bot.api.config.use((prev, method, payload, signal) => {
-        if ('parse_mode' in payload && payload.parse_mode === undefined) {
-            payload.parse_mode = 'HTML';
-        }
-        return prev(method, payload, signal);
-    });
     const storage = new RedisAdapter<SessionData>({ instance: redis, ttl: 24 * 60 * 60 });
     // noinspection JSUnusedGlobalSymbols
     bot.use(

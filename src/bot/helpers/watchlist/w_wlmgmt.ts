@@ -3,6 +3,7 @@ import { MyContext, MyConversation, MyConversationContext } from "../../bot";
 import { getWLName } from "./w_helpers";
 import { Menu } from "@grammyjs/menu";
 import { selfyeet } from "../misc_handles";
+import { code, fmt } from "@grammyjs/parse-mode";
 
 /**Creates a new watchlist. Responds to /createwl */
 export async function createWL(conversation: MyConversation, ctx: MyConversationContext) {
@@ -18,9 +19,8 @@ export async function createWL(conversation: MyConversation, ctx: MyConversation
         await ctx.reply("Error creating watchlist ;_;");
         return;
     }
-    await ctx.reply(
-        `Watchlist <code>${name}</code> created successfully. Use /mywatchlists to manage your watchlists.`
-    );
+    const message = fmt`Watchlist ${code}${name}${code} created successfully. Use /mywatchlists to manage your watchlists.`;
+    await ctx.reply(message.text, { entities: message.entities });
     return;
 }
 
@@ -39,11 +39,9 @@ export function deleteWL() {
             }
         })
         .back("Nope, get me outta here.", async (ctx1) => {
-            await ctx1.editMessageText(
-                `Watchlist <code>${
-                    await getWLName(ctx1)
-                }</code> chosen.\nWhat do you want to do with it?`
-            );
+            const wlname = await getWLName(ctx1);
+            const message = fmt`Watchlist ${code}${wlname}${code} chosen.\nWhat do you want to do with it?`;
+            await ctx1.editMessageText(message.text, { entities: message.entities });
         });
 }
 
@@ -63,13 +61,15 @@ export async function renameWL(convo: MyConversation, ctx: MyConversationContext
             return name;
         });
     
-    await ctx.reply(`Enter the new name for watchlist <code>${wlname}</code>.\n(Or /cancel to cancel renaming.)`);
+    const message1 = fmt`Enter the new name for watchlist ${code}${wlname}${code}.\n(Or /cancel to cancel renaming.)`;
+    await ctx.reply(message1.text, { entities: message1.entities });
     const newname = await convo.waitFor(":text");
     if (newname.hasCommand("cancel")) {
         await ctx.reply("Cancelling rename.");
         return;
     }
-    await ctx.reply(`Alright, setting <code>${newname.msg.text}</code> as the new name.`);
+    const message2 = fmt`Alright, setting ${code}${newname.msg.text}${code} as the new name.`;
+    await ctx.reply(message2.text, { entities: message2.entities });
     await convo.external(() => renameWatchlist(wlid, newname.msg.text));
     await convo.external((ctx) => {
         ctx.session.menudata.wlname = undefined;

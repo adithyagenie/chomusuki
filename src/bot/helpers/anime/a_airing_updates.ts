@@ -4,6 +4,7 @@ import { MyContext } from "../../bot";
 import { getPagination, HTMLMessageToMessage } from "./a_misc_helpers";
 import { airingupdates, anime } from "../../../database/schema";
 import { eq, sql } from "drizzle-orm";
+import { b, fmt, i as italic, link } from "@grammyjs/parse-mode";
 
 /**
  ** Live updates for airing shit.
@@ -39,9 +40,8 @@ export async function remindMe(ctx: MyContext) {
             .from(anime)
             .where(eq(anime.alid, alid));
         
-        await ctx.reply(
-            `You will now recieve updates on <b>${jpnameResult[0]?.jpname}.</b>`
-        );
+        const message = fmt`You will now recieve updates on ${b}${jpnameResult[0]?.jpname}.${b}`;
+        await ctx.reply(message.text, { entities: message.entities });
     } else {
         await ctx.reply("Error encountered ;_;");
     }
@@ -54,10 +54,10 @@ export async function remindMe(ctx: MyContext) {
  */
 export async function airingUpdatesList(ctx: MyContext) {
     const userid = ctx.session.userid;
-    const { msg, keyboard } = await airingUpdatesListHelper(userid, 1, ctx.me.username);
+    const { msg, msgEntities, keyboard } = await airingUpdatesListHelper(userid, 1, ctx.me.username);
     if (keyboard == undefined || keyboard.inline_keyboard[0].length == 1)
-        await ctx.reply(msg);
-    else await ctx.reply(msg, { reply_markup: keyboard });
+        await ctx.reply(msg, { entities: msgEntities });
+    else await ctx.reply(msg, { entities: msgEntities, reply_markup: keyboard });
 }
 
 /**
@@ -70,20 +70,18 @@ export async function airingUpdatesListHelper(userid: number, offset: number, us
         5,
         offset
     );
-    let msg: string;
     if (amount == 0) {
-        msg = `<b>You have not subscribed to airing updates for any anime. </b>`;
-        return { msg: msg, keyboard: undefined };
-    } else msg = `<b>Displaying your anime subscriptions: </b>\n\n`;
+        const message = fmt`${b}You have not subscribed to airing updates for any anime. ${b}`;
+        return { msg: message.text, msgEntities: message.entities, keyboard: undefined };
+    }
+    
+    let formattedMsg = fmt`${b}Displaying your anime subscriptions: ${b}\n\n`;
     for (let i = 0; i < alidlist.length; i++) {
-        msg += `${i + 1}. ${
-            animelist[i]
-        }\n<i>Stop reminding me: <a href="t.me/${username}?start=stopremindme_${
-            alidlist[i]
-        }">Click here!</a></i>\n\n`;
+        const url = `t.me/${username}?start=stopremindme_${alidlist[i]}`;
+        formattedMsg = fmt`${formattedMsg}${i + 1}. ${animelist[i]}\n${italic}Stop reminding me: ${link(url)}Click here!${link(url)}${italic}\n\n`;
     }
     const keyboard = getPagination(offset, Math.ceil(amount / 5), "airingupd");
-    return { msg, keyboard };
+    return { msg: formattedMsg.text, msgEntities: formattedMsg.entities, keyboard };
 }
 
 /**The callback from pages of /airingupdates. CBQ: airingupd_*/
@@ -91,14 +89,14 @@ export async function airingUpdatesListCBQ(ctx: MyContext) {
     await ctx.answerCallbackQuery("Fetching!");
     const movepg = parseInt(ctx.match[1]);
     if (ctx.match[2] == "_current") return;
-    const { msg, keyboard } = await airingUpdatesListHelper(
+    const { msg, msgEntities, keyboard } = await airingUpdatesListHelper(
         ctx.session.userid,
         movepg,
         ctx.me.username
     );
     try {
         if (ctx.msg.text.trim() !== HTMLMessageToMessage(msg).trim())
-            await ctx.editMessageText(msg, { reply_markup: keyboard });
+            await ctx.editMessageText(msg, { entities: msgEntities, reply_markup: keyboard });
     } catch (e) {
         console.log(e);
     }
@@ -128,7 +126,8 @@ export async function stopAiringUpdates(ctx: MyContext) {
     let i = -1;
     if (userau.length > 0) i = userau.map((o) => o.alid).indexOf(remove);
     if (i === -1) {
-        await ctx.reply(`You are already not recieving the updates for <b>${name}</b>.`);
+        const message = fmt`You are already not recieving the updates for ${b}${name}${b}.`;
+        await ctx.reply(message.text, { entities: message.entities });
         return;
     }
     const updatedUserids = [...userau[i].userid];
@@ -138,6 +137,7 @@ export async function stopAiringUpdates(ctx: MyContext) {
         .set({ userid: updatedUserids })
         .where(eq(airingupdates.alid, remove));
     
-    await ctx.reply(`You will no longer recieve updates for <b>${name}</b>.`);
+    const message2 = fmt`You will no longer recieve updates for ${b}${name}${b}.`;
+    await ctx.reply(message2.text, { entities: message2.entities });
     return;
 }
