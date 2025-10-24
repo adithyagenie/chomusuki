@@ -1,4 +1,4 @@
-import { pgTable, smallint, integer, varchar, decimal, boolean, bigint, serial } from "drizzle-orm/pg-core";
+import { pgTable, smallint, integer, varchar, decimal, boolean, bigint, serial, primaryKey, unique } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
 // Anime table
@@ -19,10 +19,13 @@ export const anime = pgTable("anime", {
 
 // Users table
 export const users = pgTable("users", {
-    userid: smallint("userid").primaryKey().generatedAlwaysAsIdentity(),
-    chatid: bigint("chatid", { mode: "bigint" }).unique("unique_chatid"),
+    userid: smallint("userid").primaryKey().generatedByDefaultAsIdentity(),
+    chatid: bigint("chatid", { mode: "bigint" }),
     username: varchar("username", { length: 255 }),
-});
+}, (table) => ({
+    uniqueChatid: unique("unique_chatid").on(table.chatid),
+    useridChatidUnique: unique("userid_chatid_unique").on(table.userid, table.chatid),
+}));
 
 // Completed anime table
 export const completedanime = pgTable("completedanime", {
@@ -39,7 +42,7 @@ export const config = pgTable("config", {
 // Sync updates table
 export const syncupd = pgTable("syncupd", {
     userid: integer("userid").notNull().references(() => users.userid, { onDelete: "cascade" }),
-    queuenum: smallint("queuenum").primaryKey().generatedAlwaysAsIdentity(),
+    queuenum: smallint("queuenum").primaryKey().generatedByDefaultAsIdentity(),
     synctype: varchar("synctype", { length: 20 }),
     anime: varchar("anime", { length: 255 }),
     epnum: decimal("epnum"),
@@ -53,11 +56,14 @@ export const watchedepanime = pgTable("watchedepanime", {
     userid: integer("userid").notNull().references(() => users.userid, { onDelete: "cascade" }),
     alid: integer("alid").notNull().references(() => anime.alid, { onDelete: "cascade" }),
     ep: decimal("ep").array().notNull(),
-});
+}, (table) => ({
+    pk: primaryKey({ columns: [table.userid, table.alid] }),
+    watchedepanimeUserAnimeUnique: unique("watchedepanime_user_anime_unique").on(table.userid, table.alid),
+}));
 
 // Watchlists table
 export const watchlists = pgTable("watchlists", {
-    watchlistid: smallint("watchlistid").primaryKey().generatedAlwaysAsIdentity(),
+    watchlistid: smallint("watchlistid").primaryKey().generatedByDefaultAsIdentity(),
     watchlist_name: varchar("watchlist_name", { length: 255 }),
     alid: integer("alid").array().notNull(),
     generated_by: integer("generated_by").notNull().references(() => users.userid, { onDelete: "cascade" }),
@@ -65,7 +71,7 @@ export const watchlists = pgTable("watchlists", {
 
 // Airing updates table
 export const airingupdates = pgTable("airingupdates", {
-    alid: integer("alid").primaryKey().references(() => anime.alid, { onDelete: "cascade" }),
+    alid: integer("alid").primaryKey().references(() => anime.alid, { onDelete: "cascade", onUpdate: "no action" }),
     userid: integer("userid").array().notNull(),
 });
 
