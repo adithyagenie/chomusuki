@@ -1,7 +1,7 @@
 import anilist, { AnimeEntry, MediaFilterTypes, MediaSearchEntry } from "anilist-node";
 import { addReqCache, fetchReqCache } from "../database/redis";
 
-const al = new anilist(process.env.ANILIST_TOKEN);
+const al = new anilist();
 
 export async function imageGet(id: number) {
     let url: string;

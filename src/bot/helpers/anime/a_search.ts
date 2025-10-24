@@ -2,7 +2,7 @@
 
 import { db } from "../../..";
 import { searchAnime } from "../../../api/anilist_api";
-import { MyContext, MyConversation } from "../../bot";
+import { MyContext, MyConversation, MyConversationContext } from "../../bot";
 import { watchinganime, airingupdates, watchlists } from "../../../database/schema";
 import { eq, sql } from "drizzle-orm";
 import { getPagination } from "./a_misc_helpers";
@@ -16,7 +16,7 @@ import { MediaSearchEntry } from "anilist-node";
 // 	await ctx.conversation.enter("animeadd");
 // }
 //
-// export async function animeadd(conversation: MyConversation, ctx: MyContext) {
+// export async function animeadd(conversation: MyConversation, ctx: MyConversationContext) {
 // 	let responseobj: anime;
 // 	await ctx.reply(
 // 		"Please provide data required. Type /cancel at any point to cancel adding.",

@@ -1,4 +1,4 @@
-import { MyContext, MyConversation } from "../../bot";
+import { MyContext, MyConversation, MyConversationContext } from "../../bot";
 import { db } from "../../../index";
 import { watchlists } from "../../../database/schema";
 import { eq } from "drizzle-orm";

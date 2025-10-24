@@ -1,18 +1,19 @@
 import { deleteWatchlist, newWatchlist, renameWatchlist } from "../../../database/animeDB";
-import { MyContext, MyConversation } from "../../bot";
+import { MyContext, MyConversation, MyConversationContext } from "../../bot";
 import { getWLName } from "./w_helpers";
 import { Menu } from "@grammyjs/menu";
 import { selfyeet } from "../misc_handles";
 
 /**Creates a new watchlist. Responds to /createwl */
-export async function createWL(conversation: MyConversation, ctx: MyContext) {
+export async function createWL(conversation: MyConversation, ctx: MyConversationContext) {
     await ctx.reply("What is your new watchlist's name?");
     const name = await conversation.form.text();
     if (name === "/cancel") {
         await ctx.reply("Alright, cancelling.");
         return;
     }
-    const res = await newWatchlist(name, ctx.session.userid);
+    const userid = await conversation.external((ctx) => ctx.session.userid);
+    const res = await conversation.external(() => newWatchlist(name, userid));
     if (res === 1) {
         await ctx.reply("Error creating watchlist ;_;");
         return;
@@ -46,17 +47,32 @@ export function deleteWL() {
         });
 }
 
-export async function renameWL(convo: MyConversation, ctx: MyContext) {
-    const wlid = ctx.session.menudata.wlid;
-    const wlname = await getWLName(ctx);
+export async function renameWL(convo: MyConversation, ctx: MyConversationContext) {
+    // Get watchlist ID and name from session
+    const { wlid, wlname: currentName } = await convo.external((ctx) => ({
+        wlid: ctx.session.menudata.wlid,
+        wlname: ctx.session.menudata.wlname
+    }));
+    
+    // Fetch the current watchlist name if not cached
+    const wlname = currentName !== undefined 
+        ? currentName 
+        : await convo.external(async (ctx) => {
+            const name = await getWLName(ctx);
+            ctx.session.menudata.wlname = name; // Cache it
+            return name;
+        });
+    
     await ctx.reply(`Enter the new name for watchlist <code>${wlname}</code>.\n(Or /cancel to cancel renaming.)`);
     const newname = await convo.waitFor(":text");
     if (newname.hasCommand("cancel")) {
         await ctx.reply("Cancelling rename.");
-        await ctx.conversation.exit("renameWL");
+        return;
     }
     await ctx.reply(`Alright, setting <code>${newname.msg.text}</code> as the new name.`);
     await convo.external(() => renameWatchlist(wlid, newname.msg.text));
-    ctx.session.menudata.wlname = undefined;
+    await convo.external((ctx) => {
+        ctx.session.menudata.wlname = undefined;
+    });
     return;
 }

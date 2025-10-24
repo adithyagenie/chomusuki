@@ -11,40 +11,33 @@ import { botErrorHandle, initConvos, setCommands } from "./helpers/misc_handles"
 import { limit } from "@grammyjs/ratelimiter";
 
 interface SessionData {
-    userid: number;
-    config: { pause_airing_updates: boolean };
+    userid: number | undefined;
+    config: { pause_airing_updates: boolean | undefined };
     menudata: {
-        activemenuopt: number,
-        wlid: number,
-        wlname: string,
-        alid: number,
-        l_page: number,
-        maxpg: number,
+        activemenuopt: number | undefined,
+        wlid: number | undefined,
+        wlname: string | undefined,
+        alid: number | undefined,
+        l_page: number | undefined,
+        maxpg: number | undefined,
         listmethod: "all" | "towatch" | undefined
     };
 }
 
-export type MyContext =
-    Context
-    & ConversationFlavor<Context>
-    & SessionFlavor<SessionData>
-export type MyConversation = Conversation<MyContext, MyContext>;
+// Outside context objects (knows all middleware plugins)
+export type MyContext = ConversationFlavor<Context> & SessionFlavor<SessionData>;
 
-export const bot = new Bot<MyContext>(`${process.env.BOT_TOKEN}`, {
-    botInfo: {
-        id: 6104968853,
-        is_bot: true,
-        first_name: "Cunnime_DEV",
-        username: "cunnime_dev_bot",
-        can_join_groups: false,
-        can_read_all_group_messages: false,
-        supports_inline_queries: false,
-        can_connect_to_business: false,
-        has_main_web_app: false
-    }
-});
+// Inside context objects (knows all conversation plugins)
+export type MyConversationContext = Context;
+
+// Conversation type with both outside and inside context
+export type MyConversation = Conversation<MyContext, MyConversationContext>;
+
+export let bot: Bot<MyContext>;
 
 export function botinit() {
+    // Initialize bot here, after environment variables are loaded
+    bot = new Bot<MyContext>(`${process.env.BOT_TOKEN}`);
     //const throttler = apiThrottler();
     //bot.api.config.use(throttler);
     // Set default parse_mode to HTML for all text messages

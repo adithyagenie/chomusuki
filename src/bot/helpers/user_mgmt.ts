@@ -1,5 +1,5 @@
 import { db } from "../../index";
-import { MyContext, MyConversation } from "../bot";
+import { MyContext, MyConversation, MyConversationContext } from "../bot";
 import { NextFunction } from "grammy";
 import { users, config, watchinganime, completedanime } from "../../database/schema";
 import { eq, and } from "drizzle-orm";
@@ -12,7 +12,7 @@ export async function registerUser(ctx: MyContext) {
     await ctx.conversation.enter("newUser");
 }
 
-export async function newUser(conversation: MyConversation, ctx: MyContext) {
+export async function newUser(conversation: MyConversation, ctx: MyConversationContext) {
     const msgid = await ctx.reply("What do you want your username to be?", {
         reply_markup: { force_reply: true }
     });
@@ -45,7 +45,10 @@ export async function newUser(conversation: MyConversation, ctx: MyContext) {
         msgid2,
         `Your username has been set as <code>${username}</code>!\n\nUser created!`
     );
-    ctx.session.userid = res.userid;
+    // Set session via external access to outside context
+    await conversation.external((outsideCtx) => {
+        outsideCtx.session.userid = res.userid;
+    });
     return;
 }
 
@@ -67,7 +70,7 @@ export async function userMiddleware(ctx: MyContext, next: NextFunction) {
     }
 }
 
-export async function deleteUser(conversation: MyConversation, ctx: MyContext) {
+export async function deleteUser(conversation: MyConversation, ctx: MyConversationContext) {
     await ctx.reply(
         `Deleting your account will remove all your data from this data. <b>This cannot be reversed.</b>\n
 If you are absolutely sure you want to delete - Please type in <code>Yes, I'm sure.</code>\n
@@ -79,10 +82,11 @@ or cancel by typing <code>cancel</code>.`
             await ctx.reply("Cancelling deletion...");
             return;
         } else if (msg.message?.text === "Yes, I'm sure.") {
+            const userid = await conversation.external((ctx) => ctx.session.userid);
             const res = await conversation.external(async () => {
                 const result = await db.delete(users)
                     .where(and(
-                        eq(users.userid, ctx.session.userid),
+                        eq(users.userid, userid),
                         eq(users.chatid, BigInt(ctx.from.id))
                     ))
                     .returning();
@@ -91,7 +95,9 @@ or cancel by typing <code>cancel</code>.`
             await ctx.reply(
                 `Account has been deleted! <code>${res.username}</code> is now dead...\n(っ˘̩╭╮˘̩)っ`
             );
-            ctx.session.userid = undefined;
+            await conversation.external((ctx) => {
+                ctx.session.userid = undefined;
+            });
             return;
         }
     }

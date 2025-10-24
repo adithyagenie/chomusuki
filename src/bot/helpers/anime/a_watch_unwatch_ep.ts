@@ -2,7 +2,7 @@
 
 import { InlineKeyboard, Keyboard } from "grammy";
 import { getDecimal, markWatchedunWatched } from "../../../database/animeDB";
-import { MyContext, MyConversation } from "../../bot";
+import { MyContext, MyConversation, MyConversationContext } from "../../bot";
 import { getPending, getSinglePending } from "../../../api/pending";
 import { db } from "../../..";
 import { getUpdaterAnimeIndex, makeEpKeyboard, messageToHTMLMessage } from "./a_misc_helpers";
@@ -14,8 +14,8 @@ export async function anime_unwatch(ctx: MyContext) {
     await ctx.conversation.enter("unwatchhelper");
 }
 
-export async function unwatchhelper(conversation: MyConversation, ctx: MyContext) {
-    const userid = ctx.session.userid;
+export async function unwatchhelper(conversation: MyConversation, ctx: MyConversationContext) {
+    const userid = await conversation.external((ctx) => ctx.session.userid);
     const updateobj = await conversation.external(() => getPending(userid));
     const keyboard = new Keyboard().resized().persistent().oneTime();
     const animelist = [];
@@ -175,11 +175,12 @@ const consecutiveRanges = (a: number[]) => {
     return list;
 };
 
-export async function markWatchedRange(conversation: MyConversation, ctx: MyContext) {
+export async function markWatchedRange(conversation: MyConversation, ctx: MyConversationContext) {
     const genkeyboard = new InlineKeyboard();
+    const userid = await conversation.external((ctx) => ctx.session.userid);
     const watching = await conversation.external(async () => {
         const result = await db.execute<{ jpname: string; alid: number }>(
-            sql`SELECT a.jpname, a.alid FROM anime a, watchinganime w, unnest(w.alid) s WHERE (a.alid IN (s)) AND (w.userid = ${ctx.session.userid})`
+            sql`SELECT a.jpname, a.alid FROM anime a, watchinganime w, unnest(w.alid) s WHERE (a.alid IN (s)) AND (w.userid = ${userid})`
         );
         return result.rows;
     });
@@ -203,7 +204,7 @@ export async function markWatchedRange(conversation: MyConversation, ctx: MyCont
     await ctx.api.deleteMessage(ctx.from.id, msgid);
     const aniname = watching.find((o) => o.alid == alid).jpname;
     const data = await conversation.external(() =>
-        getSinglePending(ctx.session.userid, null, alid)
+        getSinglePending(userid, null, alid)
     );
     if (data.notwatched.length == 0) {
         await ctx.reply(`You have already marked all the episodes of ${aniname} as watched!`);
@@ -240,7 +241,7 @@ export async function markWatchedRange(conversation: MyConversation, ctx: MyCont
             const epResult = await db.select({ ep: watchedepanime.ep })
                 .from(watchedepanime)
                 .where(and(
-                    eq(watchedepanime.userid, ctx.session.userid),
+                    eq(watchedepanime.userid, userid),
                     eq(watchedepanime.alid, alid)
                 ));
             
@@ -250,7 +251,7 @@ export async function markWatchedRange(conversation: MyConversation, ctx: MyCont
             await db.update(watchedepanime)
                 .set({ ep: id })
                 .where(and(
-                    eq(watchedepanime.userid, ctx.session.userid),
+                    eq(watchedepanime.userid, userid),
                     eq(watchedepanime.alid, alid)
                 ));
         });

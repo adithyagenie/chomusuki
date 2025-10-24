@@ -1,7 +1,7 @@
 import { InlineKeyboard } from "grammy";
 import { db } from "../../..";
 import { addWatching, checkAnimeTable, getUserWatchingAiring } from "../../../database/animeDB";
-import { MyContext, MyConversation } from "../../bot";
+import { MyContext, MyConversation, MyConversationContext } from "../../bot";
 import { getPagination, HTMLMessageToMessage } from "./a_misc_helpers";
 import { selfyeet } from "../misc_handles";
 import { watchinganime, anime, watchedepanime } from "../../../database/schema";
@@ -136,17 +136,18 @@ export async function animeStartWatch(ctx: MyContext, menu = false) {
  ** Remove an anime from watching list of user.
  ** Called with /stopwatching_alid.
  */
-export async function stopWatching(conversation: MyConversation, ctx: MyContext) {
+export async function stopWatching(conversation: MyConversation, ctx: MyConversationContext) {
     await ctx.deleteMessage();
     const match = parseInt(ctx.match[1]);
     if (Number.isNaN(match[1])) {
         await ctx.reply("Invalid command.");
         return;
     }
+    const userid = await conversation.external((ctx) => ctx.session.userid);
     const alidResult = await conversation.external(async () => {
         const result = await db.select({ alid: watchinganime.alid })
             .from(watchinganime)
-            .where(eq(watchinganime.userid, ctx.session.userid));
+            .where(eq(watchinganime.userid, userid));
         return result[0]?.alid || [];
     });
     const _ = alidResult;
@@ -181,11 +182,11 @@ export async function stopWatching(conversation: MyConversation, ctx: MyContext)
             );
             await db.update(watchinganime)
                 .set({ alid: _ })
-                .where(eq(watchinganime.userid, ctx.session.userid));
+                .where(eq(watchinganime.userid, userid));
             
             await db.delete(watchedepanime)
                 .where(and(
-                    eq(watchedepanime.userid, ctx.session.userid),
+                    eq(watchedepanime.userid, userid),
                     eq(watchedepanime.alid, match)
                 ));
         });

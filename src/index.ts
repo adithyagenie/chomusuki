@@ -5,6 +5,7 @@ import { botinit } from "./bot/bot";
 import { createWriteStream } from "fs-extra";
 import { format } from "util";
 import { drizzle } from "drizzle-orm/node-postgres";
+import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { Pool } from "pg";
 import * as schema from "./database/schema";
 import { initCron, terminateCron } from "./api/refreshAiring";
@@ -16,7 +17,6 @@ import Redis from "ioredis";
 config();
 if (
     process.env.BOT_TOKEN === undefined ||
-    process.env.ANILIST_TOKEN === undefined ||
     process.env.AUTHORISED_CHAT === undefined ||
     process.env.DATABASE_URL === undefined ||
     (process.env.RUN_METHOD !== "WEBHOOK" && process.env.RUN_METHOD !== "POLLING") ||
@@ -66,7 +66,14 @@ class RedisClient extends Redis {
 export const redis = new RedisClient(process.env.REDIS_URL);
 redis.on("error", err => console.error(`REDIS ERROR: ${err}`));
 
+async function runMigrations() {
+    console.log("Running database migrations...");
+    await migrate(db, { migrationsFolder: "./drizzle" });
+    console.log("Migrations completed successfully");
+}
+
 async function spinup() {
+    await runMigrations();
     botinit();
     await initCron();
 }
