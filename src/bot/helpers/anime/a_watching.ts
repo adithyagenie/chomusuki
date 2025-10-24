@@ -147,7 +147,7 @@ export async function stopWatching(conversation: MyConversation, ctx: MyContext)
     const _ = (
         await conversation.external(() =>
             db.watchinganime.findUnique({
-                where: { userid: conversation.session.userid },
+                where: { userid: ctx.session.userid },
                 select: { alid: true }
             })
         )
@@ -180,13 +180,13 @@ export async function stopWatching(conversation: MyConversation, ctx: MyContext)
                 1
             );
             await db.watchinganime.update({
-                where: { userid: conversation.session.userid },
+                where: { userid: ctx.session.userid },
                 data: { alid: _, userid: undefined }
             });
             await db.watchedepanime.delete({
                 where: {
                     userid_alid: {
-                        userid: conversation.session.userid,
+                        userid: ctx.session.userid,
                         alid: match
                     }
                 }

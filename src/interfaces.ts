@@ -42,7 +42,7 @@ interface AbstractMessageEntity {
 }
 
 interface CommonMessageEntity extends AbstractMessageEntity {
-    type: "mention" | "hashtag" | "cashtag" | "bot_command" | "url" | "email" | "phone_number" | "bold" | "italic" | "underline" | "strikethrough" | "spoiler" | "code";
+    type: "mention" | "hashtag" | "cashtag" | "bot_command" | "url" | "email" | "phone_number" | "bold" | "italic" | "underline" | "strikethrough" | "spoiler" | "blockquote" | "expandable_blockquote" | "code";
 }
 
 interface PreMessageEntity extends AbstractMessageEntity {

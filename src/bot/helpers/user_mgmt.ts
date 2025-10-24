@@ -39,7 +39,7 @@ export async function newUser(conversation: MyConversation, ctx: MyContext) {
         msgid2,
         `Your username has been set as <code>${username}</code>!\n\nUser created!`
     );
-    conversation.session.userid = res.userid;
+    ctx.session.userid = res.userid;
     return;
 }
 
@@ -83,7 +83,7 @@ or cancel by typing <code>cancel</code>.`
             await ctx.reply(
                 `Account has been deleted! <code>${res.username}</code> is now dead...\n(っ˘̩╭╮˘̩)っ`
             );
-            conversation.session = undefined;
+            ctx.session.userid = undefined;
             return;
         }
     }

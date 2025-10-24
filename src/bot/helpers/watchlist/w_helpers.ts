@@ -1,18 +1,18 @@
 import { MyContext, MyConversation } from "../../bot";
 import { db } from "../../../index";
 
-export async function getWLName(c: MyContext | MyConversation) {
-    if (c.session.menudata.wlname !== undefined) return c.session.menudata.wlname;
+export async function getWLName(ctx: MyContext) {
+    if (ctx.session.menudata.wlname !== undefined) return ctx.session.menudata.wlname;
     else {
         try {
-            if (c.session.menudata.wlid === undefined)
+            if (ctx.session.menudata.wlid === undefined)
                 return undefined;
 
             const wlname = (await db.watchlists.findUniqueOrThrow({
-                where: { watchlistid: c.session.menudata.wlid },
+                where: { watchlistid: ctx.session.menudata.wlid },
                 select: { watchlist_name: true }
             })).watchlist_name;
-            c.session.menudata.wlname = wlname;
+            ctx.session.menudata.wlname = wlname;
             return wlname;
         } catch (e) {
             console.error(e);

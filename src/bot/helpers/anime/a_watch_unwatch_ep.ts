@@ -185,7 +185,7 @@ export async function markWatchedRange(conversation: MyConversation, ctx: MyCont
             db.$queryRaw<{
                 jpname: string;
                 alid: number
-            }[]>`SELECT a.jpname, a.alid FROM anime a, watchinganime w, unnest(w.alid) s WHERE (a.alid IN (s)) AND (w.userid = ${conversation.session.userid});`
+            }[]>`SELECT a.jpname, a.alid FROM anime a, watchinganime w, unnest(w.alid) s WHERE (a.alid IN (s)) AND (w.userid = ${ctx.session.userid});`
     );
     if (watching === null) return;
     await conversation.external(() => {
@@ -207,7 +207,7 @@ export async function markWatchedRange(conversation: MyConversation, ctx: MyCont
     await ctx.api.deleteMessage(ctx.from.id, msgid);
     const aniname = watching.find((o) => o.alid == alid).jpname;
     const data = await conversation.external(() =>
-        getSinglePending(conversation.session.userid, null, alid)
+        getSinglePending(ctx.session.userid, null, alid)
     );
     if (data.notwatched.length == 0) {
         await ctx.reply(`You have already marked all the episodes of ${aniname} as watched!`);
@@ -243,13 +243,13 @@ export async function markWatchedRange(conversation: MyConversation, ctx: MyCont
         await conversation.external(async () => {
             let id = (
                 await db.watchedepanime.findUnique({
-                    where: { userid_alid: { userid: conversation.session.userid, alid: alid } },
+                    where: { userid_alid: { userid: ctx.session.userid, alid: alid } },
                     select: { ep: true }
                 })
             ).ep;
             id = id.concat(...(getDecimal(arr) as Prisma.Decimal[]));
             await db.watchedepanime.update({
-                where: { userid_alid: { userid: conversation.session.userid, alid: alid } },
+                where: { userid_alid: { userid: ctx.session.userid, alid: alid } },
                 data: { ep: id }
             });
         });

@@ -13,13 +13,13 @@ import { selfyeet } from "../misc_handles";
  */
 export async function addWL(convo: MyConversation, ctx: MyContext) {
     const item = await convo.external(() =>
-        db.watchlists.count({ where: { watchlistid: convo.session.menudata.wlid } })
+        db.watchlists.count({ where: { watchlistid: ctx.session.menudata.wlid } })
     );
     if (item === 0) {
         await ctx.reply("Watchlist missing.");
         return;
     }
-    const wlname = await getWLName(convo);
+    const wlname = await getWLName(ctx);
     await ctx.reply("Send the name of anime or /done to stop adding.");
     let msgid = 0;
     while (1) {
@@ -41,7 +41,7 @@ export async function addWL(convo: MyConversation, ctx: MyContext) {
                 await name.deleteMessage();
                 const result = await convo.external(() =>
                     addToWatchlist(
-                        convo.session.menudata.wlid,
+                        ctx.session.menudata.wlid,
                         parseInt(name.message.text.match(/\/start wl_(\d+)/)[1])
                     )
                 );
@@ -65,7 +65,7 @@ export async function addWL(convo: MyConversation, ctx: MyContext) {
                         await ctx.api.deleteMessage(ctx.chat?.id, msgid);
                     } catch {}
                 }
-                msgid = await startSearchWL(convo, ctx, name.message.text, convo.session.menudata.wlid);
+                msgid = await startSearchWL(convo, name, name.message.text, ctx.session.menudata.wlid);
             }
         }
     }
@@ -90,7 +90,7 @@ async function searchCB(convo: MyConversation, ctx: MyContext) {
         "addwl",
         movepg,
         ctx.me.username,
-        convo.session.userid,
+        ctx.session.userid,
         wlid
     );
     if (msg == undefined || keyboard == undefined) {
@@ -113,7 +113,7 @@ async function startSearchWL(
     }
     const msgid = (await ctx.reply("Searching...")).message_id;
     const { msg, keyboard } = await convo.external(() =>
-        animeSearchHandler(name, "addwl", 1, ctx.me.username, convo.session.userid, wlid)
+        animeSearchHandler(name, "addwl", 1, ctx.me.username, ctx.session.userid, wlid)
     );
     if (msg == undefined || keyboard == undefined) {
         await ctx.api.editMessageText(ctx.from.id, msgid, "Unable to find any results.");

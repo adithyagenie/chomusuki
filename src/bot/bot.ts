@@ -9,7 +9,6 @@ import { botcommands } from "./handlers/commands";
 import { middleware } from "./handlers/middleware";
 import { botErrorHandle, initConvos, setCommands } from "./helpers/misc_handles";
 import { limit } from "@grammyjs/ratelimiter";
-import { parseMode, ParseModeFlavor } from "@grammyjs/parse-mode";
 
 interface SessionData {
     userid: number;
@@ -27,11 +26,11 @@ interface SessionData {
 
 export type MyContext =
     Context
-    & ConversationFlavor
+    & ConversationFlavor<Context>
     & SessionFlavor<SessionData>
-export type MyConversation = Conversation<MyContext>;
+export type MyConversation = Conversation<MyContext, MyContext>;
 
-export const bot = new Bot<ParseModeFlavor<MyContext>>(`${process.env.BOT_TOKEN}`, {
+export const bot = new Bot<MyContext>(`${process.env.BOT_TOKEN}`, {
     botInfo: {
         id: 6104968853,
         is_bot: true,
@@ -39,14 +38,22 @@ export const bot = new Bot<ParseModeFlavor<MyContext>>(`${process.env.BOT_TOKEN}
         username: "cunnime_dev_bot",
         can_join_groups: false,
         can_read_all_group_messages: false,
-        supports_inline_queries: false
+        supports_inline_queries: false,
+        can_connect_to_business: false,
+        has_main_web_app: false
     }
 });
 
 export function botinit() {
     //const throttler = apiThrottler();
     //bot.api.config.use(throttler);
-    bot.api.config.use(parseMode("HTML"));
+    // Set default parse_mode to HTML for all text messages
+    bot.api.config.use((prev, method, payload, signal) => {
+        if ('parse_mode' in payload && payload.parse_mode === undefined) {
+            payload.parse_mode = 'HTML';
+        }
+        return prev(method, payload, signal);
+    });
     const storage = new RedisAdapter<SessionData>({ instance: redis, ttl: 24 * 60 * 60 });
     // noinspection JSUnusedGlobalSymbols
     bot.use(

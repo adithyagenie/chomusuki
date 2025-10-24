@@ -26,7 +26,10 @@ export async function cancel_handle(ctx: MyContext) {
         return;
     }
     console.log(`Terminating convo ${JSON.stringify(active)} for ${ctx.from.id}`);
-    await ctx.conversation.exit();
+    // Exit all active conversations
+    for (const conversationName of Object.keys(active)) {
+        await ctx.conversation.exit(conversationName);
+    }
     await ctx.reply("Cancelling operation...", {
         reply_markup: { remove_keyboard: true }
     });
@@ -102,7 +105,11 @@ export async function botErrorHandle(err: BotError<MyContext>) {
     if (err.error instanceof TypeError && err.stack.includes("_replayApi")) {
         console.error(`Encountered error: ${err.error} at context \n${JSON.stringify(err.ctx.msg)}\nStack trace: ${err.stack}`);
         console.log(`Found conversation error. Deleting conversation session data for ${err.ctx.chat.id}`);
-        await err.ctx.conversation.exit();
+        // Exit all active conversations in case of error
+        const active = await err.ctx.conversation.active();
+        for (const conversationName of Object.keys(active)) {
+            await err.ctx.conversation.exit(conversationName);
+        }
         await redis.del(`${err.ctx.chat.id}_c`);
         await err.ctx.reply("Error occured and the current operation has been cancelled." +
             " Please retry.");
