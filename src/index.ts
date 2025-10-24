@@ -4,7 +4,9 @@ import { config } from "dotenv";
 import { botinit } from "./bot/bot";
 import { createWriteStream } from "fs-extra";
 import { format } from "util";
-import { PrismaClient } from "@prisma/client";
+import { drizzle } from "drizzle-orm/node-postgres";
+import { Pool } from "pg";
+import * as schema from "./database/schema";
 import { initCron, terminateCron } from "./api/refreshAiring";
 import { FastifyInstance } from "fastify";
 import { startserver } from "./api/server";
@@ -47,7 +49,14 @@ console.error = function (...d: unknown[]) {
 
 export let server: FastifyInstance;
 startserver().then((serv) => {server = serv;}).catch(e => console.error(e));
-export const db = new PrismaClient();
+
+// Create PostgreSQL connection pool
+export const pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+});
+
+// Export drizzle db instance
+export const db = drizzle(pool, { schema });
 
 class RedisClient extends Redis {
     constructor(redisUrl: string) {
@@ -64,7 +73,7 @@ async function spinup() {
 
 async function shutdown() {
     console.log("Attempting graceful shutdown...");
-    await db.$disconnect();
+    await pool.end();
     console.log("Database connection closed...");
     await redis.quit(() => console.log("Redis connection closed..."));
     terminateCron(() => console.log("Cron Jobs cleared..."));

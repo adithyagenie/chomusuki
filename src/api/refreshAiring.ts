@@ -2,6 +2,8 @@ import * as cron from "node-schedule";
 import { bot } from "../bot/bot";
 import { checkAnimeTable, getNumber } from "../database/animeDB";
 import { db } from "../index";
+import { anime, airingupdates, users } from "../database/schema";
+import { eq, inArray } from "drizzle-orm";
 
 async function cronn(alid: number, aniname: string, next_ep_air: number, next_ep_num: number) {
     console.log(
@@ -33,17 +35,27 @@ async function cronn(alid: number, aniname: string, next_ep_air: number, next_ep
 
 async function airhandle(alid: number, aniname: string, next_ep_num: number) {
     console.log(`Processing job for ${aniname} - ${next_ep_num}.`);
-    await db.anime.update({ where: { alid }, data: { last_ep: next_ep_num } });
-    const sususers = await db.airingupdates.findUnique({
-        where: { alid },
-        select: { userid: true }
-    });
-    const imglink = await db.anime.findUnique({ where: { alid }, select: { fileid: true } });
-    if (sususers === null) throw new Error("Unable to find airing ppl");
-    const chatid = await db.users.findMany({
-        where: { userid: { in: sususers.userid } },
-        select: { chatid: true }
-    });
+    await db.update(anime)
+        .set({ last_ep: next_ep_num })
+        .where(eq(anime.alid, alid));
+    
+    const sususersResult = await db.select({ userid: airingupdates.userid })
+        .from(airingupdates)
+        .where(eq(airingupdates.alid, alid));
+    
+    if (sususersResult.length === 0) throw new Error("Unable to find airing ppl");
+    const sususers = sususersResult[0];
+    
+    const imglinkResult = await db.select({ fileid: anime.fileid })
+        .from(anime)
+        .where(eq(anime.alid, alid));
+    
+    const imglink = imglinkResult[0];
+    
+    const chatid = await db.select({ chatid: users.chatid })
+        .from(users)
+        .where(inArray(users.userid, sususers.userid));
+    
     for (const o of chatid) {
         await bot.api.sendPhoto(Number(o.chatid), imglink.fileid, {
             caption: `Episode ${next_ep_num} of <b>${aniname}</b> is airing now.\nDownload links will be available soon.`
@@ -76,21 +88,23 @@ async function airhandle(alid: number, aniname: string, next_ep_num: number) {
 
 async function reInitCron() {
     console.log("Refreshing all cron!");
-    const data = await db.anime.findMany({
-        where: {
-            next_ep_air: {
-                not: null
-            },
-            status: "RELEASING"
-        },
-        select: { jpname: true, next_ep_air: true, alid: true, next_ep_num: true }
-    });
+    const data = await db.select({
+        jpname: anime.jpname,
+        next_ep_air: anime.next_ep_air,
+        alid: anime.alid,
+        next_ep_num: anime.next_ep_num
+    })
+        .from(anime)
+        .where(eq(anime.status, "RELEASING"));
+    
     const oldtasks = cron.scheduledJobs;
     Object.keys(oldtasks).forEach((i) => {
         if (!(oldtasks[i].name == "main" || oldtasks[i].triggeredJobs() != 0)) oldtasks[i].cancel();
     });
     for (const o of data) {
-        await cronn(o.alid, o.jpname, o.next_ep_air, o.next_ep_num.toNumber());
+        if (o.next_ep_air !== null && o.next_ep_num !== null) {
+            await cronn(o.alid, o.jpname, o.next_ep_air, Number(o.next_ep_num));
+        }
     }
 }
 

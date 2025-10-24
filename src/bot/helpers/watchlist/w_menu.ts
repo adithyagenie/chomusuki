@@ -20,6 +20,8 @@ import { getWlAlid, getWLName } from "./w_helpers";
 import { animeList, WLMainMenu } from "./w_list";
 import { deleteWL } from "./w_wlmgmt";
 import { animeStartWatch } from "../anime/a_watching";
+import { watchlists, watchinganime, anime, completedanime } from "../../../database/schema";
+import { eq, and, sql } from "drizzle-orm";
 
 
 /**
@@ -53,9 +55,8 @@ function WLOptsMenu() {
 
         .submenu("Delete watchlist", "wl_delete", async (ctx1) => {
                 // await ctx1.conversation.enter("deleteWL");
-                const itemlen = Number((await db.$queryRaw<{
-                    len: bigint
-                }[]>`SELECT array_length(alid, 1) as len FROM watchlists WHERE watchlistid = ${ctx1.session.menudata.wlid}`)[0].len);
+                const result = await db.execute<{ len: string }>(sql`SELECT array_length(alid, 1) as len FROM watchlists WHERE watchlistid = ${ctx1.session.menudata.wlid}`);
+                const itemlen = result.rows[0]?.len ? Number(result.rows[0].len) : 0;
                 if (itemlen === 0)
                     await ctx1.editMessageText(`Your watchlist is empty. Do you want to delete it?`);
                 else
@@ -75,47 +76,60 @@ function stopWatching() {
     return new Menu<MyContext>("wl_stopwatch")
         .text("Yes.", async (ctx) => {
             const alid = ctx.session.menudata.alid;
-            const watching = (await db.watchinganime.findUniqueOrThrow({
-                where: { userid: ctx.session.userid },
-                select: { alid: true }
-            })).alid;
+            const watchingResult = await db.select({ alid: watchinganime.alid })
+                .from(watchinganime)
+                .where(eq(watchinganime.userid, ctx.session.userid));
+            
+            if (watchingResult.length === 0) throw new Error("User watching record not found");
+            
+            const watching = [...watchingResult[0].alid];
             watching.splice(watching.findIndex(o => o === alid), 1);
-            await db.watchinganime.update({
-                where: { userid: ctx.session.userid },
-                data: { alid: watching }
-            });
+            await db.update(watchinganime)
+                .set({ alid: watching })
+                .where(eq(watchinganime.userid, ctx.session.userid));
+            
             const yeet = await ctx.reply("Removed from watching.");
             selfyeet(ctx.chat?.id, yeet.message_id, 5000);
 
-            const item = await db.anime.findUniqueOrThrow({
-                where: { alid },
-                select: { jpname: true, enname: true }
-            });
+            const itemResult = await db.select({ jpname: anime.jpname, enname: anime.enname })
+                .from(anime)
+                .where(eq(anime.alid, alid));
+            
+            if (itemResult.length === 0) throw new Error("Anime not found");
+            
+            const item = itemResult[0];
             ctx.menu.back();
+            
+            const imglinkResult = await db.select({ imglink: anime.imglink })
+                .from(anime)
+                .where(eq(anime.alid, alid));
+            
             await ctx.editMessageText(
                 `Chosen watchlist: <b>${await getWLName(ctx)}</b>\n\n` +
                 `Chosen anime: \n<b>${item.jpname}</b>\n<i>(${item.enname})</i>\n\n` +
                 `What do you wanna do with it?` +
-                `<a href = "${(await db.anime.findUniqueOrThrow({
-                    where: { alid },
-                    select: { imglink: true }
-                })).imglink}">​</a>`
+                `<a href = "${imglinkResult[0]?.imglink}">​</a>`
             );
         })
         .back("No.", async (ctx) => {
             const alid = ctx.session.menudata.alid;
-            const item = await db.anime.findUniqueOrThrow({
-                where: { alid },
-                select: { jpname: true, enname: true }
-            });
+            const itemResult = await db.select({ jpname: anime.jpname, enname: anime.enname })
+                .from(anime)
+                .where(eq(anime.alid, alid));
+            
+            if (itemResult.length === 0) throw new Error("Anime not found");
+            
+            const item = itemResult[0];
+            
+            const imglinkResult = await db.select({ imglink: anime.imglink })
+                .from(anime)
+                .where(eq(anime.alid, alid));
+            
             await ctx.editMessageText(
                 `Chosen watchlist: <b>${await getWLName(ctx)}</b>\n\n` +
                 `Chosen anime: \n<b>${item.jpname}</b>\n<i>(${item.enname})</i>\n\n` +
                 `What do you wanna do with it?` +
-                `<a href = "${(await db.anime.findUniqueOrThrow({
-                    where: { alid },
-                    select: { imglink: true }
-                })).imglink}">​</a>`
+                `<a href = "${imglinkResult[0]?.imglink}">​</a>`
             );
         });
 }
@@ -135,22 +149,29 @@ function animeListOpts() {
                 return range;
             }
             const { wlid, alid } = temp;
-            const name = (await db.anime.findUniqueOrThrow({
-                where: { alid },
-                select: { jpname: true }
-            })).jpname;
-            const is_watched = await db.completedanime.count({
-                where: {
-                    userid: ctx.session.userid,
-                    completed: { has: alid }
-                }
-            });
-            const is_watching = await db.watchinganime.count({
-                where: {
-                    userid: ctx.session.userid,
-                    alid: { has: alid }
-                }
-            });
+            const nameResult = await db.select({ jpname: anime.jpname })
+                .from(anime)
+                .where(eq(anime.alid, alid));
+            
+            if (nameResult.length === 0) throw new Error("Anime not found");
+            
+            const name = nameResult[0].jpname;
+            
+            const is_watched_result = await db.select({ count: sql<number>`count(*)` })
+                .from(completedanime)
+                .where(and(
+                    eq(completedanime.userid, ctx.session.userid),
+                    sql`${alid} = ANY(${completedanime.completed})`
+                ));
+            const is_watched = Number(is_watched_result[0].count);
+            
+            const is_watching_result = await db.select({ count: sql<number>`count(*)` })
+                .from(watchinganime)
+                .where(and(
+                    eq(watchinganime.userid, ctx.session.userid),
+                    sql`${alid} = ANY(${watchinganime.alid})`
+                ));
+            const is_watching = Number(is_watching_result[0].count);
             if (is_watching === 0)
                 range.text("Start watching", async (ctx1) => {
                     await animeStartWatch(ctx1, true);

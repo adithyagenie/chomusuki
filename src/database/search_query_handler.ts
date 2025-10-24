@@ -1,19 +1,16 @@
 // handles search query formation
 
-import { anime } from "@prisma/client";
-//import { db } from "..";
-// export const db = new PrismaClient();
 import { db } from "..";
+import { anime, Anime } from "./schema";
+import { inArray } from "drizzle-orm";
 
 /**Takes alid list as parameter and returns list of nyaa search queries along with their anime objects. */
 export async function GetNyaaSearchQueries(alid: number[]) {
     const searchqueries: string[] = [];
     const otime = new Date().getTime();
-    const obj = await db.anime.findMany({
-        where: {
-            alid: { in: alid }
-        }
-    });
+    const obj = await db.select()
+        .from(anime)
+        .where(inArray(anime.alid, alid));
     console.log(`Postgres took: ${new Date().getTime() - otime} ms`);
     for (let i = 0; i < obj.length; i++) {
         const cs = obj[i];
@@ -35,6 +32,6 @@ export async function GetNyaaSearchQueries(alid: number[]) {
         const finalsearch = `${name} 1080p`;
         searchqueries.push(finalsearch);
     }
-    const returnobj: [string[], anime[]] = [searchqueries, obj];
+    const returnobj: [string[], Anime[]] = [searchqueries, obj];
     return returnobj;
 }

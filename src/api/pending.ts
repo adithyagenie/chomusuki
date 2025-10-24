@@ -1,19 +1,22 @@
-import { anime } from "@prisma/client";
 import { getNumber, GetWatchedList } from "../database/animeDB";
 import { db } from "..";
 import { i_ProcessedObjV2 } from "../interfaces";
+import { watchinganime, anime, watchedepanime, Anime } from "../database/schema";
+import { eq, inArray, and } from "drizzle-orm";
 
 /** Returns all yet to watch episodes of user. */
 export async function getPending(userid: number) {
     const t = new Date().getTime();
-    const alidlist = await db.watchinganime.findUnique({
-        where: { userid },
-        select: { alid: true }
-    });
-    if (alidlist === null) return undefined;
-    const animelist = await db.anime.findMany({
-        where: { alid: { in: alidlist.alid } }
-    });
+    const alidlistResult = await db.select({ alid: watchinganime.alid })
+        .from(watchinganime)
+        .where(eq(watchinganime.userid, userid));
+    
+    if (alidlistResult.length === 0) return undefined;
+    const alidlist = alidlistResult[0];
+    
+    const animelist = await db.select()
+        .from(anime)
+        .where(inArray(anime.alid, alidlist.alid));
     const watchedlist = await GetWatchedList(userid, alidlist.alid);
     const reqQueue = [];
     for (let i = 0; i < alidlist.alid.length; i++) {
@@ -30,40 +33,42 @@ export async function getPending(userid: number) {
 }
 
 export async function getSinglePending(userid: number, animename?: string, alid?: number) {
-    let animeentry: anime;
+    let animeentry: Anime;
     try {
         if (alid == undefined) {
-            const _ = await db.anime.findMany({
-                where: {
-                    jpname: animename.trim()
-                },
-                take: 1
-            });
-            if (_.length == 0) {
+            const animeResult = await db.select()
+                .from(anime)
+                .where(eq(anime.jpname, animename.trim()))
+                .limit(1);
+            
+            if (animeResult.length == 0) {
                 console.error(`Unable to fetch anime with name ${animename}`);
                 return undefined;
             }
-            animeentry = _[0];
+            animeentry = animeResult[0];
         } else {
-            animeentry = await db.anime.findUnique({
-                where: { alid }
-            });
-            if (animeentry === null) {
+            const animeResult = await db.select()
+                .from(anime)
+                .where(eq(anime.alid, alid));
+            
+            if (animeResult.length === 0) {
                 console.error(`No anime found: ${alid}`);
                 return undefined;
             }
+            animeentry = animeResult[0];
         }
-        const watched = await db.watchedepanime.findUnique({
-            where: {
-                userid_alid: { userid: userid, alid: animeentry.alid }
-            },
-            select: { ep: true }
-        });
-        if (watched === null) {
+        const watchedResult = await db.select({ ep: watchedepanime.ep })
+            .from(watchedepanime)
+            .where(and(
+                eq(watchedepanime.userid, userid),
+                eq(watchedepanime.alid, animeentry.alid)
+            ));
+        
+        if (watchedResult.length === 0) {
             console.error(`Got null when pulling watched - ${alid}: ${userid}`);
             return null;
         }
-        return await getPendingInAnime(getNumber(watched.ep) as number[], animeentry);
+        return await getPendingInAnime(getNumber(watchedResult[0].ep) as number[], animeentry);
     } catch (error) {
         console.error(error);
         return undefined;
@@ -74,7 +79,7 @@ export async function getSinglePending(userid: number, animename?: string, alid?
  ** Internal function.
  ** Returns the 'res' obj for each watching anime.
  */
-async function getPendingInAnime(watchedep: number[], animeentry: anime) {
+async function getPendingInAnime(watchedep: number[], animeentry: Anime) {
     let shortname: string | undefined;
     if (!(animeentry.optnames == null || animeentry.optnames.length == 0)) {
         shortname = animeentry.optnames.reduce((a, b) => (a.length <= b.length ? a : b)); // returns

@@ -4,6 +4,8 @@ import { addWatching, checkAnimeTable, getUserWatchingAiring } from "../../../da
 import { MyContext, MyConversation } from "../../bot";
 import { getPagination, HTMLMessageToMessage } from "./a_misc_helpers";
 import { selfyeet } from "../misc_handles";
+import { watchinganime, anime, watchedepanime } from "../../../database/schema";
+import { eq, and } from "drizzle-orm";
 
 /**
  ** Sends the first page of the list of anime the user is currently watching.
@@ -93,21 +95,18 @@ export async function animeStartWatch(ctx: MyContext, menu = false) {
     }
     const userid = ctx.session.userid;
     if (menu === false) {
-        const old = (
-            await db.watchinganime.findUnique({
-                where: { userid }
-            })
-        ).alid;
+        const oldResult = await db.select({ alid: watchinganime.alid })
+            .from(watchinganime)
+            .where(eq(watchinganime.userid, userid));
+        
+        const old = oldResult[0]?.alid || [];
         if (old.includes(alid)) {
+            const jpnameResult = await db.select({ jpname: anime.jpname })
+                .from(anime)
+                .where(eq(anime.alid, alid));
+            
             await ctx.reply(
-                `You have already marked <b>${
-                    (
-                        await db.anime.findUnique({
-                            where: { alid },
-                            select: { jpname: true }
-                        })
-                    ).jpname
-                }</b> as watching.`
+                `You have already marked <b>${jpnameResult[0]?.jpname}</b> as watching.`
             );
             return;
         }
@@ -144,21 +143,22 @@ export async function stopWatching(conversation: MyConversation, ctx: MyContext)
         await ctx.reply("Invalid command.");
         return;
     }
-    const _ = (
-        await conversation.external(() =>
-            db.watchinganime.findUnique({
-                where: { userid: ctx.session.userid },
-                select: { alid: true }
-            })
-        )
-    ).alid;
-    const aniname = await conversation.external(() =>
-        db.anime.findUnique({
-            where: { alid: match },
-            select: { jpname: true }
-        })
-    );
-    if (aniname === null) {
+    const alidResult = await conversation.external(async () => {
+        const result = await db.select({ alid: watchinganime.alid })
+            .from(watchinganime)
+            .where(eq(watchinganime.userid, ctx.session.userid));
+        return result[0]?.alid || [];
+    });
+    const _ = alidResult;
+    
+    const aniname = await conversation.external(async () => {
+        const result = await db.select({ jpname: anime.jpname })
+            .from(anime)
+            .where(eq(anime.alid, match));
+        return result[0];
+    });
+    
+    if (aniname === undefined) {
         await ctx.reply("Anime not found ;_;");
         return;
     }
@@ -179,18 +179,15 @@ export async function stopWatching(conversation: MyConversation, ctx: MyContext)
                 _.findIndex((o) => o == match),
                 1
             );
-            await db.watchinganime.update({
-                where: { userid: ctx.session.userid },
-                data: { alid: _, userid: undefined }
-            });
-            await db.watchedepanime.delete({
-                where: {
-                    userid_alid: {
-                        userid: ctx.session.userid,
-                        alid: match
-                    }
-                }
-            });
+            await db.update(watchinganime)
+                .set({ alid: _ })
+                .where(eq(watchinganime.userid, ctx.session.userid));
+            
+            await db.delete(watchedepanime)
+                .where(and(
+                    eq(watchedepanime.userid, ctx.session.userid),
+                    eq(watchedepanime.alid, match)
+                ));
         });
         await ctx.api.deleteMessage(ctx.from.id, msgid);
         await ctx.reply(`${aniname.jpname} has been removed from your watching list.`);

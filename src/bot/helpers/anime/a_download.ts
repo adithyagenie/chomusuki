@@ -7,6 +7,8 @@ import { getxdcc } from "../../../api/subsplease-xdcc";
 import { i_DlSync, i_NyaaResponse } from "../../../interfaces";
 import { makeEpKeyboard } from "./a_misc_helpers";
 import axios, { AxiosResponse } from "axios";
+import { syncupd, anime } from "../../../database/schema";
+import { eq } from "drizzle-orm";
 
 /**
  ** Gives all the downloads queued for the user.
@@ -15,12 +17,11 @@ import axios, { AxiosResponse } from "axios";
 export async function anime_dllist(ctx: MyContext) {
     const userid = ctx.session.userid;
     await ctx.replyWithChatAction("typing");
-    const pendingdl = (
-        await db.syncupd.findMany({
-            where: { userid },
-            select: { anime: true, epnum: true }
-        })
-    ).map((o) => {
+    const syncupdResult = await db.select({ anime: syncupd.anime, epnum: syncupd.epnum })
+        .from(syncupd)
+        .where(eq(syncupd.userid, userid));
+    
+    const pendingdl = syncupdResult.map((o) => {
         return { anime: o.anime, epnum: getNumber(o.epnum) as number };
     });
     if (pendingdl.length == 0) {
@@ -71,19 +72,21 @@ export async function dlep_cbq(ctx: MyContext) {
     const userid = ctx.session.userid;
     const alid = parseInt(ctx.match[1]);
     const epnum = parseInt(ctx.match[2]);
-    const pull1 = await db.anime.findFirst({
-        where: { alid },
-        select: { optnames: true }
-    });
-    if (pull1 === null) throw new Error(`Anime not found: ${alid}`);
+    const pull1Result = await db.select({ optnames: anime.optnames })
+        .from(anime)
+        .where(eq(anime.alid, alid));
+    
+    if (pull1Result.length === 0) throw new Error(`Anime not found: ${alid}`);
+    const pull1 = pull1Result[0];
+    
     const updateobj = await getSinglePending(userid, null, alid);
-    const pendingdl: i_DlSync[] = (
-        await db.syncupd.findMany({
-            where: { userid }
-        })
-    ).map((o) => {
+    const syncupdResult = await db.select()
+        .from(syncupd)
+        .where(eq(syncupd.userid, userid));
+    
+    const pendingdl: i_DlSync[] = syncupdResult.map((o) => {
         const i = getNumber(o.epnum) as number;
-        return Object.assign(o, { epnum: i });
+        return Object.assign({}, o, { epnum: i });
     });
     let flag = false;
     for (let i = 0; i < pendingdl.length; i++) {

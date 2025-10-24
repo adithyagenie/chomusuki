@@ -3,6 +3,8 @@ import { MyContext } from "../../bot";
 import { db } from "../../../index";
 import { getWlAlid, getWLName } from "./w_helpers";
 import { getWatchlistAnime } from "../../../database/animeDB";
+import { watchlists, anime } from "../../../database/schema";
+import { eq } from "drizzle-orm";
 
 /**
  * - The main menu builder for /mywatchlists command.
@@ -12,10 +14,12 @@ import { getWatchlistAnime } from "../../../database/animeDB";
 export function WLMainMenu() {
     return new Menu<MyContext>("wl_main").dynamic(async (ctx) => {
         const range = new MenuRange<MyContext>();
-        const wllist = await db.watchlists.findMany({
-            where: { generated_by: ctx.session.userid },
-            select: { watchlist_name: true, watchlistid: true }
-        });
+        const wllist = await db.select({
+            watchlist_name: watchlists.watchlist_name,
+            watchlistid: watchlists.watchlistid
+        })
+            .from(watchlists)
+            .where(eq(watchlists.generated_by, ctx.session.userid));
         if (wllist === null || wllist.length === 0) {
             range
                 .text("-No watchlists available-")
@@ -100,13 +104,16 @@ export function animeList() {
             for (const item of wl) {
                 range.submenu(item.jpname, "wl_alopts", async (ctx1) => {
                     ctx1.session.menudata.alid = item.alid;
+                    const imgResult = await db.select({ imglink: anime.imglink })
+                        .from(anime)
+                        .where(eq(anime.alid, item.alid));
+                    
+                    if (imgResult.length === 0) throw new Error("Anime not found");
+                    
                     await ctx1.editMessageText(`Chosen watchlist: <b>${wlname}</b>\n\n` +
                         `Chosen anime: \n<b>${item.jpname}</b>\n<i>(${item.enname})</i>\n\n` +
                         `What do you wanna do with it?` +
-                        `<a href = "${(await db.anime.findUniqueOrThrow({
-                            where: { alid: item.alid },
-                            select: { imglink: true }
-                        })).imglink}">​</a>`
+                        `<a href = "${imgResult[0].imglink}">​</a>`
                     );
                 }).row();
             }

@@ -1,6 +1,8 @@
 import { db } from "../../index";
 import { MyContext, MyConversation } from "../bot";
 import { NextFunction } from "grammy";
+import { users, config, watchinganime, completedanime } from "../../database/schema";
+import { eq, and } from "drizzle-orm";
 
 export async function registerUser(ctx: MyContext) {
     if (ctx.session.userid !== undefined) {
@@ -18,20 +20,24 @@ export async function newUser(conversation: MyConversation, ctx: MyContext) {
     const msgid2 = (
         await ctx.reply(`Your username will be set as <code>${username}</code>!`)
     ).message_id;
-    const res = await conversation.external(() =>
-        db.users.create({
-            data: { chatid: ctx.from.id, userid: undefined, username: username }
-        })
-    );
+    const res = await conversation.external(async () => {
+        const result = await db.insert(users).values({
+            chatid: BigInt(ctx.from.id),
+            username: username
+        }).returning();
+        return result[0];
+    });
     await conversation.external(async () => {
-        await db.config.create({
-            data: { userid: res.userid }
+        await db.insert(config).values({
+            userid: res.userid
         });
-        await db.watchinganime.create({
-            data: { userid: res.userid, alid: [] }
+        await db.insert(watchinganime).values({
+            userid: res.userid,
+            alid: []
         });
-        await db.completedanime.create({
-            data: { userid: res.userid, completed: [] }
+        await db.insert(completedanime).values({
+            userid: res.userid,
+            completed: []
         });
     });
     await ctx.api.editMessageText(
@@ -44,11 +50,11 @@ export async function newUser(conversation: MyConversation, ctx: MyContext) {
 }
 
 export async function userMiddleware(ctx: MyContext, next: NextFunction) {
-    const userid = await db.users.findUnique({
-        where: { chatid: ctx.from.id },
-        select: { userid: true }
-    });
-    if (userid === null) {
+    const result = await db.select({ userid: users.userid })
+        .from(users)
+        .where(eq(users.chatid, BigInt(ctx.from.id)));
+    
+    if (result.length === 0) {
         if (ctx.hasCommand("register")) {
             await next();
         } else {
@@ -56,7 +62,7 @@ export async function userMiddleware(ctx: MyContext, next: NextFunction) {
         }
     } else {
         console.log(`adding ${ctx.from.id} to mem cache.`);
-        ctx.session.userid = userid.userid;
+        ctx.session.userid = result[0].userid;
         await next();
     }
 }
@@ -73,13 +79,15 @@ or cancel by typing <code>cancel</code>.`
             await ctx.reply("Cancelling deletion...");
             return;
         } else if (msg.message?.text === "Yes, I'm sure.") {
-            const res = await conversation.external(() =>
-                db.users.delete({
-                    where: {
-                        userid_chatid: { userid: ctx.session.userid, chatid: ctx.from.id }
-                    }
-                })
-            );
+            const res = await conversation.external(async () => {
+                const result = await db.delete(users)
+                    .where(and(
+                        eq(users.userid, ctx.session.userid),
+                        eq(users.chatid, BigInt(ctx.from.id))
+                    ))
+                    .returning();
+                return result[0];
+            });
             await ctx.reply(
                 `Account has been deleted! <code>${res.username}</code> is now dead...\n(っ˘̩╭╮˘̩)っ`
             );

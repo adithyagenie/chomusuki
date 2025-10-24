@@ -1,5 +1,7 @@
 import { MyContext, MyConversation } from "../../bot";
 import { db } from "../../../index";
+import { watchlists } from "../../../database/schema";
+import { eq } from "drizzle-orm";
 
 export async function getWLName(ctx: MyContext) {
     if (ctx.session.menudata.wlname !== undefined) return ctx.session.menudata.wlname;
@@ -8,10 +10,13 @@ export async function getWLName(ctx: MyContext) {
             if (ctx.session.menudata.wlid === undefined)
                 return undefined;
 
-            const wlname = (await db.watchlists.findUniqueOrThrow({
-                where: { watchlistid: ctx.session.menudata.wlid },
-                select: { watchlist_name: true }
-            })).watchlist_name;
+            const result = await db.select({ watchlist_name: watchlists.watchlist_name })
+                .from(watchlists)
+                .where(eq(watchlists.watchlistid, ctx.session.menudata.wlid));
+            
+            if (result.length === 0) throw new Error("Watchlist not found");
+            
+            const wlname = result[0].watchlist_name;
             ctx.session.menudata.wlname = wlname;
             return wlname;
         } catch (e) {

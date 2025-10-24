@@ -2,6 +2,8 @@ import { db } from "../../..";
 import { addAiringFollow, checkAnimeTable, getUserWatchingAiring } from "../../../database/animeDB";
 import { MyContext } from "../../bot";
 import { getPagination, HTMLMessageToMessage } from "./a_misc_helpers";
+import { airingupdates, anime } from "../../../database/schema";
+import { eq, sql } from "drizzle-orm";
 
 /**
  ** Live updates for airing shit.
@@ -19,30 +21,30 @@ export async function remindMe(ctx: MyContext) {
         await ctx.reply(`Invalid Anilist ID.`);
         return;
     }
-    const __ = await db.airingupdates.findMany({
-        where: { userid: { has: userid } },
-        select: { alid: true }
-    });
+    const auResult = await db.select({ alid: airingupdates.alid })
+        .from(airingupdates)
+        .where(sql`${userid} = ANY(${airingupdates.userid})`);
+    
     let remindme: number[];
-    if (__ === null) remindme = [];
-    else remindme = __.map((o) => o.alid);
+    if (auResult.length === 0) remindme = [];
+    else remindme = auResult.map((o) => o.alid);
+    
     if (remindme.includes(alid)) {
         await ctx.reply("You are already following updates for this anime!");
         return;
     }
     const res = await addAiringFollow(alid, userid);
-    if (res == 0)
+    if (res == 0) {
+        const jpnameResult = await db.select({ jpname: anime.jpname })
+            .from(anime)
+            .where(eq(anime.alid, alid));
+        
         await ctx.reply(
-            `You will now recieve updates on <b>${
-                (
-                    await db.anime.findUnique({
-                        where: { alid },
-                        select: { jpname: true }
-                    })
-                ).jpname
-            }.</b>`
+            `You will now recieve updates on <b>${jpnameResult[0]?.jpname}.</b>`
         );
-    else await ctx.reply("Error encountered ;_;");
+    } else {
+        await ctx.reply("Error encountered ;_;");
+    }
     return;
 }
 
@@ -109,29 +111,33 @@ export async function airingUpdatesListCBQ(ctx: MyContext) {
 export async function stopAiringUpdates(ctx: MyContext) {
     await ctx.deleteMessage();
     const remove = parseInt(ctx.match[1] as string);
-    const anideets = await db.anime.findUnique({
-        where: { alid: remove },
-        select: { jpname: true, status: true }
-    });
+    const anideetsResult = await db.select({ jpname: anime.jpname, status: anime.status })
+        .from(anime)
+        .where(eq(anime.alid, remove));
+    
+    const anideets = anideetsResult[0];
     if (anideets == undefined || !(anideets.status == "RELEASING" || anideets.status == "NOT_YET_RELEASED")) {
         await ctx.reply(`Invalid anime provided.`);
         return;
     }
     const name = anideets.jpname;
-    const userau = await db.airingupdates.findMany({
-        where: { userid: { has: ctx.session.userid } }
-    });
+    const userau = await db.select()
+        .from(airingupdates)
+        .where(sql`${ctx.session.userid} = ANY(${airingupdates.userid})`);
+    
     let i = -1;
-    if (userau !== null) i = userau.map((o) => o.alid).indexOf(remove);
+    if (userau.length > 0) i = userau.map((o) => o.alid).indexOf(remove);
     if (i === -1) {
         await ctx.reply(`You are already not recieving the updates for <b>${name}</b>.`);
         return;
     }
-    userau[i].userid.splice(userau[i].userid.indexOf(ctx.session.userid), 1);
-    await db.airingupdates.update({
-        where: { alid: remove },
-        data: userau[i]
-    });
+    const updatedUserids = [...userau[i].userid];
+    updatedUserids.splice(updatedUserids.indexOf(ctx.session.userid), 1);
+    
+    await db.update(airingupdates)
+        .set({ userid: updatedUserids })
+        .where(eq(airingupdates.alid, remove));
+    
     await ctx.reply(`You will no longer recieve updates for <b>${name}</b>.`);
     return;
 }

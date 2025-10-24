@@ -1,8 +1,11 @@
-import * as Prisma from "@prisma/client";
+import * as schema from "./database/schema";
 
-export interface i_DlSync
-    extends Omit<Prisma.syncupd, "queuenum" | "xdccdata" | "torrentdata" | "epnum"> {
+export interface i_DlSync {
+    userid: number;
+    synctype?: string;
+    anime?: string;
     epnum: number;
+    dltype?: string;
     queuenum?: number;
     xdccdata?: string[];
     torrentdata?: string;

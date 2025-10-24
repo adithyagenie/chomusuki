@@ -4,6 +4,8 @@ import { MyContext, MyConversation } from "../../bot";
 import { animeSearchHandler } from "../anime/a_search";
 import { getWLName } from "./w_helpers";
 import { selfyeet } from "../misc_handles";
+import { watchlists } from "../../../database/schema";
+import { eq, count } from "drizzle-orm";
 
 
 /**
@@ -12,10 +14,13 @@ import { selfyeet } from "../misc_handles";
  * @param ctx - Context
  */
 export async function addWL(convo: MyConversation, ctx: MyContext) {
-    const item = await convo.external(() =>
-        db.watchlists.count({ where: { watchlistid: ctx.session.menudata.wlid } })
-    );
-    if (item === 0) {
+    const itemCount = await convo.external(async () => {
+        const result = await db.select({ count: count() })
+            .from(watchlists)
+            .where(eq(watchlists.watchlistid, ctx.session.menudata.wlid));
+        return result[0].count;
+    });
+    if (itemCount === 0) {
         await ctx.reply("Watchlist missing.");
         return;
     }

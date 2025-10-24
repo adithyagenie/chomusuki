@@ -1,19 +1,21 @@
 /** Rewrite this shit.*/
 
-import { config } from "@prisma/client";
 import { db } from "../..";
 import { changeConfig } from "../../database/animeDB";
 import { MyContext } from "../bot";
+import { config, Config } from "../../database/schema";
+import { eq } from "drizzle-orm";
 
 async function getConfig(ctx: MyContext) {
     try {
         if (ctx.session.config !== undefined) return ctx.session.config;
-        const data = await db.config.findUnique({
-            where: { userid: ctx.session.userid },
-            select: { pause_airing_updates: true }
-        });
-        ctx.session.config = data;
-        return data;
+        const data = await db.select({ pause_airing_updates: config.pause_airing_updates })
+            .from(config)
+            .where(eq(config.userid, ctx.session.userid));
+        
+        if (data.length === 0) return undefined;
+        ctx.session.config = data[0];
+        return data[0];
     } catch (err) {
         console.error(err);
         return undefined;
@@ -27,7 +29,7 @@ export async function anime_config(ctx: MyContext) {
     const userid = ctx.session.userid;
     const oldconfig = await getConfig(ctx);
 
-    const newconfig: config = {
+    const newconfig: Config = {
         userid: userid,
         pause_airing_updates: oldconfig.pause_airing_updates
     };

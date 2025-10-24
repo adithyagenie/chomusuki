@@ -2,7 +2,9 @@
 
 import { db } from "../../..";
 import { searchAnime } from "../../../api/anilist_api";
-import { MyContext } from "../../bot";
+import { MyContext, MyConversation } from "../../bot";
+import { watchinganime, airingupdates, watchlists } from "../../../database/schema";
+import { eq, sql } from "drizzle-orm";
 import { getPagination } from "./a_misc_helpers";
 import { MediaSearchEntry } from "anilist-node";
 
@@ -86,25 +88,24 @@ export async function animeSearchStart(ctx: MyContext, command: "startwatching" 
 async function getStatusFromDB(table: string, userid?: number, wlid?: number) {
     let alid: number[] = [];
     if (table == "startwatching") {
-        alid = (
-            await db.watchinganime.findUnique({
-                where: { userid },
-                select: { alid: true }
-            })
-        ).alid;
+        const result = await db.select({ alid: watchinganime.alid })
+            .from(watchinganime)
+            .where(eq(watchinganime.userid, userid));
+        
+        alid = result[0]?.alid || [];
     } else if (table == "remindme") {
-        const rec = await db.airingupdates.findMany({
-            where: { userid: { has: userid } },
-            select: { alid: true }
-        });
+        const rec = await db.select({ alid: airingupdates.alid })
+            .from(airingupdates)
+            .where(sql`${userid} = ANY(${airingupdates.userid})`);
+        
         alid = rec.map((o) => o.alid);
     } else if (table.startsWith("addwl")) {
-        const rec = await db.watchlists.findUnique({
-            where: { watchlistid: wlid },
-            select: { alid: true }
-        });
-        if (rec === null) alid = [];
-        else alid = rec.alid;
+        const rec = await db.select({ alid: watchlists.alid })
+            .from(watchlists)
+            .where(eq(watchlists.watchlistid, wlid));
+        
+        if (rec.length === 0) alid = [];
+        else alid = rec[0].alid;
     }
     return alid;
 }

@@ -3,11 +3,12 @@
 import { InlineKeyboard, Keyboard } from "grammy";
 import { getDecimal, markWatchedunWatched } from "../../../database/animeDB";
 import { MyContext, MyConversation } from "../../bot";
-import { Prisma, watchedepanime } from "@prisma/client";
 import { getPending, getSinglePending } from "../../../api/pending";
 import { db } from "../../..";
 import { getUpdaterAnimeIndex, makeEpKeyboard, messageToHTMLMessage } from "./a_misc_helpers";
 import aniep from "aniep";
+import { watchedepanime, anime } from "../../../database/schema";
+import { eq, and, sql } from "drizzle-orm";
 
 export async function anime_unwatch(ctx: MyContext) {
     await ctx.conversation.enter("unwatchhelper");
@@ -49,10 +50,11 @@ export async function unwatchhelper(conversation: MyConversation, ctx: MyContext
         let watchedAnime: number[] = [];
         watchedAnime = updateobj[animeindex].watched;
         watchedAnime = watchedAnime.filter((o) => o != tounwatch);
-        const toupdate: watchedepanime = {
+        const epArray = getDecimal(watchedAnime);
+        const toupdate = {
             userid: userid,
             alid: alid,
-            ep: getDecimal(watchedAnime) as Prisma.Decimal[]
+            ep: Array.isArray(epArray) ? epArray : [epArray]
         };
         const updres = await markWatchedunWatched(toupdate);
         if (updres == 0) {
@@ -81,33 +83,28 @@ export async function callback_mkwatchep(ctx: MyContext) {
     const alid = parseInt(ctx.match[1]);
     const epnum = parseInt(ctx.match[2]);
 
-    const ep = (
-        await db.watchedepanime.findUnique({
-            where: {
-                userid_alid: {
-                    userid,
-                    alid
-                }
-            },
-            select: { ep: true }
-        })
-    ).ep;
-    ep.push(getDecimal(epnum) as Prisma.Decimal);
+    const epResult = await db.select({ ep: watchedepanime.ep })
+        .from(watchedepanime)
+        .where(and(
+            eq(watchedepanime.userid, userid),
+            eq(watchedepanime.alid, alid)
+        ));
+    
+    const ep = [...(epResult[0]?.ep || [])];
+    ep.push(...getDecimal(epnum));
 
     const res = await markWatchedunWatched({ userid, alid, ep });
     if (res === 1) {
         await ctx.reply("Failed to add to watched.");
         return;
     }
+    
+    const jpnameResult = await db.select({ jpname: anime.jpname })
+        .from(anime)
+        .where(eq(anime.alid, alid));
+    
     await ctx.reply(
-        `Episode: ${epnum} of ${
-            (
-                await db.anime.findUnique({
-                    where: { alid },
-                    select: { jpname: true }
-                })
-            ).jpname
-        } has been marked as watched!`
+        `Episode: ${epnum} of ${jpnameResult[0]?.jpname} has been marked as watched!`
     );
 
     // let oldwatch: { epnum: number; epname: string }[] = [];
@@ -180,14 +177,13 @@ const consecutiveRanges = (a: number[]) => {
 
 export async function markWatchedRange(conversation: MyConversation, ctx: MyContext) {
     const genkeyboard = new InlineKeyboard();
-    const watching = await conversation.external(
-        () =>
-            db.$queryRaw<{
-                jpname: string;
-                alid: number
-            }[]>`SELECT a.jpname, a.alid FROM anime a, watchinganime w, unnest(w.alid) s WHERE (a.alid IN (s)) AND (w.userid = ${ctx.session.userid});`
-    );
-    if (watching === null) return;
+    const watching = await conversation.external(async () => {
+        const result = await db.execute<{ jpname: string; alid: number }>(
+            sql`SELECT a.jpname, a.alid FROM anime a, watchinganime w, unnest(w.alid) s WHERE (a.alid IN (s)) AND (w.userid = ${ctx.session.userid})`
+        );
+        return result.rows;
+    });
+    if (watching === null || watching.length === 0) return;
     await conversation.external(() => {
         for (let i = 0; i < watching.length; i += 2) {
             if (watching[i].alid != undefined)
@@ -241,17 +237,22 @@ export async function markWatchedRange(conversation: MyConversation, ctx: MyCont
             continue;
         }
         await conversation.external(async () => {
-            let id = (
-                await db.watchedepanime.findUnique({
-                    where: { userid_alid: { userid: ctx.session.userid, alid: alid } },
-                    select: { ep: true }
-                })
-            ).ep;
-            id = id.concat(...(getDecimal(arr) as Prisma.Decimal[]));
-            await db.watchedepanime.update({
-                where: { userid_alid: { userid: ctx.session.userid, alid: alid } },
-                data: { ep: id }
-            });
+            const epResult = await db.select({ ep: watchedepanime.ep })
+                .from(watchedepanime)
+                .where(and(
+                    eq(watchedepanime.userid, ctx.session.userid),
+                    eq(watchedepanime.alid, alid)
+                ));
+            
+            let id = [...(epResult[0]?.ep || [])];
+            id = id.concat(...getDecimal(arr));
+            
+            await db.update(watchedepanime)
+                .set({ ep: id })
+                .where(and(
+                    eq(watchedepanime.userid, ctx.session.userid),
+                    eq(watchedepanime.alid, alid)
+                ));
         });
         break;
     }
