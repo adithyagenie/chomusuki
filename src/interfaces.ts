@@ -1,5 +1,3 @@
-import * as schema from "./database/schema";
-
 export interface i_DlSync {
     userid: number;
     synctype?: string;
@@ -45,7 +43,22 @@ interface AbstractMessageEntity {
 }
 
 interface CommonMessageEntity extends AbstractMessageEntity {
-    type: "mention" | "hashtag" | "cashtag" | "bot_command" | "url" | "email" | "phone_number" | "bold" | "italic" | "underline" | "strikethrough" | "spoiler" | "blockquote" | "expandable_blockquote" | "code";
+    type:
+        | "mention"
+        | "hashtag"
+        | "cashtag"
+        | "bot_command"
+        | "url"
+        | "email"
+        | "phone_number"
+        | "bold"
+        | "italic"
+        | "underline"
+        | "strikethrough"
+        | "spoiler"
+        | "blockquote"
+        | "expandable_blockquote"
+        | "code";
 }
 
 interface PreMessageEntity extends AbstractMessageEntity {
@@ -78,7 +91,7 @@ interface CustomEmojiMessageEntity extends AbstractMessageEntity {
 }
 
 export type MessageEntity =
-    CommonMessageEntity
+    | CommonMessageEntity
     | CustomEmojiMessageEntity
     | PreMessageEntity
     | TextLinkMessageEntity
@@ -89,14 +102,14 @@ export interface DownloadJobData {
     anime: string;
     episode: number;
     alid: number;
-    dltype: 'xdcc' | 'torrent';
-    xdcc?: { 
-        botname: string; 
-        packnum: number; 
+    dltype: "xdcc" | "torrent";
+    xdcc?: {
+        botname: string;
+        packnum: number;
         server?: string;
     };
-    torrent?: { 
-        magnetLink?: string; 
+    torrent?: {
+        magnetLink?: string;
         fileUrl: string;
     };
 }

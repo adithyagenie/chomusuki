@@ -1,19 +1,19 @@
-import { Worker, Job } from 'bullmq';
-import { NotificationJobData } from '../interfaces';
-import { bot } from '../bot/bot';
-import { InlineKeyboard } from 'grammy';
-import { getRedisConnection } from '../queues/redis-config';
+import { Job, Worker } from "bullmq";
+import { InlineKeyboard } from "grammy";
+import { bot } from "../bot/bot";
+import { NotificationJobData } from "../interfaces";
+import { getRedisConnection } from "../queues/redis-config";
 
 async function processNotification(job: Job<NotificationJobData>) {
     const { userid, chatid, message, anime, episode, alid, imageFileId } = job.data;
-    
+
     console.log(`Processing notification for user ${userid}: ${anime} Episode ${episode}`);
-    
+
     try {
         const keyboard = new InlineKeyboard()
-            .text('📥 Download', `dlep_${alid}_${episode}`)
-            .text('✅ Mark Watched', `watched_${alid}_${episode}`);
-        
+            .text("📥 Download", `dlep_${alid}_${episode}`)
+            .text("✅ Mark Watched", `watched_${alid}_${episode}`);
+
         if (imageFileId) {
             await bot.api.sendPhoto(Number(chatid), imageFileId, {
                 caption: message,
@@ -24,7 +24,7 @@ async function processNotification(job: Job<NotificationJobData>) {
                 reply_markup: keyboard,
             });
         }
-        
+
         console.log(`Notification sent successfully to user ${userid}`);
         return { success: true, userid, anime, episode };
     } catch (error) {
@@ -34,7 +34,7 @@ async function processNotification(job: Job<NotificationJobData>) {
 }
 
 export const notificationWorker = new Worker<NotificationJobData>(
-    'notifications',
+    "notifications",
     processNotification,
     {
         connection: getRedisConnection(),
@@ -46,16 +46,16 @@ export const notificationWorker = new Worker<NotificationJobData>(
     }
 );
 
-notificationWorker.on('completed', (job) => {
+notificationWorker.on("completed", (job) => {
     console.log(`Notification job ${job.id} completed`);
 });
 
-notificationWorker.on('failed', (job, err) => {
+notificationWorker.on("failed", (job, err) => {
     console.error(`Notification job ${job?.id} failed:`, err.message);
 });
 
-notificationWorker.on('error', (err) => {
-    console.error('Notification worker error:', err);
+notificationWorker.on("error", (err) => {
+    console.error("Notification worker error:", err);
 });
 
-console.log('Notification worker started');
+console.log("Notification worker started");

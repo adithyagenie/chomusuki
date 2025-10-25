@@ -1,12 +1,12 @@
+import { b, fmt, i as italic, link } from "@grammyjs/parse-mode";
+import { and, eq } from "drizzle-orm";
 import { InlineKeyboard } from "grammy";
 import { db } from "../../..";
 import { addWatching, checkAnimeTable, getUserWatchingAiring } from "../../../database/animeDB";
+import { anime, watchedepanime, watchinganime } from "../../../database/schema";
 import { MyContext, MyConversation, MyConversationContext } from "../../bot";
-import { getPagination, HTMLMessageToMessage } from "./a_misc_helpers";
 import { selfyeet } from "../misc_handles";
-import { watchinganime, anime, watchedepanime } from "../../../database/schema";
-import { eq, and } from "drizzle-orm";
-import { b, fmt, i as italic, link } from "@grammyjs/parse-mode";
+import { getPagination, HTMLMessageToMessage } from "./a_misc_helpers";
 
 /**
  ** Sends the first page of the list of anime the user is currently watching.
@@ -45,7 +45,7 @@ async function watchingListHelper(
         const message = fmt`${b}You are currently not watching any anime. Add some with /startwatching to get started.${b}`;
         return { msg: message.text, msgEntities: message.entities, keyboard: undefined };
     }
-    
+
     let formattedMsg = fmt`${b}Displaying your currently watching list: ${b}\n\n`;
     for (let i = 0; i < alidlist.length; i++) {
         formattedMsg = fmt`${formattedMsg}${i + 1}. ${b}${animelist[i]}${b}\n`;
@@ -91,24 +91,25 @@ export async function animeStartWatch(ctx: MyContext, menu = false) {
     if (menu === false) {
         await ctx.deleteMessage();
         alid = parseInt(ctx.match[1]);
-    } else
-        alid = ctx.session.menudata.alid;
+    } else alid = ctx.session.menudata.alid;
     if (alid == undefined || Number.isNaN(alid)) {
         await ctx.reply("Invalid.");
         return;
     }
     const userid = ctx.session.userid;
     if (menu === false) {
-        const oldResult = await db.select({ alid: watchinganime.alid })
+        const oldResult = await db
+            .select({ alid: watchinganime.alid })
             .from(watchinganime)
             .where(eq(watchinganime.userid, userid));
-        
+
         const old = oldResult[0]?.alid || [];
         if (old.includes(alid)) {
-            const jpnameResult = await db.select({ jpname: anime.jpname })
+            const jpnameResult = await db
+                .select({ jpname: anime.jpname })
                 .from(anime)
                 .where(eq(anime.alid, alid));
-            
+
             const message = fmt`You have already marked ${b}${jpnameResult[0]?.jpname}${b} as watching.`;
             await ctx.reply(message.text, { entities: message.entities });
             return;
@@ -125,7 +126,11 @@ export async function animeStartWatch(ctx: MyContext, menu = false) {
     }
     await addWatching(userid, alid);
     if (menu)
-        selfyeet(ctx.chat?.id, (await ctx.reply(`Marked ${res.pull.jpname} as watching!`)).message_id, 5000);
+        selfyeet(
+            ctx.chat?.id,
+            (await ctx.reply(`Marked ${res.pull.jpname} as watching!`)).message_id,
+            5000
+        );
     else await ctx.reply(`Marked ${res.pull.jpname} as watching!`);
     if (res.airing) {
         const url = `t.me/${ctx.me.username}?start=remindme_${res.pull.alid}`;
@@ -147,20 +152,22 @@ export async function stopWatching(conversation: MyConversation, ctx: MyConversa
     }
     const userid = await conversation.external((ctx) => ctx.session.userid);
     const alidResult = await conversation.external(async () => {
-        const result = await db.select({ alid: watchinganime.alid })
+        const result = await db
+            .select({ alid: watchinganime.alid })
             .from(watchinganime)
             .where(eq(watchinganime.userid, userid));
         return result[0]?.alid || [];
     });
     const _ = alidResult;
-    
+
     const aniname = await conversation.external(async () => {
-        const result = await db.select({ jpname: anime.jpname })
+        const result = await db
+            .select({ jpname: anime.jpname })
             .from(anime)
             .where(eq(anime.alid, match));
         return result[0];
     });
-    
+
     if (aniname === undefined) {
         await ctx.reply("Anime not found ;_;");
         return;
@@ -171,7 +178,7 @@ export async function stopWatching(conversation: MyConversation, ctx: MyConversa
     }
     const msgid = (
         await ctx.reply(`You will lose all the progress in the anime. Proceed?`, {
-            reply_markup: new InlineKeyboard().text("Yes.", "y").text("Hell no.", "n")
+            reply_markup: new InlineKeyboard().text("Yes.", "y").text("Hell no.", "n"),
         })
     ).message_id;
     const cbq = await conversation.waitForCallbackQuery(/[yn]/);
@@ -182,15 +189,11 @@ export async function stopWatching(conversation: MyConversation, ctx: MyConversa
                 _.findIndex((o) => o == match),
                 1
             );
-            await db.update(watchinganime)
-                .set({ alid: _ })
-                .where(eq(watchinganime.userid, userid));
-            
-            await db.delete(watchedepanime)
-                .where(and(
-                    eq(watchedepanime.userid, userid),
-                    eq(watchedepanime.alid, match)
-                ));
+            await db.update(watchinganime).set({ alid: _ }).where(eq(watchinganime.userid, userid));
+
+            await db
+                .delete(watchedepanime)
+                .where(and(eq(watchedepanime.userid, userid), eq(watchedepanime.alid, match)));
         });
         await ctx.api.deleteMessage(ctx.from.id, msgid);
         await ctx.reply(`${aniname.jpname} has been removed from your watching list.`);

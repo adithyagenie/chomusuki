@@ -1,9 +1,9 @@
+import { Menu } from "@grammyjs/menu";
+import { code, fmt } from "@grammyjs/parse-mode";
 import { deleteWatchlist, newWatchlist, renameWatchlist } from "../../../database/animeDB";
 import { MyContext, MyConversation, MyConversationContext } from "../../bot";
-import { getWLName } from "./w_helpers";
-import { Menu } from "@grammyjs/menu";
 import { selfyeet } from "../misc_handles";
-import { code, fmt } from "@grammyjs/parse-mode";
+import { getWLName } from "./w_helpers";
 
 /**Creates a new watchlist. Responds to /createwl */
 export async function createWL(conversation: MyConversation, ctx: MyConversationContext) {
@@ -49,18 +49,19 @@ export async function renameWL(convo: MyConversation, ctx: MyConversationContext
     // Get watchlist ID and name from session
     const { wlid, wlname: currentName } = await convo.external((ctx) => ({
         wlid: ctx.session.menudata.wlid,
-        wlname: ctx.session.menudata.wlname
+        wlname: ctx.session.menudata.wlname,
     }));
-    
+
     // Fetch the current watchlist name if not cached
-    const wlname = currentName !== undefined 
-        ? currentName 
-        : await convo.external(async (ctx) => {
-            const name = await getWLName(ctx);
-            ctx.session.menudata.wlname = name; // Cache it
-            return name;
-        });
-    
+    const wlname =
+        currentName !== undefined
+            ? currentName
+            : await convo.external(async (ctx) => {
+                  const name = await getWLName(ctx);
+                  ctx.session.menudata.wlname = name; // Cache it
+                  return name;
+              });
+
     const message1 = fmt`Enter the new name for watchlist ${code}${wlname}${code}.\n(Or /cancel to cancel renaming.)`;
     await ctx.reply(message1.text, { entities: message1.entities });
     const newname = await convo.waitFor(":text");

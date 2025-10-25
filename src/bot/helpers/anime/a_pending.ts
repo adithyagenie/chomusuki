@@ -1,10 +1,9 @@
-import { InlineKeyboard } from "grammy";
+import { b, fmt, i as italic } from "@grammyjs/parse-mode";
 import axios from "axios";
+import { FastifyInstance } from "fastify";
+import { InlineKeyboard } from "grammy";
 import { getSinglePending } from "../../../api/pending";
 import { bot, MyContext } from "../../bot";
-import { FastifyInstance } from "fastify";
-import { b, fmt, i as italic } from "@grammyjs/parse-mode";
-
 
 export async function a_Pending(ctx: MyContext) {
     await ctx.deleteMessage();
@@ -15,8 +14,8 @@ export async function a_Pending(ctx: MyContext) {
                 chatid: ctx.from.id,
                 userid: userid,
                 alid: parseInt(ctx.match[1]),
-                is_bot: true
-            }
+                is_bot: true,
+            },
         });
         if (res.status == 200) {
             return;
@@ -50,7 +49,7 @@ async function animePendingBotHandle(chatid: number, userid: number, alid: numbe
         formattedHeader = fmt`${formattedHeader}${italic}\n\n`;
     }
     formattedHeader = fmt`${formattedHeader}${b}Pending:${b}\n`;
-    
+
     for (let j = 0; j < res.notwatched.length; j++) {
         if (j < 30) msg += `🔹${res.jpname} - ${res.notwatched[j]}\n`;
         else {
@@ -83,7 +82,7 @@ async function animePendingBotHandle(chatid: number, userid: number, alid: numbe
         caption_entities: finalMessage.caption_entities,
         reply_markup: new InlineKeyboard()
             .text("Mark watched", "mark_watch")
-            .text("Download", "download")
+            .text("Download", "download"),
     });
     return 0;
 }
@@ -165,10 +164,10 @@ async function animePendingBotHandle(chatid: number, userid: number, alid: numbe
 
 export function pendingEndpoint(server: FastifyInstance) {
     interface customreq {
-        chatid: number,
-        userid: number,
-        alid: number,
-        is_bot: boolean
+        chatid: number;
+        userid: number;
+        alid: number;
+        is_bot: boolean;
     }
 
     server.get<{ Querystring: customreq }>("/pending", async (req, res) => {
@@ -191,7 +190,7 @@ export function pendingEndpoint(server: FastifyInstance) {
                     await res.status(400).send([]);
                     return;
                 } else if (res2 === null) {
-                    return ("UserID is not currently watching specified anime.");
+                    return "UserID is not currently watching specified anime.";
                 }
                 await res.send(res2);
                 return;

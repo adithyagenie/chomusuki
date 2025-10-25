@@ -1,5 +1,15 @@
-import { pgTable, smallint, integer, varchar, decimal, boolean, bigint, serial, primaryKey, unique } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
+import {
+    bigint,
+    boolean,
+    decimal,
+    integer,
+    pgTable,
+    primaryKey,
+    smallint,
+    unique,
+    varchar
+} from "drizzle-orm/pg-core";
 
 // Anime table
 export const anime = pgTable("anime", {
@@ -18,30 +28,40 @@ export const anime = pgTable("anime", {
 });
 
 // Users table
-export const users = pgTable("users", {
-    userid: smallint("userid").primaryKey().generatedByDefaultAsIdentity(),
-    chatid: bigint("chatid", { mode: "bigint" }),
-    username: varchar("username", { length: 255 }),
-}, (table) => ({
-    uniqueChatid: unique("unique_chatid").on(table.chatid),
-    useridChatidUnique: unique("userid_chatid_unique").on(table.userid, table.chatid),
-}));
+export const users = pgTable(
+    "users",
+    {
+        userid: smallint("userid").primaryKey().generatedByDefaultAsIdentity(),
+        chatid: bigint("chatid", { mode: "bigint" }),
+        username: varchar("username", { length: 255 }),
+    },
+    (table) => ({
+        uniqueChatid: unique("unique_chatid").on(table.chatid),
+        useridChatidUnique: unique("userid_chatid_unique").on(table.userid, table.chatid),
+    })
+);
 
 // Completed anime table
 export const completedanime = pgTable("completedanime", {
-    userid: integer("userid").primaryKey().references(() => users.userid, { onDelete: "cascade" }),
+    userid: integer("userid")
+        .primaryKey()
+        .references(() => users.userid, { onDelete: "cascade" }),
     completed: integer("completed").array().notNull(),
 });
 
 // Config table
 export const config = pgTable("config", {
-    userid: integer("userid").primaryKey().references(() => users.userid, { onDelete: "cascade" }),
+    userid: integer("userid")
+        .primaryKey()
+        .references(() => users.userid, { onDelete: "cascade" }),
     pause_airing_updates: boolean("pause_airing_updates").default(false),
 });
 
 // Sync updates table
 export const syncupd = pgTable("syncupd", {
-    userid: integer("userid").notNull().references(() => users.userid, { onDelete: "cascade" }),
+    userid: integer("userid")
+        .notNull()
+        .references(() => users.userid, { onDelete: "cascade" }),
     queuenum: smallint("queuenum").primaryKey().generatedByDefaultAsIdentity(),
     synctype: varchar("synctype", { length: 20 }),
     anime: varchar("anime", { length: 255 }),
@@ -52,32 +72,49 @@ export const syncupd = pgTable("syncupd", {
 });
 
 // Watched episodes anime table
-export const watchedepanime = pgTable("watchedepanime", {
-    userid: integer("userid").notNull().references(() => users.userid, { onDelete: "cascade" }),
-    alid: integer("alid").notNull().references(() => anime.alid, { onDelete: "cascade" }),
-    ep: decimal("ep").array().notNull(),
-}, (table) => ({
-    pk: primaryKey({ columns: [table.userid, table.alid] }),
-    watchedepanimeUserAnimeUnique: unique("watchedepanime_user_anime_unique").on(table.userid, table.alid),
-}));
+export const watchedepanime = pgTable(
+    "watchedepanime",
+    {
+        userid: integer("userid")
+            .notNull()
+            .references(() => users.userid, { onDelete: "cascade" }),
+        alid: integer("alid")
+            .notNull()
+            .references(() => anime.alid, { onDelete: "cascade" }),
+        ep: decimal("ep").array().notNull(),
+    },
+    (table) => ({
+        pk: primaryKey({ columns: [table.userid, table.alid] }),
+        watchedepanimeUserAnimeUnique: unique("watchedepanime_user_anime_unique").on(
+            table.userid,
+            table.alid
+        ),
+    })
+);
 
 // Watchlists table
 export const watchlists = pgTable("watchlists", {
     watchlistid: smallint("watchlistid").primaryKey().generatedByDefaultAsIdentity(),
     watchlist_name: varchar("watchlist_name", { length: 255 }),
     alid: integer("alid").array().notNull(),
-    generated_by: integer("generated_by").notNull().references(() => users.userid, { onDelete: "cascade" }),
+    generated_by: integer("generated_by")
+        .notNull()
+        .references(() => users.userid, { onDelete: "cascade" }),
 });
 
 // Airing updates table
 export const airingupdates = pgTable("airingupdates", {
-    alid: integer("alid").primaryKey().references(() => anime.alid, { onDelete: "cascade", onUpdate: "no action" }),
+    alid: integer("alid")
+        .primaryKey()
+        .references(() => anime.alid, { onDelete: "cascade", onUpdate: "no action" }),
     userid: integer("userid").array().notNull(),
 });
 
 // Watching anime table
 export const watchinganime = pgTable("watchinganime", {
-    userid: integer("userid").primaryKey().references(() => users.userid, { onDelete: "cascade" }),
+    userid: integer("userid")
+        .primaryKey()
+        .references(() => users.userid, { onDelete: "cascade" }),
     alid: integer("alid").array().notNull(),
 });
 

@@ -1,13 +1,13 @@
 // Adding anime to subscriptions
 
+import { b, fmt, i as italic, link } from "@grammyjs/parse-mode";
+import { MediaSearchEntry } from "anilist-node";
+import { eq, sql } from "drizzle-orm";
 import { db } from "../../..";
 import { searchAnime } from "../../../api/anilist_api";
-import { MyContext, MyConversation, MyConversationContext } from "../../bot";
-import { watchinganime, airingupdates, watchlists } from "../../../database/schema";
-import { eq, sql } from "drizzle-orm";
+import { airingupdates, watchinganime, watchlists } from "../../../database/schema";
+import { MyContext } from "../../bot";
 import { getPagination } from "./a_misc_helpers";
-import { MediaSearchEntry } from "anilist-node";
-import { b, fmt, i as italic, link } from "@grammyjs/parse-mode";
 
 // export async function anime_add(ctx: MyContext) {
 // 	if (ctx.chat.id != authchat) {
@@ -82,7 +82,7 @@ export async function animeSearchStart(ctx: MyContext, command: "startwatching" 
         await ctx.api.editMessageText(ctx.from.id, msgid, msg, { entities: msgEntities });
     await ctx.api.editMessageText(ctx.from.id, msgid, msg, {
         entities: msgEntities,
-        reply_markup: keyboard
+        reply_markup: keyboard,
     });
     return;
 }
@@ -90,22 +90,25 @@ export async function animeSearchStart(ctx: MyContext, command: "startwatching" 
 async function getStatusFromDB(table: string, userid?: number, wlid?: number) {
     let alid: number[] = [];
     if (table == "startwatching") {
-        const result = await db.select({ alid: watchinganime.alid })
+        const result = await db
+            .select({ alid: watchinganime.alid })
             .from(watchinganime)
             .where(eq(watchinganime.userid, userid));
-        
+
         alid = result[0]?.alid || [];
     } else if (table == "remindme") {
-        const rec = await db.select({ alid: airingupdates.alid })
+        const rec = await db
+            .select({ alid: airingupdates.alid })
             .from(airingupdates)
             .where(sql`${userid} = ANY(${airingupdates.userid})`);
-        
+
         alid = rec.map((o) => o.alid);
     } else if (table.startsWith("addwl")) {
-        const rec = await db.select({ alid: watchlists.alid })
+        const rec = await db
+            .select({ alid: watchlists.alid })
             .from(watchlists)
             .where(eq(watchlists.watchlistid, wlid));
-        
+
         if (rec.length === 0) alid = [];
         else alid = rec[0].alid;
     }
@@ -130,13 +133,14 @@ export async function animeSearchHandler(
     for (let i = currentpg; i <= 5; i++)
         searchArray.push(searchAnime(query, i, command === "remindme"));
     const t = await Promise.all(searchArray);
-    const pages = t.filter(o => o !== undefined);
-    if (pages.find(o => o.pageInfo.currentPage === currentpg) === undefined) return {
-        msg: undefined,
-        keyboard: undefined
-    };
-    const maxpg = Math.max(...pages.map(o => o.pageInfo.currentPage));
-    const page = pages.find(o => o.pageInfo.currentPage === currentpg);
+    const pages = t.filter((o) => o !== undefined);
+    if (pages.find((o) => o.pageInfo.currentPage === currentpg) === undefined)
+        return {
+            msg: undefined,
+            keyboard: undefined,
+        };
+    const maxpg = Math.max(...pages.map((o) => o.pageInfo.currentPage));
+    const page = pages.find((o) => o.pageInfo.currentPage === currentpg);
     // if (currentpg != 1 && currentpg != 2)
     //     maxpg = pages.pageInfo.lastPage > 5 ? 5 : pages.pageInfo.lastPage;
     // else if (currentpg == 1 || currentpg == 2) {
@@ -157,10 +161,13 @@ export async function animeSearchHandler(
     const dbidlist = await getStatusFromDB(command, userid, watchlistid);
     for (let i = 0; i < page.media.length; i++) {
         const title = page.media[i].title.romaji;
-        const subtitle = page.media[i].title.english === null ? page.media[i].title.userPreferred : page.media[i].title.english;
-        
+        const subtitle =
+            page.media[i].title.english === null
+                ? page.media[i].title.userPreferred
+                : page.media[i].title.english;
+
         formattedMsg = fmt`${formattedMsg}${b}${title}${b}\n${subtitle}\n`;
-        
+
         if (command == "startwatching" && userid !== undefined) {
             // let old = await db.watchinganime.findUnique({
             // 	where: { userid }
@@ -199,8 +206,7 @@ export async function animeSearchHandler(
             // old = _ === null ? [] : _.alid;
             if (dbidlist.includes(page.media[i].id)) {
                 formattedMsg = fmt`${formattedMsg}${italic}(Already present in watchlist!)${italic}\n\n`;
-            }
-            else {
+            } else {
                 const url = `t.me/${username}?start=wl_${page.media[i].id}`;
                 formattedMsg = fmt`${formattedMsg}${italic}Add to watchlist: ${link(url)}Click here!${link(url)}${italic}\n\n`;
             }

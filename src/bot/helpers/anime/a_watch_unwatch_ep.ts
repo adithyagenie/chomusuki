@@ -1,15 +1,15 @@
 // Unwatch anime command
 
-import { InlineKeyboard, Keyboard } from "grammy";
-import { getDecimal, markWatchedunWatched } from "../../../database/animeDB";
-import { MyContext, MyConversation, MyConversationContext } from "../../bot";
-import { getPending, getSinglePending } from "../../../api/pending";
-import { db } from "../../..";
-import { getUpdaterAnimeIndex, makeEpKeyboard, messageToHTMLMessage } from "./a_misc_helpers";
-import aniep from "aniep";
-import { watchedepanime, anime } from "../../../database/schema";
-import { eq, and, sql } from "drizzle-orm";
 import { code, fmt, i as italic } from "@grammyjs/parse-mode";
+import aniep from "aniep";
+import { and, eq, sql } from "drizzle-orm";
+import { InlineKeyboard, Keyboard } from "grammy";
+import { db } from "../../..";
+import { getPending, getSinglePending } from "../../../api/pending";
+import { getDecimal, markWatchedunWatched } from "../../../database/animeDB";
+import { anime, watchedepanime } from "../../../database/schema";
+import { MyContext, MyConversation, MyConversationContext } from "../../bot";
+import { getUpdaterAnimeIndex, makeEpKeyboard, messageToHTMLMessage } from "./a_misc_helpers";
 
 export async function anime_unwatch(ctx: MyContext) {
     await ctx.conversation.enter("unwatchhelper");
@@ -25,7 +25,7 @@ export async function unwatchhelper(conversation: MyConversation, ctx: MyConvers
         keyboard.text(`Anime: ${updateobj[i].jpname}`).row();
     }
     await ctx.reply("Select the anime: (/cancel to cancel)", {
-        reply_markup: keyboard
+        reply_markup: keyboard,
     });
     const animename = (await conversation.waitForHears(/Anime: (.+)/)).message.text.slice(7).trim();
     const alid = updateobj.find((o) => o.jpname == animename).alid;
@@ -55,16 +55,16 @@ export async function unwatchhelper(conversation: MyConversation, ctx: MyConvers
         const toupdate = {
             userid: userid,
             alid: alid,
-            ep: Array.isArray(epArray) ? epArray : [epArray]
+            ep: Array.isArray(epArray) ? epArray : [epArray],
         };
         const updres = await markWatchedunWatched(toupdate);
         if (updres == 0) {
             await ctx.reply(`Marked Ep ${tounwatch} of ${animename} as not watched`, {
-                reply_markup: { remove_keyboard: true }
+                reply_markup: { remove_keyboard: true },
             });
         } else {
             await ctx.reply(`Error occured while marking episode as unwatched`, {
-                reply_markup: { remove_keyboard: true }
+                reply_markup: { remove_keyboard: true },
             });
         }
     }
@@ -84,13 +84,11 @@ export async function callback_mkwatchep(ctx: MyContext) {
     const alid = parseInt(ctx.match[1]);
     const epnum = parseInt(ctx.match[2]);
 
-    const epResult = await db.select({ ep: watchedepanime.ep })
+    const epResult = await db
+        .select({ ep: watchedepanime.ep })
         .from(watchedepanime)
-        .where(and(
-            eq(watchedepanime.userid, userid),
-            eq(watchedepanime.alid, alid)
-        ));
-    
+        .where(and(eq(watchedepanime.userid, userid), eq(watchedepanime.alid, alid)));
+
     const ep = [...(epResult[0]?.ep || [])];
     ep.push(...getDecimal(epnum));
 
@@ -99,14 +97,13 @@ export async function callback_mkwatchep(ctx: MyContext) {
         await ctx.reply("Failed to add to watched.");
         return;
     }
-    
-    const jpnameResult = await db.select({ jpname: anime.jpname })
+
+    const jpnameResult = await db
+        .select({ jpname: anime.jpname })
         .from(anime)
         .where(eq(anime.alid, alid));
-    
-    await ctx.reply(
-        `Episode: ${epnum} of ${jpnameResult[0]?.jpname} has been marked as watched!`
-    );
+
+    await ctx.reply(`Episode: ${epnum} of ${jpnameResult[0]?.jpname} has been marked as watched!`);
 
     // let oldwatch: { epnum: number; epname: string }[] = [];
     // let toupdateanime: { epnum: number; epname: string };
@@ -137,13 +134,13 @@ export async function callback_mkwatchep(ctx: MyContext) {
     //newkeyboard = newkeyboard.map((o1) => o1.filter((o) => !(o.text == `Episode ${epnum}`)));
     /**TEST THIS PLEASEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE */
     let tt: {
-        text: string,
-        callback_data: string
+        text: string;
+        callback_data: string;
     }[] = [].concat(...ctx.msg.reply_markup.inline_keyboard);
     tt = tt.filter((o) => !(o.text == `Episode ${epnum}`));
     for (let i = 0; i < tt.length; i += 2) {
-        const bruh: { text: string, callback_data: string } = tt[i];
-        const bruh2: { text: string, callback_data: string } = tt[i + 1];
+        const bruh: { text: string; callback_data: string } = tt[i];
+        const bruh2: { text: string; callback_data: string } = tt[i + 1];
         if (tt[i + 1] === undefined) newkeyboard.add(bruh).row();
         else newkeyboard.add(bruh).add(bruh2).row();
     }
@@ -158,7 +155,7 @@ export async function callback_mkwatchep(ctx: MyContext) {
     }
     await ctx.api.editMessageCaption(ctx.from.id, ctx.msg.message_id, {
         caption: newMsgArray.join("\n"),
-        reply_markup: newkeyboard
+        reply_markup: newkeyboard,
     });
 }
 
@@ -204,9 +201,7 @@ export async function markWatchedRange(conversation: MyConversation, ctx: MyConv
     if (Number.isNaN(alid)) return;
     await ctx.api.deleteMessage(ctx.from.id, msgid);
     const aniname = watching.find((o) => o.alid == alid).jpname;
-    const data = await conversation.external(() =>
-        getSinglePending(userid, null, alid)
-    );
+    const data = await conversation.external(() => getSinglePending(userid, null, alid));
     if (data.notwatched.length == 0) {
         await ctx.reply(`You have already marked all the episodes of ${aniname} as watched!`);
         return;
@@ -236,22 +231,18 @@ export async function markWatchedRange(conversation: MyConversation, ctx: MyConv
             continue;
         }
         await conversation.external(async () => {
-            const epResult = await db.select({ ep: watchedepanime.ep })
+            const epResult = await db
+                .select({ ep: watchedepanime.ep })
                 .from(watchedepanime)
-                .where(and(
-                    eq(watchedepanime.userid, userid),
-                    eq(watchedepanime.alid, alid)
-                ));
-            
+                .where(and(eq(watchedepanime.userid, userid), eq(watchedepanime.alid, alid)));
+
             let id = [...(epResult[0]?.ep || [])];
             id = id.concat(...getDecimal(arr));
-            
-            await db.update(watchedepanime)
+
+            await db
+                .update(watchedepanime)
                 .set({ ep: id })
-                .where(and(
-                    eq(watchedepanime.userid, userid),
-                    eq(watchedepanime.alid, alid)
-                ));
+                .where(and(eq(watchedepanime.userid, userid), eq(watchedepanime.alid, alid)));
         });
         break;
     }

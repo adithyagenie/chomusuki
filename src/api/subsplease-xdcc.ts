@@ -22,12 +22,12 @@ export async function getxdcc(name: string) {
     let botnum: number;
     let returnobj: SPSearch = {
         packnum: 0,
-        botname: ""
+        botname: "",
     };
     const botnames = {
         989: "CR-ARUTHA|NEW",
         696: "CR-HOLLAND|NEW",
-        21: "Ginpachi-Sensei"
+        21: "Ginpachi-Sensei",
     };
     const baseURL = "https://api.nibl.co.uk/nibl";
     const encodename = encodeURI(name);
@@ -55,14 +55,14 @@ export async function getxdcc(name: string) {
         console.error("axios err");
         return {
             packnum: 0,
-            botname: ""
+            botname: "",
         };
     }
     if (packnum === undefined || botnum === undefined) return returnobj;
     else {
         returnobj = {
             packnum: packnum,
-            botname: botnames[botnum]
+            botname: botnames[botnum],
         };
         return returnobj;
     }

@@ -1,11 +1,11 @@
 import { Menu, MenuRange } from "@grammyjs/menu";
-import { MyContext } from "../../bot";
-import { db } from "../../../index";
-import { getWlAlid, getWLName } from "./w_helpers";
-import { getWatchlistAnime } from "../../../database/animeDB";
-import { watchlists, anime } from "../../../database/schema";
-import { eq } from "drizzle-orm";
 import { b, code, fmt, i as italic, link } from "@grammyjs/parse-mode";
+import { eq } from "drizzle-orm";
+import { getWatchlistAnime } from "../../../database/animeDB";
+import { anime, watchlists } from "../../../database/schema";
+import { db } from "../../../index";
+import { MyContext } from "../../bot";
+import { getWlAlid, getWLName } from "./w_helpers";
 
 /**
  * - The main menu builder for /mywatchlists command.
@@ -15,16 +15,15 @@ import { b, code, fmt, i as italic, link } from "@grammyjs/parse-mode";
 export function WLMainMenu() {
     return new Menu<MyContext>("wl_main").dynamic(async (ctx) => {
         const range = new MenuRange<MyContext>();
-        const wllist = await db.select({
-            watchlist_name: watchlists.watchlist_name,
-            watchlistid: watchlists.watchlistid
-        })
+        const wllist = await db
+            .select({
+                watchlist_name: watchlists.watchlist_name,
+                watchlistid: watchlists.watchlistid,
+            })
             .from(watchlists)
             .where(eq(watchlists.generated_by, ctx.session.userid));
         if (wllist === null || wllist.length === 0) {
-            range
-                .text("-No watchlists available-")
-                .row();
+            range.text("-No watchlists available-").row();
             return range;
         }
         // length : 5 - index: 4.
@@ -80,17 +79,17 @@ export function animeList() {
         const wlid = temp.wlid;
         const wlname = await getWLName(ctx);
         let maxpg: number;
-        let wl: { jpname: string, enname: string, alid: number }[];
+        let wl: { jpname: string; enname: string; alid: number }[];
         if (ctx.session.menudata.maxpg === undefined) {
             ({ wl, maxpg } = await getWatchlistAnime(wlid, movepg, 5, true, true, {
                 towatch,
-                userid: towatch === false ? undefined : ctx.session.userid
+                userid: towatch === false ? undefined : ctx.session.userid,
             }));
             ctx.session.menudata.maxpg = maxpg;
         } else {
             ({ wl, maxpg } = await getWatchlistAnime(wlid, movepg, 5, true, false, {
                 towatch,
-                userid: towatch === false ? undefined : ctx.session.userid
+                userid: towatch === false ? undefined : ctx.session.userid,
             }));
             maxpg = ctx.session.menudata.maxpg;
         }
@@ -98,32 +97,39 @@ export function animeList() {
             range.text("Watchlist is empty").row();
         } else {
             for (const item of wl) {
-                range.submenu(item.jpname, "wl_alopts", async (ctx1) => {
-                    ctx1.session.menudata.alid = item.alid;
-                    const imgResult = await db.select({ imglink: anime.imglink })
-                        .from(anime)
-                        .where(eq(anime.alid, item.alid));
-                    
-                    if (imgResult.length === 0) throw new Error("Anime not found");
-                    
-                    const message = fmt`Chosen watchlist: ${b}${wlname}${b}\n\nChosen anime: \n${b}${item.jpname}${b}\n${italic}(${item.enname})${italic}\n\nWhat do you wanna do with it?${link(imgResult[0].imglink)}​${link(imgResult[0].imglink)}`;
-                    await ctx1.editMessageText(message.text, { entities: message.entities });
-                }).row();
+                range
+                    .submenu(item.jpname, "wl_alopts", async (ctx1) => {
+                        ctx1.session.menudata.alid = item.alid;
+                        const imgResult = await db
+                            .select({ imglink: anime.imglink })
+                            .from(anime)
+                            .where(eq(anime.alid, item.alid));
+
+                        if (imgResult.length === 0) throw new Error("Anime not found");
+
+                        const message = fmt`Chosen watchlist: ${b}${wlname}${b}\n\nChosen anime: \n${b}${item.jpname}${b}\n${italic}(${item.enname})${italic}\n\nWhat do you wanna do with it?${link(imgResult[0].imglink)}​${link(imgResult[0].imglink)}`;
+                        await ctx1.editMessageText(message.text, { entities: message.entities });
+                    })
+                    .row();
             }
             if (maxpg !== 1) {
-                if (movepg > 1) range.submenu(`«1`, "wl_allist", (ctx1) => {
-                    ctx1.session.menudata.l_page = 1;
-                });
-                if (movepg > 2) range.submenu(`‹${movepg - 1}`, "wl_allist", (ctx1) => {
-                    ctx1.session.menudata.l_page = movepg - 1;
-                });
+                if (movepg > 1)
+                    range.submenu(`«1`, "wl_allist", (ctx1) => {
+                        ctx1.session.menudata.l_page = 1;
+                    });
+                if (movepg > 2)
+                    range.submenu(`‹${movepg - 1}`, "wl_allist", (ctx1) => {
+                        ctx1.session.menudata.l_page = movepg - 1;
+                    });
                 range.text(`-${movepg}-`);
-                if (movepg < maxpg - 1) range.submenu(`${movepg + 1}›`, "wl_allist", (ctx1) => {
-                    ctx1.session.menudata.l_page = movepg + 1;
-                });
-                if (movepg < maxpg) range.submenu(`${maxpg}»`, "wl_allist", (ctx1) => {
-                    ctx1.session.menudata.l_page = maxpg;
-                });
+                if (movepg < maxpg - 1)
+                    range.submenu(`${movepg + 1}›`, "wl_allist", (ctx1) => {
+                        ctx1.session.menudata.l_page = movepg + 1;
+                    });
+                if (movepg < maxpg)
+                    range.submenu(`${maxpg}»`, "wl_allist", (ctx1) => {
+                        ctx1.session.menudata.l_page = maxpg;
+                    });
                 range.row();
             }
         }

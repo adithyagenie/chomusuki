@@ -1,26 +1,26 @@
-import { registerUser } from "../helpers/user_mgmt";
-import {
-    animeStartWatch,
-    watching_pending_list,
-    watchingListCBQ
-} from "../helpers/anime/a_watching";
+import { bot } from "../bot";
 import {
     airingUpdatesList,
     airingUpdatesListCBQ,
     remindMe,
-    stopAiringUpdates
+    stopAiringUpdates,
 } from "../helpers/anime/a_airing_updates";
+import { anime_dllist, dl_cbq, dlep_cbq } from "../helpers/anime/a_download";
 import { a_Pending } from "../helpers/anime/a_pending";
 import { animeSearchStart, search_startWatch_remindMe_cb } from "../helpers/anime/a_search";
-import { back_handle, cancel_handle, log_command } from "../helpers/misc_handles";
 import {
     anime_unwatch,
     callback_mkwatch,
-    callback_mkwatchep
+    callback_mkwatchep,
 } from "../helpers/anime/a_watch_unwatch_ep";
-import { anime_dllist, dl_cbq, dlep_cbq } from "../helpers/anime/a_download";
+import {
+    animeStartWatch,
+    watching_pending_list,
+    watchingListCBQ,
+} from "../helpers/anime/a_watching";
 import { anime_config } from "../helpers/anime_config";
-import { bot } from "../bot";
+import { back_handle, cancel_handle, log_command } from "../helpers/misc_handles";
+import { registerUser } from "../helpers/user_mgmt";
 
 export function botcommands() {
     bot.on("my_chat_member", async (ctx, next) => {
@@ -28,14 +28,19 @@ export function botcommands() {
             console.log(`Got added to ${ctx.myChatMember.chat.id}. Exited group.`);
             await ctx.reply("I cannot function in groups yet :/");
             await ctx.leaveChat();
-        } else if (ctx.myChatMember.chat.type === "channel" && ctx.myChatMember.chat.id !== -1001869285732) {
+        } else if (
+            ctx.myChatMember.chat.type === "channel" &&
+            ctx.myChatMember.chat.id !== -1001869285732
+        ) {
             console.log(`Got added to ${ctx.myChatMember.chat.id}. Exited channel.`);
             await ctx.leaveChat();
         } else if (ctx.myChatMember.chat.type === "private") {
-            await ctx.reply("Hey! This is a multipurpose anime bot made by @adithyagenie! I'm" +
-                " still under development," +
-                " you may encounter bugs sometimes :)\nIf you do come across some issues, DM my" +
-                " creator!");
+            await ctx.reply(
+                "Hey! This is a multipurpose anime bot made by @adithyagenie! I'm" +
+                    " still under development," +
+                    " you may encounter bugs sometimes :)\nIf you do come across some issues, DM my" +
+                    " creator!"
+            );
             await next();
             return;
         }

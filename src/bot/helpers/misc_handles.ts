@@ -1,13 +1,13 @@
-import { Bot, BotError, HttpError, InlineKeyboard, InputFile } from "grammy";
-import { bot, MyContext } from "../bot";
-import { createReadStream } from "fs-extra";
 import { conversations, createConversation } from "@grammyjs/conversations";
-import { deleteUser, newUser } from "./user_mgmt";
+import { createReadStream } from "fs-extra";
+import { Bot, BotError, HttpError, InlineKeyboard, InputFile } from "grammy";
+import { redis } from "../../index";
+import { bot, MyContext } from "../bot";
 import { markWatchedRange, unwatchhelper } from "./anime/a_watch_unwatch_ep";
 import { stopWatching } from "./anime/a_watching";
+import { deleteUser, newUser } from "./user_mgmt";
 import { addWL } from "./watchlist/w_addanime";
 import { createWL, renameWL } from "./watchlist/w_wlmgmt";
-import { redis } from "../../index";
 
 // going back in a menu
 export async function back_handle(ctx: MyContext) {
@@ -31,7 +31,7 @@ export async function cancel_handle(ctx: MyContext) {
         await ctx.conversation.exit(conversationName);
     }
     await ctx.reply("Cancelling operation...", {
-        reply_markup: { remove_keyboard: true }
+        reply_markup: { remove_keyboard: true },
     });
 }
 
@@ -65,19 +65,19 @@ export function setCommands(bot: Bot<MyContext>) {
         { command: "register", description: "Create a new user!" },
         {
             command: "startwatching",
-            description: "Start watching an anime! Use /startwatching 'search query'."
+            description: "Start watching an anime! Use /startwatching 'search query'.",
         },
         {
             command: "remindme",
-            description: "Subscribe to updates of an anime! Use /remindme 'search query'."
+            description: "Subscribe to updates of an anime! Use /remindme 'search query'.",
         },
         {
             command: "watching",
-            description: "Get a list of all the anime you are currently watching."
+            description: "Get a list of all the anime you are currently watching.",
         },
         {
             command: "airingupdates",
-            description: "Get a list of all the anime you have subscribed for updates."
+            description: "Get a list of all the anime you have subscribed for updates.",
         },
         { command: "markwatched", description: "Mark a range of episodes of anime as watched." },
         { command: "unwatch", description: "Un-mark an episode of an anime as watched." },
@@ -86,7 +86,7 @@ export function setCommands(bot: Bot<MyContext>) {
         { command: "createwl", description: "Create a watchlist." },
         { command: "dllist", description: "Get your queued downloads. Under development." },
         { command: "cancel", description: "Cancel any currently going operations." },
-        { command: "deleteaccount", description: "Delete your account." }
+        { command: "deleteaccount", description: "Delete your account." },
     ]);
     return;
 }
@@ -103,19 +103,25 @@ export function selfyeet(chatid: number, mid: number, time: number) {
 
 export async function botErrorHandle(err: BotError<MyContext>) {
     if (err.error instanceof TypeError && err.stack.includes("_replayApi")) {
-        console.error(`Encountered error: ${err.error} at context \n${JSON.stringify(err.ctx.msg)}\nStack trace: ${err.stack}`);
-        console.log(`Found conversation error. Deleting conversation session data for ${err.ctx.chat.id}`);
+        console.error(
+            `Encountered error: ${err.error} at context \n${JSON.stringify(err.ctx.msg)}\nStack trace: ${err.stack}`
+        );
+        console.log(
+            `Found conversation error. Deleting conversation session data for ${err.ctx.chat.id}`
+        );
         // Exit all active conversations in case of error
         const active = await err.ctx.conversation.active();
         for (const conversationName of Object.keys(active)) {
             await err.ctx.conversation.exit(conversationName);
         }
         await redis.del(`${err.ctx.chat.id}_c`);
-        await err.ctx.reply("Error occured and the current operation has been cancelled." +
-            " Please retry.");
+        await err.ctx.reply(
+            "Error occured and the current operation has been cancelled." + " Please retry."
+        );
         return;
     }
-    console.error(`Encountered error: ${err.error} at context \n${JSON.stringify(err.ctx.msg)}\nStack trace: ${err.stack}`);
-    if (!(err.error instanceof HttpError))
-        await err.ctx.reply("Internal error occured :/");
+    console.error(
+        `Encountered error: ${err.error} at context \n${JSON.stringify(err.ctx.msg)}\nStack trace: ${err.stack}`
+    );
+    if (!(err.error instanceof HttpError)) await err.ctx.reply("Internal error occured :/");
 }

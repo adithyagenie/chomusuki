@@ -1,9 +1,9 @@
+import { b, code, fmt } from "@grammyjs/parse-mode";
+import { and, eq } from "drizzle-orm";
+import { NextFunction } from "grammy";
+import { completedanime, config, users, watchinganime } from "../../database/schema";
 import { db } from "../../index";
 import { MyContext, MyConversation, MyConversationContext } from "../bot";
-import { NextFunction } from "grammy";
-import { users, config, watchinganime, completedanime } from "../../database/schema";
-import { eq, and } from "drizzle-orm";
-import { b, code, fmt } from "@grammyjs/parse-mode";
 
 export async function registerUser(ctx: MyContext) {
     if (ctx.session.userid !== undefined) {
@@ -15,40 +15,38 @@ export async function registerUser(ctx: MyContext) {
 
 export async function newUser(conversation: MyConversation, ctx: MyConversationContext) {
     const msgid = await ctx.reply("What do you want your username to be?", {
-        reply_markup: { force_reply: true }
+        reply_markup: { force_reply: true },
     });
     const username = (await conversation.waitForReplyTo(msgid.message_id)).message?.text;
     const message1 = fmt`Your username will be set as ${code}${username}${code}!`;
-    const msgid2 = (
-        await ctx.reply(message1.text, { entities: message1.entities })
-    ).message_id;
+    const msgid2 = (await ctx.reply(message1.text, { entities: message1.entities })).message_id;
     const res = await conversation.external(async () => {
-        const result = await db.insert(users).values({
-            chatid: BigInt(ctx.from.id),
-            username: username
-        }).returning();
+        const result = await db
+            .insert(users)
+            .values({
+                chatid: BigInt(ctx.from.id),
+                username: username,
+            })
+            .returning();
         return result[0];
     });
     await conversation.external(async () => {
         await db.insert(config).values({
-            userid: res.userid
+            userid: res.userid,
         });
         await db.insert(watchinganime).values({
             userid: res.userid,
-            alid: []
+            alid: [],
         });
         await db.insert(completedanime).values({
             userid: res.userid,
-            completed: []
+            completed: [],
         });
     });
     const message2 = fmt`Your username has been set as ${code}${username}${code}!\n\nUser created!`;
-    await ctx.api.editMessageText(
-        ctx.from.id,
-        msgid2,
-        message2.text,
-        { entities: message2.entities }
-    );
+    await ctx.api.editMessageText(ctx.from.id, msgid2, message2.text, {
+        entities: message2.entities,
+    });
     // Set session via external access to outside context
     await conversation.external((outsideCtx) => {
         outsideCtx.session.userid = res.userid;
@@ -57,10 +55,11 @@ export async function newUser(conversation: MyConversation, ctx: MyConversationC
 }
 
 export async function userMiddleware(ctx: MyContext, next: NextFunction) {
-    const result = await db.select({ userid: users.userid })
+    const result = await db
+        .select({ userid: users.userid })
         .from(users)
         .where(eq(users.chatid, BigInt(ctx.from.id)));
-    
+
     if (result.length === 0) {
         if (ctx.hasCommand("register")) {
             await next();
@@ -87,11 +86,9 @@ or cancel by typing ${code}cancel${code}.`;
         } else if (msg.message?.text === "Yes, I'm sure.") {
             const userid = await conversation.external((ctx) => ctx.session.userid);
             const res = await conversation.external(async () => {
-                const result = await db.delete(users)
-                    .where(and(
-                        eq(users.userid, userid),
-                        eq(users.chatid, BigInt(ctx.from.id))
-                    ))
+                const result = await db
+                    .delete(users)
+                    .where(and(eq(users.userid, userid), eq(users.chatid, BigInt(ctx.from.id))))
                     .returning();
                 return result[0];
             });

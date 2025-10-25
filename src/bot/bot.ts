@@ -1,26 +1,26 @@
 // telegram bot endpoint
 
 import { type Conversation, type ConversationFlavor } from "@grammyjs/conversations";
-import { Bot, Context, MemorySessionStorage, session, SessionFlavor } from "grammy";
-import { initWLMenu } from "./helpers/watchlist/w_menu";
+import { limit } from "@grammyjs/ratelimiter";
 import { RedisAdapter } from "@grammyjs/storage-redis";
+import { Bot, Context, MemorySessionStorage, session, SessionFlavor } from "grammy";
 import { redis } from "../index";
 import { botcommands } from "./handlers/commands";
 import { middleware } from "./handlers/middleware";
 import { botErrorHandle, initConvos, setCommands } from "./helpers/misc_handles";
-import { limit } from "@grammyjs/ratelimiter";
+import { initWLMenu } from "./helpers/watchlist/w_menu";
 
 interface SessionData {
     userid: number | undefined;
     config: { pause_airing_updates: boolean | undefined };
     menudata: {
-        activemenuopt: number | undefined,
-        wlid: number | undefined,
-        wlname: string | undefined,
-        alid: number | undefined,
-        l_page: number | undefined,
-        maxpg: number | undefined,
-        listmethod: "all" | "towatch" | undefined
+        activemenuopt: number | undefined;
+        wlid: number | undefined;
+        wlname: string | undefined;
+        alid: number | undefined;
+        l_page: number | undefined;
+        maxpg: number | undefined;
+        listmethod: "all" | "towatch" | undefined;
     };
 }
 
@@ -36,22 +36,20 @@ export type MyConversation = Conversation<MyContext, MyConversationContext>;
 export let bot: Bot<MyContext>;
 
 export function botinit() {
-    // Initialize bot here, after environment variables are loaded
     bot = new Bot<MyContext>(`${process.env.BOT_TOKEN}`);
     //const throttler = apiThrottler();
     //bot.api.config.use(throttler);
     const storage = new RedisAdapter<SessionData>({ instance: redis, ttl: 24 * 60 * 60 });
-    // noinspection JSUnusedGlobalSymbols
     bot.use(
         session({
             type: "multi",
             userid: {
                 storage: new MemorySessionStorage(60 * 60 * 1000),
-                initial: () => undefined
+                initial: () => undefined,
             },
             config: {
                 storage: new MemorySessionStorage(60 * 60 * 1000),
-                initial: () => ({ pause_airing_updates: undefined })
+                initial: () => ({ pause_airing_updates: undefined }),
             },
             menudata: {
                 storage: storage,
@@ -62,13 +60,13 @@ export function botinit() {
                     alid: undefined,
                     l_page: undefined,
                     maxpg: undefined,
-                    listmethod: undefined
-                })
+                    listmethod: undefined,
+                }),
             },
             conversation: {
                 getSessionKey: (ctx) => `${ctx.chat?.id}_c`,
-                storage: storage
-            }
+                storage: storage,
+            },
         })
     );
     bot.use(
@@ -81,7 +79,7 @@ export function botinit() {
             },
             keyGenerator: (ctx) => {
                 return ctx.from?.id.toString();
-            }
+            },
         })
     );
     bot.use(middleware());
@@ -97,4 +95,3 @@ export function botinit() {
         void bot.start();
     }
 }
-

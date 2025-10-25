@@ -1,15 +1,15 @@
-import { db } from "../../..";
-import { bot, MyContext } from "../../bot";
-import { getNumber, newDL } from "../../../database/animeDB";
+import { b, code, fmt } from "@grammyjs/parse-mode";
 import aniep from "aniep";
+import axios, { AxiosResponse } from "axios";
+import { eq } from "drizzle-orm";
+import { db } from "../../..";
 import { getSinglePending } from "../../../api/pending";
 import { getxdcc } from "../../../api/subsplease-xdcc";
+import { newDL } from "../../../database/animeDB";
+import { anime } from "../../../database/schema";
 import { i_DlSync, i_NyaaResponse } from "../../../interfaces";
+import { bot, MyContext } from "../../bot";
 import { makeEpKeyboard } from "./a_misc_helpers";
-import axios, { AxiosResponse } from "axios";
-import { syncupd, anime } from "../../../database/schema";
-import { eq } from "drizzle-orm";
-import { b, code, fmt } from "@grammyjs/parse-mode";
 
 /**
  ** Gives all the downloads queued for the user.
@@ -18,12 +18,12 @@ import { b, code, fmt } from "@grammyjs/parse-mode";
 export async function anime_dllist(ctx: MyContext) {
     const userid = ctx.session.userid;
     await ctx.replyWithChatAction("typing");
-    
-    const { downloadsQueue } = await import('../../../queues/downloads.queue');
-    const jobs = await downloadsQueue.getJobs(['waiting', 'active', 'delayed']);
-    
-    const userJobs = jobs.filter(job => job.data.userid === userid);
-    
+
+    const { downloadsQueue } = await import("../../../queues/downloads.queue");
+    const jobs = await downloadsQueue.getJobs(["waiting", "active", "delayed"]);
+
+    const userJobs = jobs.filter((job) => job.data.userid === userid);
+
     if (userJobs.length === 0) {
         await ctx.reply("No pending downloads!");
     } else {
@@ -33,7 +33,7 @@ export async function anime_dllist(ctx: MyContext) {
             if (index === -1) {
                 resser.push({
                     anime: job.data.anime,
-                    epnum: [job.data.episode]
+                    epnum: [job.data.episode],
                 });
             } else {
                 resser[index].epnum.push(job.data.episode);
@@ -55,7 +55,9 @@ export async function anime_dllist(ctx: MyContext) {
         if (msglist.length > 0) {
             for (let i = 0; i < msglist.length; i++) {
                 const message = fmt`${msglist[i]}`;
-                await bot.api.sendMessage(ctx.from.id, message.text, { entities: message.entities });
+                await bot.api.sendMessage(ctx.from.id, message.text, {
+                    entities: message.entities,
+                });
             }
         } else {
             const message = fmt`${msg}`;
@@ -78,25 +80,26 @@ export async function dlep_cbq(ctx: MyContext) {
     const userid = ctx.session.userid;
     const alid = parseInt(ctx.match[1]);
     const epnum = parseInt(ctx.match[2]);
-    const pull1Result = await db.select({ optnames: anime.optnames })
+    const pull1Result = await db
+        .select({ optnames: anime.optnames })
         .from(anime)
         .where(eq(anime.alid, alid));
-    
+
     if (pull1Result.length === 0) throw new Error(`Anime not found: ${alid}`);
     const pull1 = pull1Result[0];
-    
+
     const updateobj = await getSinglePending(userid, null, alid);
-    
-    const { downloadsQueue } = await import('../../../queues/downloads.queue');
+
+    const { downloadsQueue } = await import("../../../queues/downloads.queue");
     const existingJob = await downloadsQueue.getJob(`dl-${userid}-${alid}-${epnum}`);
-    
+
     if (existingJob) {
         await ctx.reply(
             `Episode ${epnum} of ${updateobj.jpname} already queued for download! Use /dllist to view your pending downloads.`
         );
         return;
     }
-    
+
     try {
         let query = `"${updateobj.jpname}"|"${updateobj.enname}"`;
         if (pull1.optnames !== null) pull1.optnames.forEach((o) => (query += `|"${o}"`));
@@ -148,7 +151,7 @@ export async function dlep_cbq(ctx: MyContext) {
                 anime: updateobj.jpname,
                 epnum: epnum,
                 dltype: "xdcc",
-                xdccdata: [xdcclink.botname, xdcclink.packnum.toFixed()]
+                xdccdata: [xdcclink.botname, xdcclink.packnum.toFixed()],
             };
             const returncode = await newDL(sync_toupd, alid);
             if (returncode === 0) {
@@ -164,7 +167,7 @@ export async function dlep_cbq(ctx: MyContext) {
                 anime: updateobj.jpname,
                 epnum: epnum,
                 dltype: "torrent",
-                torrentdata: torrentlink
+                torrentdata: torrentlink,
             };
             const returncode = await newDL(sync_toupd, alid);
             if (returncode === 0) {

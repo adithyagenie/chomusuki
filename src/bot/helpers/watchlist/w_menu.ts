@@ -12,18 +12,17 @@
  */
 
 import { Menu, MenuRange } from "@grammyjs/menu";
-import { bot, MyContext } from "../../bot";
+import { b, code, fmt, i as italic, link } from "@grammyjs/parse-mode";
+import { and, eq, sql } from "drizzle-orm";
 import { db } from "../../..";
-import { selfyeet } from "../misc_handles";
 import { markDone, markNotDone, removeFromWatchlist } from "../../../database/animeDB";
+import { anime, completedanime, watchinganime } from "../../../database/schema";
+import { bot, MyContext } from "../../bot";
+import { animeStartWatch } from "../anime/a_watching";
+import { selfyeet } from "../misc_handles";
 import { getWlAlid, getWLName } from "./w_helpers";
 import { animeList, WLMainMenu } from "./w_list";
 import { deleteWL } from "./w_wlmgmt";
-import { animeStartWatch } from "../anime/a_watching";
-import { watchlists, watchinganime, anime, completedanime } from "../../../database/schema";
-import { eq, and, sql } from "drizzle-orm";
-import { b, code, fmt, i as italic, link } from "@grammyjs/parse-mode";
-
 
 /**
  * - The second level menu for /mywatchlists.
@@ -59,25 +58,25 @@ function WLOptsMenu() {
         })
 
         .submenu("Delete watchlist", "wl_delete", async (ctx1) => {
-                // await ctx1.conversation.enter("deleteWL");
-                const result = await db.execute<{ len: string }>(sql`SELECT array_length(alid, 1) as len FROM watchlists WHERE watchlistid = ${ctx1.session.menudata.wlid}`);
-                const itemlen = result.rows[0]?.len ? Number(result.rows[0].len) : 0;
-                if (itemlen === 0) {
-                    await ctx1.editMessageText(`Your watchlist is empty. Do you want to delete it?`);
-                }
-                else {
-                    const wlname = await getWLName(ctx1);
-                    const message = fmt`You have ${itemlen} items in your watchlist ${code}${wlname}${code}.\nDeleting will remove all the items as well.\n\nProceed?`;
-                    await ctx1.editMessageText(message.text, { entities: message.entities });
-                }
+            // await ctx1.conversation.enter("deleteWL");
+            const result = await db.execute<{ len: string }>(
+                sql`SELECT array_length(alid, 1) as len FROM watchlists WHERE watchlistid = ${ctx1.session.menudata.wlid}`
+            );
+            const itemlen = result.rows[0]?.len ? Number(result.rows[0].len) : 0;
+            if (itemlen === 0) {
+                await ctx1.editMessageText(`Your watchlist is empty. Do you want to delete it?`);
+            } else {
+                const wlname = await getWLName(ctx1);
+                const message = fmt`You have ${itemlen} items in your watchlist ${code}${wlname}${code}.\nDeleting will remove all the items as well.\n\nProceed?`;
+                await ctx1.editMessageText(message.text, { entities: message.entities });
             }
-        )
+        })
         .row()
 
         .back("Go back", async (ctx) => {
             await ctx.editMessageText("Choose the watchlist from the menu below:");
             // noinspection AssignmentResultUsedJS
-            Object.keys(ctx.session.menudata).forEach(o => ctx.session.menudata[o] = undefined);
+            Object.keys(ctx.session.menudata).forEach((o) => (ctx.session.menudata[o] = undefined));
         });
 }
 
@@ -85,52 +84,61 @@ function stopWatching() {
     return new Menu<MyContext>("wl_stopwatch")
         .text("Yes.", async (ctx) => {
             const alid = ctx.session.menudata.alid;
-            const watchingResult = await db.select({ alid: watchinganime.alid })
+            const watchingResult = await db
+                .select({ alid: watchinganime.alid })
                 .from(watchinganime)
                 .where(eq(watchinganime.userid, ctx.session.userid));
-            
+
             if (watchingResult.length === 0) throw new Error("User watching record not found");
-            
+
             const watching = [...watchingResult[0].alid];
-            watching.splice(watching.findIndex(o => o === alid), 1);
-            await db.update(watchinganime)
+            watching.splice(
+                watching.findIndex((o) => o === alid),
+                1
+            );
+            await db
+                .update(watchinganime)
                 .set({ alid: watching })
                 .where(eq(watchinganime.userid, ctx.session.userid));
-            
+
             const yeet = await ctx.reply("Removed from watching.");
             selfyeet(ctx.chat?.id, yeet.message_id, 5000);
 
-            const itemResult = await db.select({ jpname: anime.jpname, enname: anime.enname })
+            const itemResult = await db
+                .select({ jpname: anime.jpname, enname: anime.enname })
                 .from(anime)
                 .where(eq(anime.alid, alid));
-            
+
             if (itemResult.length === 0) throw new Error("Anime not found");
-            
+
             const item = itemResult[0];
             ctx.menu.back();
-            
-            const imglinkResult = await db.select({ imglink: anime.imglink })
+
+            const imglinkResult = await db
+                .select({ imglink: anime.imglink })
                 .from(anime)
                 .where(eq(anime.alid, alid));
-            
+
             const wlname = await getWLName(ctx);
             const message = fmt`Chosen watchlist: ${b}${wlname}${b}\n\nChosen anime: \n${b}${item.jpname}${b}\n${italic}(${item.enname})${italic}\n\nWhat do you wanna do with it?${link(imglinkResult[0]?.imglink)}​${link(imglinkResult[0]?.imglink)}`;
             await ctx.editMessageText(message.text, { entities: message.entities });
         })
         .back("No.", async (ctx) => {
             const alid = ctx.session.menudata.alid;
-            const itemResult = await db.select({ jpname: anime.jpname, enname: anime.enname })
+            const itemResult = await db
+                .select({ jpname: anime.jpname, enname: anime.enname })
                 .from(anime)
                 .where(eq(anime.alid, alid));
-            
+
             if (itemResult.length === 0) throw new Error("Anime not found");
-            
+
             const item = itemResult[0];
-            
-            const imglinkResult = await db.select({ imglink: anime.imglink })
+
+            const imglinkResult = await db
+                .select({ imglink: anime.imglink })
                 .from(anime)
                 .where(eq(anime.alid, alid));
-            
+
             const wlname = await getWLName(ctx);
             const message = fmt`Chosen watchlist: ${b}${wlname}${b}\n\nChosen anime: \n${b}${item.jpname}${b}\n${italic}(${item.enname})${italic}\n\nWhat do you wanna do with it?${link(imglinkResult[0]?.imglink)}​${link(imglinkResult[0]?.imglink)}`;
             await ctx.editMessageText(message.text, { entities: message.entities });
@@ -143,77 +151,94 @@ function stopWatching() {
  * - Identifier wl_alopts.
  */
 function animeListOpts() {
-    return new Menu<MyContext>("wl_alopts")
-        .dynamic(async (ctx) => {
-            const range = new MenuRange<MyContext>();
-            const temp = await getWlAlid(ctx, true, true);
-            if (temp === "back") {
-                range.text("-Menu too old. Generate a new one.-");
-                return range;
-            }
-            const { wlid, alid } = temp;
-            const nameResult = await db.select({ jpname: anime.jpname })
-                .from(anime)
-                .where(eq(anime.alid, alid));
-            
-            if (nameResult.length === 0) throw new Error("Anime not found");
-            
-            const name = nameResult[0].jpname;
-            
-            const is_watched_result = await db.select({ count: sql<number>`count(*)` })
-                .from(completedanime)
-                .where(and(
+    return new Menu<MyContext>("wl_alopts").dynamic(async (ctx) => {
+        const range = new MenuRange<MyContext>();
+        const temp = await getWlAlid(ctx, true, true);
+        if (temp === "back") {
+            range.text("-Menu too old. Generate a new one.-");
+            return range;
+        }
+        const { wlid, alid } = temp;
+        const nameResult = await db
+            .select({ jpname: anime.jpname })
+            .from(anime)
+            .where(eq(anime.alid, alid));
+
+        if (nameResult.length === 0) throw new Error("Anime not found");
+
+        const name = nameResult[0].jpname;
+
+        const is_watched_result = await db
+            .select({ count: sql<number>`count(*)` })
+            .from(completedanime)
+            .where(
+                and(
                     eq(completedanime.userid, ctx.session.userid),
                     sql`${alid} = ANY(${completedanime.completed})`
-                ));
-            const is_watched = Number(is_watched_result[0].count);
-            
-            const is_watching_result = await db.select({ count: sql<number>`count(*)` })
-                .from(watchinganime)
-                .where(and(
+                )
+            );
+        const is_watched = Number(is_watched_result[0].count);
+
+        const is_watching_result = await db
+            .select({ count: sql<number>`count(*)` })
+            .from(watchinganime)
+            .where(
+                and(
                     eq(watchinganime.userid, ctx.session.userid),
                     sql`${alid} = ANY(${watchinganime.alid})`
-                ));
-            const is_watching = Number(is_watching_result[0].count);
-            if (is_watching === 0)
-                range.text("Start watching", async (ctx1) => {
-                    await animeStartWatch(ctx1, true);
-                    try {ctx1.menu.update();} catch {}
-                });
-            else
-                range.submenu("Stop watching", "wl_stopwatch", async (ctx1) => {
-                    await ctx1.editMessageText(`You will lose all the progress in the anime. Proceed?`);
-                });
-            if (is_watched === 0) {
-                range.text("Mark as watched", async (ctx1) => {
-                    await markDone(ctx.session.userid, alid);
-                    selfyeet(ctx.from.id, (await ctx.reply(`${name} has been marked as completed.`)).message_id, 5000);
-                    try {ctx1.menu.update();} catch {}
-                });
-            } else {
-                range.text("Mark as not watched", async (ctx1) => {
-                    const result = await markNotDone(ctx.session.userid, alid);
-                    if (result === "missing") {
-                        await ctx1.reply("Outdated menu.");
-                        await ctx1.menu.update();
-                        return;
-                    }
-                    if (result === 1) {
-                        await ctx1.reply("Error occured :/");
-                        return;
-                    } else {
-                        const yeet = await ctx1.reply(`${name} has been marked as 'not watched'.`);
-                        selfyeet(ctx1.chat.id, yeet.message_id, 10000);
-                        try {ctx1.menu.update();} catch {}
-                        return;
-                    }
-
-                });
-            }
-            range.text({
+                )
+            );
+        const is_watching = Number(is_watching_result[0].count);
+        if (is_watching === 0)
+            range.text("Start watching", async (ctx1) => {
+                await animeStartWatch(ctx1, true);
+                try {
+                    ctx1.menu.update();
+                } catch {}
+            });
+        else
+            range.submenu("Stop watching", "wl_stopwatch", async (ctx1) => {
+                await ctx1.editMessageText(`You will lose all the progress in the anime. Proceed?`);
+            });
+        if (is_watched === 0) {
+            range.text("Mark as watched", async (ctx1) => {
+                await markDone(ctx.session.userid, alid);
+                selfyeet(
+                    ctx.from.id,
+                    (await ctx.reply(`${name} has been marked as completed.`)).message_id,
+                    5000
+                );
+                try {
+                    ctx1.menu.update();
+                } catch {}
+            });
+        } else {
+            range.text("Mark as not watched", async (ctx1) => {
+                const result = await markNotDone(ctx.session.userid, alid);
+                if (result === "missing") {
+                    await ctx1.reply("Outdated menu.");
+                    await ctx1.menu.update();
+                    return;
+                }
+                if (result === 1) {
+                    await ctx1.reply("Error occured :/");
+                    return;
+                } else {
+                    const yeet = await ctx1.reply(`${name} has been marked as 'not watched'.`);
+                    selfyeet(ctx1.chat.id, yeet.message_id, 10000);
+                    try {
+                        ctx1.menu.update();
+                    } catch {}
+                    return;
+                }
+            });
+        }
+        range.text(
+            {
                 text: "Remove from watchlist",
-                payload: `${wlid}_${alid}`
-            }, async (ctx1) => {
+                payload: `${wlid}_${alid}`,
+            },
+            async (ctx1) => {
                 const temp = await getWlAlid(ctx, true, true);
                 if (temp === "back") {
                     range.text("-Menu too old. Generate a new one.-");
@@ -240,17 +265,17 @@ function animeListOpts() {
                     ctx1.session.menudata.l_page = 1;
                     ctx1.session.menudata.maxpg = undefined;
                 }
-            });
-            range.back("Go back", async (ctx1) => {
-                ctx1.session.menudata.alid = undefined;
-                const wlname = await getWLName(ctx1);
-                const message = fmt`Displaying anime from watchlist: ${b}${wlname}${b}`;
-                await ctx1.editMessageText(message.text, { entities: message.entities });
-            });
-            return range;
+            }
+        );
+        range.back("Go back", async (ctx1) => {
+            ctx1.session.menudata.alid = undefined;
+            const wlname = await getWLName(ctx1);
+            const message = fmt`Displaying anime from watchlist: ${b}${wlname}${b}`;
+            await ctx1.editMessageText(message.text, { entities: message.entities });
         });
+        return range;
+    });
 }
-
 
 /**
  * Initialises menus and registers sub-menus.
@@ -265,11 +290,13 @@ export function initWLMenu() {
     wl_main.register(stopWatching(), "wl_alopts");
     bot.use(wl_main);
     bot.command("mywatchlists", async (ctx) => {
-            Object.keys(ctx.session.menudata).forEach(o => { ctx.session.menudata[o] = undefined; });
-            ctx.session.menudata.activemenuopt = (await ctx.reply("Choose the watchlist from the" +
-                " menu below:", { reply_markup: wl_main })).message_id;
-        }
-    );
+        Object.keys(ctx.session.menudata).forEach((o) => {
+            ctx.session.menudata[o] = undefined;
+        });
+        ctx.session.menudata.activemenuopt = (
+            await ctx.reply("Choose the watchlist from the" + " menu below:", {
+                reply_markup: wl_main,
+            })
+        ).message_id;
+    });
 }
-
-

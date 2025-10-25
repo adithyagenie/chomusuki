@@ -1,8 +1,8 @@
 // exposes proper endpoint and handles api calls
 
-import { bot } from "../bot/bot";
-import { BotError, webhookCallback } from "grammy";
 import fastify from "fastify";
+import { BotError, webhookCallback } from "grammy";
+import { bot } from "../bot/bot";
 import { pendingEndpoint } from "../bot/helpers/anime/a_pending";
 import { botErrorHandle } from "../bot/helpers/misc_handles";
 import downloadsRoutes from "./downloads.routes";

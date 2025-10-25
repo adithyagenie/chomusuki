@@ -13,12 +13,13 @@ export async function addReqCache(query: string, pagenum: number, response: Medi
 export async function fetchReqCache(query: string, pagenum: number) {
     try {
         const c = await redis.get(`alcache_${query}_${pagenum}`);
-        if (c === undefined || c === null)
-            return undefined;
+        if (c === undefined || c === null) return undefined;
         try {
             return JSON.parse(c) as MediaSearchEntry;
         } catch {
-            console.error(`Unable to parse redis cache alcache_${query}_${pagenum}. Resetting cache.`);
+            console.error(
+                `Unable to parse redis cache alcache_${query}_${pagenum}. Resetting cache.`
+            );
             await redis.del(`alcache_${query}_${pagenum}`);
             return undefined;
         }
@@ -26,5 +27,4 @@ export async function fetchReqCache(query: string, pagenum: number) {
         console.error(`REDIS ERROR: ${e}`);
         return undefined;
     }
-
 }

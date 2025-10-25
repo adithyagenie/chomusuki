@@ -1,22 +1,21 @@
-import { getNumber, GetWatchedList } from "../database/animeDB";
+import { and, eq, inArray } from "drizzle-orm";
 import { db } from "..";
+import { getNumber, GetWatchedList } from "../database/animeDB";
+import { anime, Anime, watchedepanime, watchinganime } from "../database/schema";
 import { i_ProcessedObjV2 } from "../interfaces";
-import { watchinganime, anime, watchedepanime, Anime } from "../database/schema";
-import { eq, inArray, and } from "drizzle-orm";
 
 /** Returns all yet to watch episodes of user. */
 export async function getPending(userid: number) {
     const t = new Date().getTime();
-    const alidlistResult = await db.select({ alid: watchinganime.alid })
+    const alidlistResult = await db
+        .select({ alid: watchinganime.alid })
         .from(watchinganime)
         .where(eq(watchinganime.userid, userid));
-    
+
     if (alidlistResult.length === 0) return undefined;
     const alidlist = alidlistResult[0];
-    
-    const animelist = await db.select()
-        .from(anime)
-        .where(inArray(anime.alid, alidlist.alid));
+
+    const animelist = await db.select().from(anime).where(inArray(anime.alid, alidlist.alid));
     const watchedlist = await GetWatchedList(userid, alidlist.alid);
     const reqQueue = [];
     for (let i = 0; i < alidlist.alid.length; i++) {
@@ -36,34 +35,33 @@ export async function getSinglePending(userid: number, animename?: string, alid?
     let animeentry: Anime;
     try {
         if (alid == undefined) {
-            const animeResult = await db.select()
+            const animeResult = await db
+                .select()
                 .from(anime)
                 .where(eq(anime.jpname, animename.trim()))
                 .limit(1);
-            
+
             if (animeResult.length == 0) {
                 console.error(`Unable to fetch anime with name ${animename}`);
                 return undefined;
             }
             animeentry = animeResult[0];
         } else {
-            const animeResult = await db.select()
-                .from(anime)
-                .where(eq(anime.alid, alid));
-            
+            const animeResult = await db.select().from(anime).where(eq(anime.alid, alid));
+
             if (animeResult.length === 0) {
                 console.error(`No anime found: ${alid}`);
                 return undefined;
             }
             animeentry = animeResult[0];
         }
-        const watchedResult = await db.select({ ep: watchedepanime.ep })
+        const watchedResult = await db
+            .select({ ep: watchedepanime.ep })
             .from(watchedepanime)
-            .where(and(
-                eq(watchedepanime.userid, userid),
-                eq(watchedepanime.alid, animeentry.alid)
-            ));
-        
+            .where(
+                and(eq(watchedepanime.userid, userid), eq(watchedepanime.alid, animeentry.alid))
+            );
+
         if (watchedResult.length === 0) {
             console.error(`Got null when pulling watched - ${alid}: ${userid}`);
             return null;
@@ -83,10 +81,10 @@ async function getPendingInAnime(watchedep: number[], animeentry: Anime) {
     let shortname: string | undefined;
     if (!(animeentry.optnames == null || animeentry.optnames.length == 0)) {
         shortname = animeentry.optnames.reduce((a, b) => (a.length <= b.length ? a : b)); // returns
-                                                                                          // shortest
-                                                                                          // string
-                                                                                          // in
-                                                                                          // optname
+        // shortest
+        // string
+        // in
+        // optname
         if (animeentry.jpname.length <= shortname.length) {
             shortname = undefined;
         }
@@ -101,12 +99,12 @@ async function getPendingInAnime(watchedep: number[], animeentry: Anime) {
         watched: watchedep,
         notwatched: [],
         image: animeentry.fileid,
-        status: status
+        status: status,
     };
     resobj.notwatched = Array.from({ length: animeentry.last_ep }, (_, i) => i + 1)
-                             .concat(getNumber(animeentry.ep_extras))
-                             .sort((a, b) => (a > b ? 1 : -1))
-                             .filter((o) => !resobj.watched.includes(o)); // gets all notwatched ep
+        .concat(getNumber(animeentry.ep_extras))
+        .sort((a, b) => (a > b ? 1 : -1))
+        .filter((o) => !resobj.watched.includes(o)); // gets all notwatched ep
     return resobj;
 }
 

@@ -1,6 +1,6 @@
-import { i_ProcessedObjV2, MessageEntity } from "../../../interfaces";
 import { InlineKeyboard } from "grammy";
 import { getSinglePending } from "../../../api/pending";
+import { i_ProcessedObjV2, MessageEntity } from "../../../interfaces";
 
 // Makes keyboard for download and mark watched
 export async function makeEpKeyboard(
@@ -18,15 +18,15 @@ export async function makeEpKeyboard(
         i < (updateobj.notwatched.length > 30 ? 30 : updateobj.notwatched.length);
         i += 2
     ) {
-        const bruh: { text: string, callback_data: string } = {
+        const bruh: { text: string; callback_data: string } = {
             text: `Episode ${updateobj.notwatched[i]}`,
-            callback_data: `${callback_data_string}_${updateobj.alid}_${updateobj.notwatched[i]}`
+            callback_data: `${callback_data_string}_${updateobj.alid}_${updateobj.notwatched[i]}`,
         };
-        const bruh2: { text: string, callback_data: string } = {
+        const bruh2: { text: string; callback_data: string } = {
             text: `Episode ${updateobj.notwatched[i + 1]}`,
             callback_data: `${callback_data_string}_${updateobj.alid}_${
                 updateobj.notwatched[i + 1]
-            }`
+            }`,
         };
         if (updateobj.notwatched[i + 1] === undefined) keyboard.add(bruh).row();
         else keyboard.add(bruh).add(bruh2).row();
@@ -39,26 +39,26 @@ export const getUpdaterAnimeIndex = async (name: string, pending: i_ProcessedObj
     pending.map((object) => object.jpname).indexOf(name);
 
 export function getPagination(current: number, maxpage: number, text: string) {
-    const keys: { text: string, callback_data: string }[] = [];
+    const keys: { text: string; callback_data: string }[] = [];
     if (current > 1) keys.push({ text: `«1`, callback_data: `${text}_1` });
     if (current > 2)
         keys.push({
             text: `‹${current - 1}`,
-            callback_data: `${text}_${(current - 1).toString()}`
+            callback_data: `${text}_${(current - 1).toString()}`,
         });
     keys.push({
         text: `-${current}-`,
-        callback_data: `${text}_${current.toString()}_current`
+        callback_data: `${text}_${current.toString()}_current`,
     });
     if (current < maxpage - 1)
         keys.push({
             text: `${current + 1}›`,
-            callback_data: `${text}_${(current + 1).toString()}`
+            callback_data: `${text}_${(current + 1).toString()}`,
         });
     if (current < maxpage)
         keys.push({
             text: `${maxpage}»`,
-            callback_data: `${text}_${maxpage.toString()}`
+            callback_data: `${text}_${maxpage.toString()}`,
         });
 
     return new InlineKeyboard().add(...keys);
@@ -77,7 +77,7 @@ export const messageToHTMLMessage = (text: string, entities: MessageEntity[]) =>
         else
             tags.push({
                 index: entity.offset,
-                tag: startTag
+                tag: startTag,
             });
         const closeTag = startTag?.indexOf("<a ") === 0 ? "</a>" : "</" + startTag?.slice(1);
         searchTag = tags.filter((tag) => tag.index === entity.offset + entity.length);
@@ -85,7 +85,7 @@ export const messageToHTMLMessage = (text: string, entities: MessageEntity[]) =>
         else
             tags.push({
                 index: entity.offset + entity.length,
-                tag: closeTag
+                tag: closeTag,
             });
     });
     let html = "";

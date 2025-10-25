@@ -1,16 +1,14 @@
 // handles search query formation
 
+import { inArray } from "drizzle-orm";
 import { db } from "..";
 import { anime, Anime } from "./schema";
-import { inArray } from "drizzle-orm";
 
 /**Takes alid list as parameter and returns list of nyaa search queries along with their anime objects. */
 export async function GetNyaaSearchQueries(alid: number[]) {
     const searchqueries: string[] = [];
     const otime = new Date().getTime();
-    const obj = await db.select()
-        .from(anime)
-        .where(inArray(anime.alid, alid));
+    const obj = await db.select().from(anime).where(inArray(anime.alid, alid));
     console.log(`Postgres took: ${new Date().getTime() - otime} ms`);
     for (let i = 0; i < obj.length; i++) {
         const cs = obj[i];

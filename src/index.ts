@@ -1,18 +1,17 @@
 // spins up everything
 
 import { config } from "dotenv";
-import { botinit } from "./bot/bot";
-import { createWriteStream } from "fs-extra";
-import { format } from "util";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
-import { Pool } from "pg";
-import * as schema from "./database/schema";
-import { initAnimeChecks, terminateAnimeChecks } from "./api/refreshAiring";
 import { FastifyInstance } from "fastify";
-import { startserver } from "./api/server";
-import IORedis from "ioredis";
+import { createWriteStream } from "fs-extra";
 import Redis from "ioredis";
+import { Pool } from "pg";
+import { format } from "util";
+import { initAnimeChecks, terminateAnimeChecks } from "./api/refreshAiring";
+import { startserver } from "./api/server";
+import { botinit } from "./bot/bot";
+import * as schema from "./database/schema";
 
 config();
 if (
@@ -20,7 +19,8 @@ if (
     process.env.AUTHORISED_CHAT === undefined ||
     process.env.DATABASE_URL === undefined ||
     (process.env.RUN_METHOD !== "WEBHOOK" && process.env.RUN_METHOD !== "POLLING") ||
-    (process.env.RENDER_EXTERNAL_URL === undefined && process.env.RUN_METHOD === "WEBHOOK")
+    (process.env.RENDER_EXTERNAL_URL === undefined && process.env.RUN_METHOD === "WEBHOOK") ||
+    process.env.REDIS_URL === undefined
 ) {
     console.log("ENV VARIABLE NOT SET!");
     process.exit(1);
@@ -32,7 +32,7 @@ const log_stderr = process.stderr;
 
 console.log = function (...d: unknown[]) {
     const time = new Date().toLocaleString("en-IN", {
-        timeZone: "Asia/Kolkata"
+        timeZone: "Asia/Kolkata",
     });
     log_file.write(`${time}: ${format(...d)}\n`);
     log_stdout.write(`${time}: ${format(...d)}\n`);
@@ -40,15 +40,18 @@ console.log = function (...d: unknown[]) {
 
 console.error = function (...d: unknown[]) {
     const time = new Date().toLocaleString("en-IN", {
-        timeZone: process.env.TZ
+        timeZone: process.env.TZ,
     });
     log_file.write(`${time}: ${format(...d)}\n`);
     log_stderr.write(`${time}: ${format(...d)}\n`);
 };
 
-
 export let server: FastifyInstance;
-startserver().then((serv) => {server = serv;}).catch(e => console.error(e));
+startserver()
+    .then((serv) => {
+        server = serv;
+    })
+    .catch((e) => console.error(e));
 
 // Create PostgreSQL connection pool
 export const pool = new Pool({
@@ -64,7 +67,7 @@ class RedisClient extends Redis {
     }
 }
 export const redis = new RedisClient(process.env.REDIS_URL);
-redis.on("error", err => console.error(`REDIS ERROR: ${err}`));
+redis.on("error", (err) => console.error(`REDIS ERROR: ${err}`));
 
 async function runMigrations() {
     console.log("Running database migrations...");
@@ -74,31 +77,31 @@ async function runMigrations() {
 
 async function spinup() {
     await runMigrations();
-    
-    const { animeChecksWorker } = await import('./workers/anime-checks.worker');
-    const { notificationWorker } = await import('./workers/notifications.worker');
-    const { scraperWorker } = await import('./workers/scraper.worker');
-    
-    console.log('BullMQ workers initialized');
-    
+
+    await import("./workers/anime-checks.worker");
+    await import("./workers/notifications.worker");
+    await import("./workers/scraper.worker");
+
+    console.log("BullMQ workers initialized");
+
     botinit();
     await initAnimeChecks();
 }
 
 async function shutdown() {
     console.log("Attempting graceful shutdown...");
-    
-    const { animeChecksWorker } = await import('./workers/anime-checks.worker');
-    const { notificationWorker } = await import('./workers/notifications.worker');
-    const { scraperWorker } = await import('./workers/scraper.worker');
-    
+
+    const { animeChecksWorker } = await import("./workers/anime-checks.worker");
+    const { notificationWorker } = await import("./workers/notifications.worker");
+    const { scraperWorker } = await import("./workers/scraper.worker");
+
     await Promise.all([
         animeChecksWorker.close(),
         notificationWorker.close(),
         scraperWorker.close(),
     ]);
     console.log("Workers closed...");
-    
+
     await pool.end();
     console.log("Database connection closed...");
     await redis.quit(() => console.log("Redis connection closed..."));

@@ -1,31 +1,33 @@
-import { db } from "..";
-import { eq, and, inArray, sql, arrayContains, count } from "drizzle-orm";
-import * as schema from "./schema";
-import * as types from "../interfaces";
 import aniep from "aniep";
+import { and, arrayContains, eq, inArray, sql } from "drizzle-orm";
+import { db } from "..";
 import { getAnimeDetails, imageGet } from "../api/anilist_api";
 import { bot } from "../bot/bot";
+import * as types from "../interfaces";
+import * as schema from "./schema";
 
 export async function addAnimeNames(obj: schema.NewAnime) {
     try {
-        const insertres = await db.insert(schema.anime)
+        const insertres = await db
+            .insert(schema.anime)
             .values(obj)
             .onConflictDoUpdate({
                 target: schema.anime.alid,
-                set: obj
+                set: obj,
             })
             .returning();
-        
-        await db.insert(schema.airingupdates)
+
+        await db
+            .insert(schema.airingupdates)
             .values({
                 alid: obj.alid,
-                userid: []
+                userid: [],
             })
             .onConflictDoUpdate({
                 target: schema.airingupdates.alid,
-                set: { userid: [] }
+                set: { userid: [] },
             });
-        
+
         console.log(`POSTGRES: Add anime - Documents inserted: ${insertres[0].alid}`);
         return 0;
     } catch (err) {
@@ -36,14 +38,15 @@ export async function addAnimeNames(obj: schema.NewAnime) {
 
 export async function markWatchedunWatched(obj: schema.NewWatchedEpAnime) {
     try {
-        const res = await db.insert(schema.watchedepanime)
+        const res = await db
+            .insert(schema.watchedepanime)
             .values(obj)
             .onConflictDoUpdate({
                 target: [schema.watchedepanime.userid, schema.watchedepanime.alid],
-                set: obj
+                set: obj,
             })
             .returning();
-        
+
         console.log(
             `POSTGRES: Mark watched/unwatched - Documents upserted: ${res[0].userid}: ${res[0].alid}`
         );
@@ -57,20 +60,21 @@ export async function markWatchedunWatched(obj: schema.NewWatchedEpAnime) {
 export async function addWatching(userid: number, alid: number) {
     try {
         // Get current alid array
-        const current = await db.select({ alid: schema.watchinganime.alid })
+        const current = await db
+            .select({ alid: schema.watchinganime.alid })
             .from(schema.watchinganime)
             .where(eq(schema.watchinganime.userid, userid));
-        
+
         const newAlids = current.length > 0 ? [...current[0].alid, alid] : [alid];
-        
-        const add = await db.update(schema.watchinganime)
+
+        const add = await db
+            .update(schema.watchinganime)
             .set({ alid: newAlids })
             .where(eq(schema.watchinganime.userid, userid))
             .returning();
-        
-        await db.insert(schema.watchedepanime)
-            .values({ userid: userid, alid: alid, ep: [] });
-        
+
+        await db.insert(schema.watchedepanime).values({ userid: userid, alid: alid, ep: [] });
+
         console.log(`POSTGRES: Add subscription - Documents updated: ${add[0].userid}: ${alid}`);
     } catch (err) {
         console.error(`POSTGRES: addWatching - ${err}`);
@@ -79,17 +83,18 @@ export async function addWatching(userid: number, alid: number) {
 
 /**Takes user id and list of alid as parameter and returns the ep status of them for the user */
 export async function GetWatchedList(userid: number, alidlist: number[]) {
-    return db.select({
-        alid: schema.watchedepanime.alid,
-        ep: schema.watchedepanime.ep
-    })
-    .from(schema.watchedepanime)
-    .where(
-        and(
-            eq(schema.watchedepanime.userid, userid),
-            inArray(schema.watchedepanime.alid, alidlist)
-        )
-    );
+    return db
+        .select({
+            alid: schema.watchedepanime.alid,
+            ep: schema.watchedepanime.ep,
+        })
+        .from(schema.watchedepanime)
+        .where(
+            and(
+                eq(schema.watchedepanime.userid, userid),
+                inArray(schema.watchedepanime.alid, alidlist)
+            )
+        );
 }
 
 export async function getUserWatchingAiring(
@@ -103,40 +108,44 @@ export async function getUserWatchingAiring(
         let amount: number;
         if (table == "airingupdates") {
             // Count airingupdates where userid array contains the userid
-            const countResult = await db.select({ count: sql<number>`count(*)` })
+            const countResult = await db
+                .select({ count: sql<number>`count(*)` })
                 .from(schema.airingupdates)
                 .where(arrayContains(schema.airingupdates.userid, [userid]));
-            
+
             amount = Number(countResult[0].count);
             console.log(amount);
             if (amount == 0) return { alidlist: [], animelist: [], amount: 0 };
-            
-            const _ = await db.select({ alid: schema.airingupdates.alid })
+
+            const _ = await db
+                .select({ alid: schema.airingupdates.alid })
                 .from(schema.airingupdates)
                 .where(arrayContains(schema.airingupdates.userid, [userid]))
                 .limit(count)
                 .offset(offset);
-            
+
             alidlist = _.map((o) => o.alid);
         } else {
-            const _ = await db.select({ alid: schema.watchinganime.alid })
+            const _ = await db
+                .select({ alid: schema.watchinganime.alid })
                 .from(schema.watchinganime)
                 .where(eq(schema.watchinganime.userid, userid));
-            
+
             if (_.length === 0) return { alidlist: [], animelist: [], amount: 0 };
             else alidlist = _[0].alid;
             amount = alidlist.length;
             if (count !== undefined && offset !== undefined)
                 alidlist = alidlist.slice(offset - 1, count + offset - 1);
         }
-        
-        const tosort = await db.select({
-            jpname: schema.anime.jpname,
-            alid: schema.anime.alid
-        })
-        .from(schema.anime)
-        .where(inArray(schema.anime.alid, alidlist));
-        
+
+        const tosort = await db
+            .select({
+                jpname: schema.anime.jpname,
+                alid: schema.anime.alid,
+            })
+            .from(schema.anime)
+            .where(inArray(schema.anime.alid, alidlist));
+
         tosort.sort((a, b) => (alidlist.indexOf(a.alid) > alidlist.indexOf(b.alid) ? 1 : -1));
         const animelist = tosort.map((o) => o.jpname);
         if (alidlist.length !== animelist.length) {
@@ -168,16 +177,18 @@ export async function getUserWatchingAiring(
 export async function addAiringFollow(alid: number, userid: number) {
     try {
         // Get current userid array
-        const current = await db.select({ userid: schema.airingupdates.userid })
+        const current = await db
+            .select({ userid: schema.airingupdates.userid })
             .from(schema.airingupdates)
             .where(eq(schema.airingupdates.alid, alid));
-        
+
         const newUserids = current.length > 0 ? [...current[0].userid, userid] : [userid];
-        
-        await db.update(schema.airingupdates)
+
+        await db
+            .update(schema.airingupdates)
             .set({ userid: newUserids })
             .where(eq(schema.airingupdates.alid, alid));
-        
+
         return 0;
     } catch (err) {
         console.error(`POSTGRES: addAiringFollow - ${err}`);
@@ -187,37 +198,33 @@ export async function addAiringFollow(alid: number, userid: number) {
 
 export async function newDL(obj: types.i_DlSync, alid: number) {
     try {
-        const { downloadsQueue } = await import('../queues/downloads.queue');
-        
+        const { downloadsQueue } = await import("../queues/downloads.queue");
+
         const jobData: types.DownloadJobData = {
             userid: obj.userid,
             anime: obj.anime,
             episode: obj.epnum,
             alid: alid,
-            dltype: obj.dltype as 'xdcc' | 'torrent',
+            dltype: obj.dltype as "xdcc" | "torrent",
         };
-        
-        if (obj.dltype === 'xdcc' && obj.xdccdata && obj.xdccdata.length >= 2) {
+
+        if (obj.dltype === "xdcc" && obj.xdccdata && obj.xdccdata.length >= 2) {
             jobData.xdcc = {
                 botname: obj.xdccdata[0],
                 packnum: parseInt(obj.xdccdata[1]),
             };
-        } else if (obj.dltype === 'torrent' && obj.torrentdata) {
+        } else if (obj.dltype === "torrent" && obj.torrentdata) {
             jobData.torrent = {
                 fileUrl: obj.torrentdata,
             };
         }
-        
-        const job = await downloadsQueue.add(
-            `dl-${obj.userid}-${alid}-${obj.epnum}`,
-            jobData,
-            {
-                jobId: `dl-${obj.userid}-${alid}-${obj.epnum}`,
-                removeOnComplete: false,
-                attempts: 3,
-            }
-        );
-        
+
+        const job = await downloadsQueue.add(`dl-${obj.userid}-${alid}-${obj.epnum}`, jobData, {
+            jobId: `dl-${obj.userid}-${alid}-${obj.epnum}`,
+            removeOnComplete: false,
+            attempts: 3,
+        });
+
         console.log(`BULLMQ: New download queued - Job ID: ${job.id}`);
         return 0;
     } catch (err) {
@@ -228,11 +235,12 @@ export async function newDL(obj: types.i_DlSync, alid: number) {
 
 export async function changeConfig(newconfig: schema.Config) {
     try {
-        const res = await db.update(schema.config)
+        const res = await db
+            .update(schema.config)
             .set(newconfig)
             .where(eq(schema.config.userid, newconfig.userid))
             .returning();
-        
+
         console.log(`POSTGRES: UPDATE CONFIG: ${res[0].userid}`);
         return 0;
     } catch (err) {
@@ -242,14 +250,15 @@ export async function changeConfig(newconfig: schema.Config) {
 
 export async function newWatchlist(watchlist_name: string, generated_by: number) {
     try {
-        const res = await db.insert(schema.watchlists)
+        const res = await db
+            .insert(schema.watchlists)
             .values({
                 watchlist_name,
                 generated_by,
-                alid: []
+                alid: [],
             })
             .returning();
-        
+
         console.log(`POSTGRES: Watchlist created - ${res[0].watchlist_name}`);
         return 0;
     } catch (err) {
@@ -266,23 +275,25 @@ export async function addToWatchlist(watchlistid: number, addAlID: number) {
             return "err";
         }
         if (anime == "invalid") return "invalid";
-        
-        const wl = await db.select({ alid: schema.watchlists.alid })
+
+        const wl = await db
+            .select({ alid: schema.watchlists.alid })
             .from(schema.watchlists)
             .where(eq(schema.watchlists.watchlistid, watchlistid));
-        
+
         if (wl.length === 0) throw new Error("Watchlist not found");
-        
+
         const is_present = wl[0].alid.filter((o) => o === addAlID).length > 0;
         if (is_present === true) return "present";
-        
+
         const newAlids = [...wl[0].alid, addAlID];
-        
-        const res = await db.update(schema.watchlists)
+
+        const res = await db
+            .update(schema.watchlists)
             .set({ alid: newAlids })
             .where(eq(schema.watchlists.watchlistid, watchlistid))
             .returning();
-        
+
         console.log(`POSTGRES: Watchlist item added - ${res[0].watchlistid}`);
         return anime.pull.jpname;
     } catch (err) {
@@ -294,17 +305,19 @@ export async function addToWatchlist(watchlistid: number, addAlID: number) {
 export async function markDone(userid: number, AlID: number) {
     try {
         // Get current completed array
-        const current = await db.select({ completed: schema.completedanime.completed })
+        const current = await db
+            .select({ completed: schema.completedanime.completed })
             .from(schema.completedanime)
             .where(eq(schema.completedanime.userid, userid));
-        
+
         const newCompleted = current.length > 0 ? [...current[0].completed, AlID] : [AlID];
-        
-        const res = await db.update(schema.completedanime)
+
+        const res = await db
+            .update(schema.completedanime)
             .set({ completed: newCompleted })
             .where(eq(schema.completedanime.userid, userid))
             .returning();
-        
+
         console.log(`POSTGRES: Marking anime as done - ${res[0].userid}:${AlID}`);
         return 0;
     } catch (err) {
@@ -314,22 +327,23 @@ export async function markDone(userid: number, AlID: number) {
 
 export async function markNotDone(userid: number, AlID: number) {
     try {
-        const result = await db.select({ completed: schema.completedanime.completed })
+        const result = await db
+            .select({ completed: schema.completedanime.completed })
             .from(schema.completedanime)
             .where(eq(schema.completedanime.userid, userid));
-        
+
         if (result.length === 0) throw new Error("User not found");
-        
+
         const completed = [...result[0].completed];
         const i = completed.indexOf(AlID);
-        if (i === -1)
-            return "missing";
+        if (i === -1) return "missing";
         completed.splice(i, 1);
-        
-        await db.update(schema.completedanime)
+
+        await db
+            .update(schema.completedanime)
             .set({ completed })
             .where(eq(schema.completedanime.userid, userid));
-        
+
         console.log(`POSTGRES: Marking anime as not done - ${userid}:${AlID}`);
         return 0;
     } catch (err) {
@@ -340,22 +354,24 @@ export async function markNotDone(userid: number, AlID: number) {
 
 export async function removeFromWatchlist(watchlistid: number, AlID: number) {
     try {
-        const old = await db.select()
+        const old = await db
+            .select()
             .from(schema.watchlists)
             .where(eq(schema.watchlists.watchlistid, watchlistid));
-        
+
         if (old.length === 0) return "wlmissing";
-        
+
         const alidArray = [...old[0].alid];
         const index = alidArray.indexOf(AlID);
         if (index == -1) return "alidmissing";
         alidArray.splice(index, 1);
-        
-        const res = await db.update(schema.watchlists)
+
+        const res = await db
+            .update(schema.watchlists)
             .set({ alid: alidArray })
             .where(eq(schema.watchlists.watchlistid, watchlistid))
             .returning();
-        
+
         console.log(`POSTGRES: Removing anime from watchlist - ${res[0].watchlistid}:${AlID}`);
         return 0;
     } catch (err) {
@@ -372,7 +388,7 @@ export async function removeFromWatchlist(watchlistid: number, AlID: number) {
 //     })
 //     .from(schema.watchlists)
 //     .where(eq(schema.watchlists.generated_by, userid));
-//     
+//
 // 	if (wl.length === 0) return { wl: null, wllist: null };
 // 	return { wl: wl, wllist: wl.map((o) => o.watchlist_name) };
 // }
@@ -405,13 +421,13 @@ export async function getWatchlistAnime(
     } else {
         maxpg = undefined;
     }
-    
+
     let wl: {
         jpname: string;
         enname: string;
-        alid: number
+        alid: number;
     }[];
-    
+
     if (towatch.towatch) {
         if (paginate) {
             const result = await db.execute<{ jpname: string; enname: string; alid: number }>(
@@ -455,10 +471,11 @@ export async function getWatchlistAnime(
 
 export async function renameWatchlist(watchlistid: number, wlname: string) {
     try {
-        await db.update(schema.watchlists)
+        await db
+            .update(schema.watchlists)
             .set({ watchlist_name: wlname })
             .where(eq(schema.watchlists.watchlistid, watchlistid));
-        
+
         console.log(`POSTGRES: Renaming watchlist - ${watchlistid} -> ${wlname}`);
         return 0;
     } catch (e) {
@@ -469,10 +486,11 @@ export async function renameWatchlist(watchlistid: number, wlname: string) {
 
 export async function deleteWatchlist(watchlistid: number) {
     try {
-        const res = await db.delete(schema.watchlists)
+        const res = await db
+            .delete(schema.watchlists)
             .where(eq(schema.watchlists.watchlistid, watchlistid))
             .returning();
-        
+
         console.log(`POSTGRES: Deleting watchlist - ${res[0].watchlistid}`);
         return 0;
     } catch (err) {
@@ -504,23 +522,24 @@ export async function checkAnimeTable(alid: number, updatedata = false) {
         next_ep_num: string;
         next_ep_air: number;
     } = null;
-    
+
     if (updatedata === false) {
-        const result = await db.select({
-            alid: schema.anime.alid,
-            status: schema.anime.status,
-            jpname: schema.anime.jpname,
-            next_ep_air: schema.anime.next_ep_air,
-            next_ep_num: schema.anime.next_ep_num
-        })
-        .from(schema.anime)
-        .where(eq(schema.anime.alid, alid));
-        
+        const result = await db
+            .select({
+                alid: schema.anime.alid,
+                status: schema.anime.status,
+                jpname: schema.anime.jpname,
+                next_ep_air: schema.anime.next_ep_air,
+                next_ep_num: schema.anime.next_ep_num,
+            })
+            .from(schema.anime)
+            .where(eq(schema.anime.alid, alid));
+
         if (result.length > 0) {
             pull = result[0];
         }
     }
-    
+
     let airing = false;
     if (pull === null) {
         const res = await getAnimeDetails(alid);
@@ -546,7 +565,7 @@ export async function checkAnimeTable(alid: number, updatedata = false) {
             last_ep: undefined,
             ep_extras: [],
             imglink: imglink,
-            fileid: fileid
+            fileid: fileid,
         };
         if (release) {
             obj.next_ep_air = res.nextAiringEpisode["airingAt"];
