@@ -6,7 +6,7 @@
     "scripts": {
         "build": "tsc",
         "start": "node ./out/index.js",
-        "dev": "node --watch ./out/index.js"
+        "dev": "tsx watch ./src/index.ts"
     },
     "author": "adithyagenie",
     "license": "ISC",
@@ -41,6 +41,7 @@
         "@typescript-eslint/parser": "8.46.2",
         "drizzle-kit": "^0.31.5",
         "eslint": "9.38.0",
+        "tsx": "^4.20.6",
         "typescript": "5.9.3"
     }
 }

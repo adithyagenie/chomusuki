@@ -41,7 +41,7 @@ export async function log_command(ctx: MyContext) {
         await ctx.reply("Logs available for admin only! (｡•́︿•̀｡)");
         return;
     }
-    const logfile = new InputFile(createReadStream("./log.txt"), "log.txt");
+    const logfile = new InputFile(createReadStream("./log.log"), "log.log");
     await ctx.replyWithDocument(logfile);
 }
 

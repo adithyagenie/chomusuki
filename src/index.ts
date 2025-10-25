@@ -26,7 +26,7 @@ if (
     process.exit(1);
 }
 
-const log_file = createWriteStream("./log.txt", { flags: "w" });
+const log_file = createWriteStream("./log.log", { flags: "w" });
 const log_stdout = process.stdout;
 const log_stderr = process.stderr;
 
