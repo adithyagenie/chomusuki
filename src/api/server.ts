@@ -2,14 +2,37 @@
 
 import fastify from "fastify";
 import { BotError, webhookCallback } from "grammy";
+import { createBullBoard } from "@bull-board/api";
+import { BullMQAdapter } from "@bull-board/api/bullMQAdapter";
+import { FastifyAdapter } from "@bull-board/fastify";
 import { bot } from "../bot/bot";
 import { pendingEndpoint } from "../bot/helpers/anime/a_pending";
 import { botErrorHandle } from "../bot/helpers/misc_handles";
 import downloadsRoutes from "./downloads.routes";
+import { downloadsQueue } from "../queues/downloads.queue";
+import { animeChecksQueue } from "../queues/anime-checks.queue";
+import { notificationsQueue } from "../queues/notifications.queue";
+import { scraperQueue } from "../queues/scraper.queue";
 
 export async function startserver() {
     const port = parseInt(process.env.PORT) || 4000;
     const server = fastify({ logger: false });
+
+    const serverAdapter = new FastifyAdapter();
+    createBullBoard({
+        queues: [
+            new BullMQAdapter(downloadsQueue),
+            new BullMQAdapter(animeChecksQueue),
+            new BullMQAdapter(notificationsQueue),
+            new BullMQAdapter(scraperQueue),
+        ],
+        serverAdapter,
+    });
+    serverAdapter.setBasePath("/admin/queues");
+    await server.register(serverAdapter.registerPlugin(), {
+        prefix: "/admin/queues",
+    });
+    
     if (process.env.RUN_METHOD === "WEBHOOK") {
         server.post(`/${process.env.BOT_TOKEN}`, webhookCallback(bot, "fastify"));
         server.setErrorHandler(async (err, req, res) => {
