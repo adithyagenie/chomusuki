@@ -20,7 +20,6 @@
         "aniep": "0.6.0",
         "anilist-node": "1.14.1",
         "axios": "1.12.2",
-        "bull": "4.16.5",
         "bullmq": "^5.61.2",
         "dotenv": "17.2.3",
         "drizzle-orm": "^0.44.7",
@@ -28,14 +27,12 @@
         "fs-extra": "11.3.2",
         "grammy": "1.38.3",
         "ioredis": "5.8.2",
-        "node-schedule": "2.1.1",
         "pg": "^8.16.3"
     },
     "devDependencies": {
         "@grammyjs/types": "3.22.2",
         "@types/fs-extra": "11.0.4",
         "@types/node-fetch": "2.6.13",
-        "@types/node-schedule": "2.1.8",
         "@types/pg": "^8.15.5",
         "@typescript-eslint/eslint-plugin": "8.46.2",
         "@typescript-eslint/parser": "8.46.2",
