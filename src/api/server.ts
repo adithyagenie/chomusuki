@@ -5,6 +5,7 @@ import { BotError, webhookCallback } from "grammy";
 import fastify from "fastify";
 import { pendingEndpoint } from "../bot/helpers/anime/a_pending";
 import { botErrorHandle } from "../bot/helpers/misc_handles";
+import downloadsRoutes from "./downloads.routes";
 
 export async function startserver() {
     const port = parseInt(process.env.PORT) || 4000;
@@ -36,6 +37,7 @@ export async function startserver() {
         } else await res.status(401);
     });
     pendingEndpoint(server);
+    await server.register(downloadsRoutes);
     await server.listen({ port: port });
     if (process.env.RUN_METHOD === "WEBHOOK")
         await bot.api.setWebhook(`${process.env.RENDER_EXTERNAL_URL}/${process.env.BOT_TOKEN}`);
