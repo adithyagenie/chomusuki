@@ -19,6 +19,7 @@
     "@grammyjs/transformer-throttler": "1.2.1",
     "aniep": "0.6.0",
     "anilist-node": "1.14.1",
+    "amqplib": "^0.10.5",
     "axios": "1.12.2",
     "bull": "4.16.5",
     "dotenv": "17.2.3",
