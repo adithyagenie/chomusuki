@@ -185,26 +185,44 @@ export async function addAiringFollow(alid: number, userid: number) {
     }
 }
 
-export async function newDL(obj: types.i_DlSync) {
+export async function newDL(obj: types.i_DlSync, alid: number) {
     try {
-        const insertData: schema.NewSyncupd = {
+        const { downloadsQueue } = await import('../queues/downloads.queue');
+        
+        const jobData: types.DownloadJobData = {
             userid: obj.userid,
-            synctype: obj.synctype,
             anime: obj.anime,
-            epnum: obj.epnum.toString(),
-            dltype: obj.dltype,
-            xdccdata: obj.xdccdata || [],
-            torrentdata: obj.torrentdata
+            episode: obj.epnum,
+            alid: alid,
+            dltype: obj.dltype as 'xdcc' | 'torrent',
         };
         
-        const res = await db.insert(schema.syncupd)
-            .values(insertData)
-            .returning();
+        if (obj.dltype === 'xdcc' && obj.xdccdata && obj.xdccdata.length >= 2) {
+            jobData.xdcc = {
+                botname: obj.xdccdata[0],
+                packnum: parseInt(obj.xdccdata[1]),
+            };
+        } else if (obj.dltype === 'torrent' && obj.torrentdata) {
+            jobData.torrent = {
+                fileUrl: obj.torrentdata,
+            };
+        }
         
-        console.log(`POSTGRES: New download queued - Documents inserted: ${res}`);
+        const job = await downloadsQueue.add(
+            `dl-${obj.userid}-${alid}-${obj.epnum}`,
+            jobData,
+            {
+                jobId: `dl-${obj.userid}-${alid}-${obj.epnum}`,
+                removeOnComplete: false,
+                attempts: 3,
+            }
+        );
+        
+        console.log(`BULLMQ: New download queued - Job ID: ${job.id}`);
         return 0;
     } catch (err) {
-        console.error(`POSTGRES: DlSync - ${err}`);
+        console.error(`BULLMQ: DlSync - ${err}`);
+        return 1;
     }
 }
 

@@ -83,3 +83,46 @@ export type MessageEntity =
     | PreMessageEntity
     | TextLinkMessageEntity
     | TextMentionMessageEntity;
+
+export interface DownloadJobData {
+    userid: number;
+    anime: string;
+    episode: number;
+    alid: number;
+    dltype: 'xdcc' | 'torrent';
+    xdcc?: { 
+        botname: string; 
+        packnum: number; 
+        server?: string;
+    };
+    torrent?: { 
+        magnetLink?: string; 
+        fileUrl: string;
+    };
+}
+
+export interface AnimeCheckJobData {
+    alid: number;
+    episode: number;
+    jpname: string;
+    enname: string;
+    subscribers: number[];
+}
+
+export interface NotificationJobData {
+    userid: number;
+    chatid: bigint;
+    message: string;
+    anime: string;
+    episode: number;
+    alid: number;
+    imageFileId?: string;
+}
+
+export interface ScraperJobData {
+    alid: number;
+    episode: number;
+    jpname: string;
+    enname: string;
+    optnames: string[];
+}

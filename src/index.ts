@@ -8,7 +8,7 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { Pool } from "pg";
 import * as schema from "./database/schema";
-import { initCron, terminateCron } from "./api/refreshAiring";
+import { initAnimeChecks, terminateAnimeChecks } from "./api/refreshAiring";
 import { FastifyInstance } from "fastify";
 import { startserver } from "./api/server";
 import IORedis from "ioredis";
@@ -74,16 +74,35 @@ async function runMigrations() {
 
 async function spinup() {
     await runMigrations();
+    
+    const { animeChecksWorker } = await import('./workers/anime-checks.worker');
+    const { notificationWorker } = await import('./workers/notifications.worker');
+    const { scraperWorker } = await import('./workers/scraper.worker');
+    
+    console.log('BullMQ workers initialized');
+    
     botinit();
-    await initCron();
+    await initAnimeChecks();
 }
 
 async function shutdown() {
     console.log("Attempting graceful shutdown...");
+    
+    const { animeChecksWorker } = await import('./workers/anime-checks.worker');
+    const { notificationWorker } = await import('./workers/notifications.worker');
+    const { scraperWorker } = await import('./workers/scraper.worker');
+    
+    await Promise.all([
+        animeChecksWorker.close(),
+        notificationWorker.close(),
+        scraperWorker.close(),
+    ]);
+    console.log("Workers closed...");
+    
     await pool.end();
     console.log("Database connection closed...");
     await redis.quit(() => console.log("Redis connection closed..."));
-    terminateCron(() => console.log("Cron Jobs cleared..."));
+    terminateAnimeChecks(() => console.log("Anime checks cleared..."));
     await new Promise<void>((resolve) => {
         server.close(() => {
             console.log("Server has been shutdown...");
