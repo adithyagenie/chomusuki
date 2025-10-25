@@ -58,6 +58,7 @@ async function processAnimeCheck(job: Job<AnimeCheckJobData>) {
             },
             {
                 delay: 5 * 60 * 1000,
+                jobId: `scraper-${alid}-${episode}`,
             }
         );
 
@@ -117,7 +118,15 @@ animeChecksWorker.on("completed", (job) => {
 });
 
 animeChecksWorker.on("failed", (job, err) => {
-    console.error(`Anime check job ${job?.id} failed:`, err.message);
+    if (job && job.attemptsMade >= 3) {
+        console.error(
+            `ALERT: Anime check job ${job.id} failed after ${job.attemptsMade} attempts`
+        );
+        console.error(`Job data:`, job.data);
+        console.error(`Error:`, err.message);
+    } else {
+        console.error(`Anime check job ${job?.id} failed:`, err.message);
+    }
 });
 
 animeChecksWorker.on("error", (err) => {

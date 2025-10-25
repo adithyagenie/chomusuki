@@ -11,8 +11,8 @@ async function processNotification(job: Job<NotificationJobData>) {
 
     try {
         const keyboard = new InlineKeyboard()
-            .text("📥 Download", `dlep_${alid}_${episode}`)
-            .text("✅ Mark Watched", `watched_${alid}_${episode}`);
+            .text("Download", `dlep_${alid}_${episode}`)
+            .text("Mark Watched", `watched_${alid}_${episode}`);
 
         if (imageFileId) {
             await bot.api.sendPhoto(Number(chatid), imageFileId, {
@@ -51,7 +51,15 @@ notificationWorker.on("completed", (job) => {
 });
 
 notificationWorker.on("failed", (job, err) => {
-    console.error(`Notification job ${job?.id} failed:`, err.message);
+    if (job && job.attemptsMade >= 3) {
+        console.error(
+            `ALERT: Notification job ${job.id} failed after ${job.attemptsMade} attempts`
+        );
+        console.error(`Job data:`, job.data);
+        console.error(`Error:`, err.message);
+    } else {
+        console.error(`Notification job ${job?.id} failed:`, err.message);
+    }
 });
 
 notificationWorker.on("error", (err) => {

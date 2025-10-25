@@ -90,15 +90,21 @@ async function processScraper(job: Job<ScraperJobData>) {
         for (const user of chatIdsResult) {
             if (!user.chatid) continue;
 
-            await notificationsQueue.add(`notification-${user.userid}-${alid}-${episode}`, {
-                userid: user.userid,
-                chatid: user.chatid,
-                message: notificationMessage.text,
-                anime: jpname,
-                episode,
-                alid,
-                imageFileId,
-            });
+            await notificationsQueue.add(
+                `notification-${user.userid}-${alid}-${episode}`,
+                {
+                    userid: user.userid,
+                    chatid: user.chatid,
+                    message: notificationMessage.text,
+                    anime: jpname,
+                    episode,
+                    alid,
+                    imageFileId,
+                },
+                {
+                    jobId: `notification-${user.userid}-${alid}-${episode}`,
+                }
+            );
         }
 
         console.log(
@@ -129,7 +135,15 @@ scraperWorker.on("completed", (job) => {
 });
 
 scraperWorker.on("failed", (job, err) => {
-    console.error(`Scraper job ${job?.id} failed:`, err.message);
+    if (job && job.attemptsMade >= 3) {
+        console.error(
+            `ALERT: Scraper job ${job.id} failed after ${job.attemptsMade} attempts`
+        );
+        console.error(`Job data:`, job.data);
+        console.error(`Error:`, err.message);
+    } else {
+        console.error(`Scraper job ${job?.id} failed:`, err.message);
+    }
 });
 
 scraperWorker.on("error", (err) => {
