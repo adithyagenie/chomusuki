@@ -1,124 +1,118 @@
-import * as cron from "node-schedule";
-import { bot } from "../bot/bot";
-import { checkAnimeTable, getNumber } from "../database/animeDB";
+import { animeChecksQueue } from '../queues/anime-checks.queue';
+import { getNumber } from "../database/animeDB";
 import { db } from "../index";
-import { anime, airingupdates, users } from "../database/schema";
-import { eq, inArray } from "drizzle-orm";
-import { b, fmt } from "@grammyjs/parse-mode";
+import { anime, airingupdates } from "../database/schema";
+import { eq } from "drizzle-orm";
 
-async function cronn(alid: number, aniname: string, next_ep_air: number, next_ep_num: number) {
+async function scheduleAnimeCheck(alid: number, aniname: string, next_ep_air: number, next_ep_num: number) {
     console.log(
-        `Scheduling job for ${aniname} - ${next_ep_num} at ${new Date(
+        `Scheduling anime check for ${aniname} - ${next_ep_num} at ${new Date(
             next_ep_air * 1000
         ).toLocaleString()}`
     );
-    if (next_ep_air * 1000 < Date.now()) {
-        console.error("Time to schedule in past.");
-        const res2 = await checkAnimeTable(alid, true);
-        if (res2 == "err" || res2 == "invalid") throw new Error("Unable to fetch anime table.");
-        await cronn(
-            alid,
-            res2.pull.jpname,
-            res2.pull.next_ep_air,
-            getNumber(res2.pull.next_ep_num) as number
-        );
+    
+    const delay = (next_ep_air * 1000) - Date.now();
+    
+    if (delay < 0) {
+        console.error(`Time to schedule is in the past for ${aniname}. Skipping...`);
         return;
     }
-    const job = cron.scheduleJob(
-        `${alid}`,
-        new Date(next_ep_air * 1000),
-        async function (alid: number, aniname: string, next_ep_num: number) {
-            await airhandle(alid, aniname, next_ep_num);
-        }.bind(null, alid, aniname, next_ep_num)
-    );
-    if (job !== null) job.on("error", (err) => console.log(err));
-}
-
-async function airhandle(alid: number, aniname: string, next_ep_num: number) {
-    console.log(`Processing job for ${aniname} - ${next_ep_num}.`);
-    await db.update(anime)
-        .set({ last_ep: next_ep_num })
-        .where(eq(anime.alid, alid));
     
-    const sususersResult = await db.select({ userid: airingupdates.userid })
+    const subscribersResult = await db.select({ userid: airingupdates.userid })
         .from(airingupdates)
         .where(eq(airingupdates.alid, alid));
     
-    if (sususersResult.length === 0) throw new Error("Unable to find airing ppl");
-    const sususers = sususersResult[0];
+    const subscribers = subscribersResult.length > 0 && subscribersResult[0].userid 
+        ? subscribersResult[0].userid 
+        : [];
     
-    const imglinkResult = await db.select({ fileid: anime.fileid })
-        .from(anime)
-        .where(eq(anime.alid, alid));
+    const animeDetails = await db.select({
+        jpname: anime.jpname,
+        enname: anime.enname,
+    })
+    .from(anime)
+    .where(eq(anime.alid, alid));
     
-    const imglink = imglinkResult[0];
-    
-    const chatid = await db.select({ chatid: users.chatid })
-        .from(users)
-        .where(inArray(users.userid, sususers.userid));
-    
-    const message = fmt`Episode ${next_ep_num} of ${b}${aniname}${b} is airing now.\nDownload links will be available soon.`;
-    for (const o of chatid) {
-        await bot.api.sendPhoto(Number(o.chatid), imglink.fileid, {
-            caption: message.text,
-            caption_entities: message.caption_entities
-        });
+    if (animeDetails.length === 0) {
+        console.error(`Anime ${alid} not found in database`);
+        return;
     }
-    console.log(
-        `CRON: I will check anilist for updates of ${alid} at ${new Date(
-            Date.now() + 20 * 60 * 1000
-        ).toLocaleString()}`
+    
+    const details = animeDetails[0];
+    
+    await animeChecksQueue.add(
+        `check-${alid}-ep${next_ep_num}`,
+        {
+            alid,
+            episode: next_ep_num,
+            jpname: details.jpname,
+            enname: details.enname,
+            subscribers,
+        },
+        {
+            delay,
+            jobId: `check-${alid}-ep${next_ep_num}`,
+        }
     );
-    cron.scheduleJob(
-        `AL_${alid}`,
-        new Date(Date.now() + 20 * 60 * 1000),
-        async function (alid: number) {
-            console.log(`Refreshing cron for ${alid}...`);
-            const res = await checkAnimeTable(alid, true);
-            if (res === "invalid" || res === "err") throw new Error("Can't fetch anime details.");
-            if (res.airing === true) {
-                res.pull.next_ep_air = Math.floor(Date.now() / 1000) + 25;
-                await cronn(
-                    alid,
-                    res.pull.jpname,
-                    res.pull.next_ep_air,
-                    getNumber(res.pull.next_ep_num) as number
-                );
-            }
-        }.bind(null, alid)
-    );
+    
+    console.log(`Anime check job scheduled for ${aniname} Episode ${next_ep_num}`);
 }
 
-async function reInitCron() {
-    console.log("Refreshing all cron!");
-    const data = await db.select({
+async function reInitAnimeChecks() {
+    console.log("Initializing anime check jobs for all airing anime...");
+    
+    const airingAnime = await db.select({
         jpname: anime.jpname,
         next_ep_air: anime.next_ep_air,
         alid: anime.alid,
         next_ep_num: anime.next_ep_num
     })
-        .from(anime)
-        .where(eq(anime.status, "RELEASING"));
+    .from(anime)
+    .where(eq(anime.status, "RELEASING"));
     
-    const oldtasks = cron.scheduledJobs;
-    Object.keys(oldtasks).forEach((i) => {
-        if (!(oldtasks[i].name == "main" || oldtasks[i].triggeredJobs() != 0)) oldtasks[i].cancel();
-    });
-    for (const o of data) {
-        if (o.next_ep_air !== null && o.next_ep_num !== null) {
-            await cronn(o.alid, o.jpname, o.next_ep_air, Number(o.next_ep_num));
+    await animeChecksQueue.obliterate({ force: true });
+    
+    let scheduledCount = 0;
+    for (const animeData of airingAnime) {
+        if (animeData.next_ep_air !== null && animeData.next_ep_num !== null) {
+            await scheduleAnimeCheck(
+                animeData.alid,
+                animeData.jpname,
+                animeData.next_ep_air,
+                Number(animeData.next_ep_num)
+            );
+            scheduledCount++;
         }
     }
+    
+    console.log(`Scheduled ${scheduledCount} anime check jobs`);
 }
 
-export function terminateCron(callback: () => void) {
-    Object.keys(cron.scheduledJobs).forEach(o => {
-        cron.scheduledJobs[o].cancel();
-    });
+export async function terminateAnimeChecks(callback: () => void) {
+    console.log("Terminating anime check jobs...");
+    await animeChecksQueue.obliterate({ force: true });
     callback();
 }
 
-export async function initCron() {
-    await reInitCron();
-    cron.scheduleJob("main", "0 * * * *", () => reInitCron());
+export async function initAnimeChecks() {
+    await reInitAnimeChecks();
+    
+    await animeChecksQueue.add(
+        'periodic-refresh',
+        {
+            alid: 0,
+            episode: 0,
+            jpname: 'REFRESH_JOB',
+            enname: '',
+            subscribers: [],
+        },
+        {
+            repeat: {
+                pattern: '0 * * * *',
+            },
+            jobId: 'periodic-refresh',
+        }
+    );
+    
+    console.log("Anime checks initialized with hourly refresh");
 }
