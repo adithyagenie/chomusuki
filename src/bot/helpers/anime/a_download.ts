@@ -18,27 +18,26 @@ import { b, code, fmt } from "@grammyjs/parse-mode";
 export async function anime_dllist(ctx: MyContext) {
     const userid = ctx.session.userid;
     await ctx.replyWithChatAction("typing");
-    const syncupdResult = await db.select({ anime: syncupd.anime, epnum: syncupd.epnum })
-        .from(syncupd)
-        .where(eq(syncupd.userid, userid));
     
-    const pendingdl = syncupdResult.map((o) => {
-        return { anime: o.anime, epnum: getNumber(o.epnum) as number };
-    });
-    if (pendingdl.length == 0) {
+    const { downloadsQueue } = await import('../../../queues/downloads.queue');
+    const jobs = await downloadsQueue.getJobs(['waiting', 'active', 'delayed']);
+    
+    const userJobs = jobs.filter(job => job.data.userid === userid);
+    
+    if (userJobs.length === 0) {
         await ctx.reply("No pending downloads!");
     } else {
         const resser: { anime: string; epnum: number[] }[] = [];
-        for (let i = 0; i < pendingdl.length; i++) {
-            const index = resser.findIndex((o) => o.anime == pendingdl[i].anime);
-            if (index == -1)
+        for (const job of userJobs) {
+            const index = resser.findIndex((o) => o.anime === job.data.anime);
+            if (index === -1) {
                 resser.push({
-                    anime: pendingdl[i].anime,
-                    epnum: [pendingdl[i].epnum]
+                    anime: job.data.anime,
+                    epnum: [job.data.episode]
                 });
-            else {
-                resser[index].epnum.push(pendingdl[i].epnum);
-                resser[index].epnum.sort();
+            } else {
+                resser[index].epnum.push(job.data.episode);
+                resser[index].epnum.sort((a, b) => a - b);
             }
         }
 
@@ -87,27 +86,17 @@ export async function dlep_cbq(ctx: MyContext) {
     const pull1 = pull1Result[0];
     
     const updateobj = await getSinglePending(userid, null, alid);
-    const syncupdResult = await db.select()
-        .from(syncupd)
-        .where(eq(syncupd.userid, userid));
     
-    const pendingdl: i_DlSync[] = syncupdResult.map((o) => {
-        const i = getNumber(o.epnum) as number;
-        return Object.assign({}, o, { epnum: i });
-    });
-    let flag = false;
-    for (let i = 0; i < pendingdl.length; i++) {
-        if (pendingdl[i].anime == updateobj.jpname && pendingdl[i].epnum == epnum) {
-            flag = true;
-            break;
-        }
-    }
-    if (flag == true) {
+    const { downloadsQueue } = await import('../../../queues/downloads.queue');
+    const existingJob = await downloadsQueue.getJob(`dl-${userid}-${alid}-${epnum}`);
+    
+    if (existingJob) {
         await ctx.reply(
             `Episode ${epnum} of ${updateobj.jpname} already queued for download! Use /dllist to view your pending downloads.`
         );
         return;
     }
+    
     try {
         let query = `"${updateobj.jpname}"|"${updateobj.enname}"`;
         if (pull1.optnames !== null) pull1.optnames.forEach((o) => (query += `|"${o}"`));
@@ -161,7 +150,7 @@ export async function dlep_cbq(ctx: MyContext) {
                 dltype: "xdcc",
                 xdccdata: [xdcclink.botname, xdcclink.packnum.toFixed()]
             };
-            const returncode = await newDL(sync_toupd);
+            const returncode = await newDL(sync_toupd, alid);
             if (returncode === 0) {
                 await ctx.reply(`Episode ${epnum} of ${updateobj.jpname} queued for download!`);
             } else await ctx.reply("Sending DL failed.");
@@ -177,7 +166,7 @@ export async function dlep_cbq(ctx: MyContext) {
                 dltype: "torrent",
                 torrentdata: torrentlink
             };
-            const returncode = await newDL(sync_toupd);
+            const returncode = await newDL(sync_toupd, alid);
             if (returncode === 0) {
                 await ctx.reply(`Episode ${epnum} of ${updateobj.jpname} queued for download!`);
             } else await ctx.reply("Sending DL failed.");
