@@ -6,7 +6,7 @@
   "scripts": {
     "build": "tsc",
     "start": "node ./out/index.js",
-    "dev": "node --watch ./out/index.js"
+    "dev": "tsx watch src/index.ts --env NODE_ENV=development"
   },
   "author": "adithyagenie",
   "license": "ISC",
@@ -17,7 +17,7 @@
     "@grammyjs/ratelimiter": "1.2.1",
     "@grammyjs/storage-redis": "2.5.1",
     "@grammyjs/transformer-throttler": "1.2.1",
-    "@prisma/client": "^7.0.1",
+    "@prisma/client": "^6.18.0",
     "aniep": "0.6.0",
     "anilist-node": "1.14.1",
     "axios": "1.13.2",
@@ -37,7 +37,8 @@
     "@typescript-eslint/eslint-plugin": "8.48.1",
     "@typescript-eslint/parser": "8.48.1",
     "eslint": "9.39.1",
-    "prisma": "^7.0.1",
+    "prisma": "^6.18.0",
+    "tsx": "^4.21.0",
     "typescript": "5.9.3"
   }
 }
