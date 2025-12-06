@@ -115,10 +115,3 @@ const getTag = (entity: MessageEntity, text: string) => {
             return `<u>`;
     }
 };
-
-export function HTMLMessageToMessage(msg: string) {
-    return msg
-        .replace(/<\/?i>/gi, ``)
-        .replace(/<\/?b>/gi, ``)
-        .replace(/<\/?u>/gi, ``);
-}

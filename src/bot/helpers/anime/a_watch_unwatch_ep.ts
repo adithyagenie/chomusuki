@@ -8,6 +8,7 @@ import { getPending, getSinglePending } from "../../../api/pending";
 import { db } from "../../..";
 import { getUpdaterAnimeIndex, makeEpKeyboard, messageToHTMLMessage } from "./a_misc_helpers";
 import aniep from "aniep";
+import { code, fmt, i } from "@grammyjs/parse-mode";
 
 export async function anime_unwatch(ctx: MyContext) {
     await ctx.conversation.enter("unwatchhelper");
@@ -213,17 +214,17 @@ export async function markWatchedRange(conversation: MyConversation, ctx: MyCont
         await ctx.reply(`You have already marked all the episodes of ${aniname} as watched!`);
         return;
     }
+    const replyMessage = fmt`Give the episode range to mark as watched:
+      ${i}Possible ranges: ${consecutiveRanges(data.notwatched).toString()}.
+      Please give it in the form of ${code}start-end${code}${i}`
     await ctx.reply(
-        `Give the episode range to mark as watched:\n<i>Possible ranges: ${consecutiveRanges(
-            data.notwatched
-        ).toString()}.\nPlease give it in the form of <code>start-end</code></i>`
+
     );
     while (true) {
         const range = (await conversation.waitForHears(/^((\d+)|((\d+)-(\d+)))$/)).match;
         if (range[0] == null) {
-            await ctx.reply(
-                "Invalid range specified. Please give it in the form of <code>start-end</code>"
-            );
+          const invalidRangeMsg = fmt`Invalid range specified. Please give it in the form of ${code}start-end${code}`;
+          await ctx.reply(invalidRangeMsg.text, { entities: invalidRangeMsg.entities });
             continue;
         }
         const [start, end] = [parseInt(range[1]), parseInt(range[2])];

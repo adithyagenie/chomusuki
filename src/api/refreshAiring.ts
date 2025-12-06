@@ -2,6 +2,7 @@ import * as cron from "node-schedule";
 import { bot } from "../bot/bot";
 import { checkAnimeTable, getNumber } from "../database/animeDB";
 import { db } from "../index";
+import { b, fmt } from "@grammyjs/parse-mode";
 
 async function cronn(alid: number, aniname: string, next_ep_air: number, next_ep_num: number) {
     console.log(
@@ -45,9 +46,10 @@ async function airhandle(alid: number, aniname: string, next_ep_num: number) {
         select: { chatid: true }
     });
     for (const o of chatid) {
-        await bot.api.sendPhoto(Number(o.chatid), imglink.fileid, {
-            caption: `Episode ${next_ep_num} of <b>${aniname}</b> is airing now.\nDownload links will be available soon.`
-        });
+      const message = fmt`Episode ${next_ep_num} of ${b}${aniname}${b} is airing now.\nDownload links will be available soon.`;
+      await bot.api.sendPhoto(Number(o.chatid), imglink.fileid, {
+        caption: message.caption, caption_entities: message.caption_entities
+      });
     }
     console.log(
         `CRON: I will check anilist for updates of ${alid} at ${new Date(

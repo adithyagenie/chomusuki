@@ -2,8 +2,9 @@ import { InlineKeyboard } from "grammy";
 import { db } from "../../..";
 import { addWatching, checkAnimeTable, getUserWatchingAiring } from "../../../database/animeDB";
 import { MyContext, MyConversation } from "../../bot";
-import { getPagination, HTMLMessageToMessage } from "./a_misc_helpers";
+import { getPagination } from "./a_misc_helpers";
 import { selfyeet } from "../misc_handles";
+import { a, b, fmt, FormattedString } from "@grammyjs/parse-mode";
 
 /**
  ** Sends the first page of the list of anime the user is currently watching.
@@ -11,7 +12,7 @@ import { selfyeet } from "../misc_handles";
  */
 export async function watching_pending_list(ctx: MyContext) {
     const userid = ctx.session.userid;
-    let res: { msg: string; keyboard: InlineKeyboard } = undefined;
+    let res: { msg: FormattedString; keyboard: InlineKeyboard } = undefined;
     if (ctx.match[1] != "pending" && ctx.match[1] != "watching") return;
     res = await watchingListHelper(userid, 1, ctx.me.username, ctx.match[1]);
     if (res == undefined) {
@@ -19,8 +20,8 @@ export async function watching_pending_list(ctx: MyContext) {
         return;
     }
     if (res.keyboard == undefined || res.keyboard.inline_keyboard.length == 0)
-        await ctx.reply(res.msg);
-    else await ctx.reply(res.msg, { reply_markup: res.keyboard });
+        await ctx.reply(res.msg.text, { entities: res.msg.entities });
+    else await ctx.reply(res.msg.text, { entites: res.msg.entities, reply_markup: res.keyboard });
 }
 
 /**
@@ -38,17 +39,17 @@ async function watchingListHelper(
         10,
         offset
     );
-    let msg: string;
+    let msg = new FormattedString("");
     if (amount == 0) {
-        msg = `<b>You are currently not watching any anime. Add some with /startwatching to get started.</b>`;
+        msg = fmt`${b}You are currently not watching any anime. Add some with /startwatching to get started.${b}`;
         return { msg: msg, keyboard: undefined };
-    } else msg = `<b>Displaying your currently watching list: </b>\n\n`;
+    } else msg = fmt`${b}Displaying your currently watching list: ${b}\n\n`;
     for (let i = 0; i < alidlist.length; i++) {
-        msg += `${i + 1}. <b>${animelist[i]}</b>\n`;
+        msg = msg.concat(fmt`${i + 1}. ${b}${animelist[i]}${b}\n`);
         if (list === "watching") {
-            msg += `<i>Remove from watching list: <a href="t.me/${username}?start=stopwatching_${alidlist[i]}">Click here!</a></i>\n\n`;
+            msg = msg.concat(fmt`${i}Remove from watching list: ${a(`t.me/${username}?start=stopwatching_${alidlist[i]}`)}Click here!${a}${i}\n\n`);
         } else if (list === "pending") {
-            msg += `<i>Get episode status: <a href="t.me/${username}?start=pending_${alidlist[i]}">Click here!</a></i>\n\n`;
+            msg = msg.concat(fmt`${i}Get episode status: ${a(`t.me/${username}?start=pending_${alidlist[i]}`)}Click here!${a}${i}\n\n`);
         }
     }
     const keyboard = getPagination(offset, Math.ceil(amount / 10), "watch");
@@ -69,8 +70,8 @@ export async function watchingListCBQ(ctx: MyContext) {
         list
     );
     try {
-        if (ctx.msg.text.trim() !== HTMLMessageToMessage(msg).trim())
-            await ctx.editMessageText(msg, { reply_markup: keyboard });
+        if (ctx.msg.text.trim() !== msg.text.trim())
+            await ctx.editMessageText(msg.text, { entities: msg.entities, reply_markup: keyboard });
     } catch (e) {
         console.log(e);
     }
@@ -99,16 +100,15 @@ export async function animeStartWatch(ctx: MyContext, menu = false) {
             })
         ).alid;
         if (old.includes(alid)) {
-            await ctx.reply(
-                `You have already marked <b>${
-                    (
-                        await db.anime.findUnique({
-                            where: { alid },
-                            select: { jpname: true }
-                        })
-                    ).jpname
-                }</b> as watching.`
-            );
+          const replyString = fmt`You have already marked ${b}${
+              (
+                  await db.anime.findUnique({
+                      where: { alid },
+                      select: { jpname: true }
+                  })
+              ).jpname
+          }${b} as watching.`
+          await ctx.reply(replyString.text, { entities: replyString.entities });
             return;
         }
     }
@@ -125,12 +125,12 @@ export async function animeStartWatch(ctx: MyContext, menu = false) {
     if (menu)
         selfyeet(ctx.chat?.id, (await ctx.reply(`Marked ${res.pull.jpname} as watching!`)).message_id, 5000);
     else await ctx.reply(`Marked ${res.pull.jpname} as watching!`);
-    if (res.airing)
-        await ctx.reply(
-            `${res.pull.jpname} is currently airing.` +
-            `If you would like to follow its episode releases: ` +
-            `<a href="t.me/${ctx.me.username}?start=remindme_${res.pull.alid}">Click here!</a>`
-        );
+    if (res.airing) {
+      const airingReplyMsg = fmt`${res.pull.jpname} is currently airing.
+        If you would like to follow its episode releases:
+        ${a(`t.me/${ctx.me.username}?start=remindme_${res.pull.alid}`)}Click here!${a}`;
+        await ctx.reply(airingReplyMsg.text, { entities: airingReplyMsg.entities });
+    }
 }
 
 /**

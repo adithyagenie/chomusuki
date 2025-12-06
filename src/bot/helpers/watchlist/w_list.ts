@@ -3,6 +3,7 @@ import { MyContext } from "../../bot";
 import { db } from "../../../index";
 import { getWlAlid, getWLName } from "./w_helpers";
 import { getWatchlistAnime } from "../../../database/animeDB";
+import { a, b, code, fmt, i } from "@grammyjs/parse-mode";
 
 /**
  * - The main menu builder for /mywatchlists command.
@@ -33,11 +34,9 @@ export function WLMainMenu() {
             if (i === wllist.length - 1 && wllist.length % 2 !== 0) {
                 range
                     .submenu(wllist.slice(-1)[0].watchlist_name, `wl_opts`, async (ctx1) => {
-                        await ctx1.editMessageText(
-                            `Watchlist <code>${
-                                wllist.slice(-1)[0].watchlist_name
-                            }</code> chosen.\nWhat do you want to do with it?`
-                        );
+                      const chosenWLReplyMsg = fmt`Watchlist ${code}${wllist.slice(-1)[0].watchlist_name
+                        }${code} chosen.\nWhat do you want to do with it?`;
+                      await ctx1.editMessageText(chosenWLReplyMsg.text, { entities: chosenWLReplyMsg.entities });
                         ctx1.session.menudata.wlid = wllist.slice(-1)[0].watchlistid;
                     })
                     .row();
@@ -45,15 +44,13 @@ export function WLMainMenu() {
             }
             range
                 .submenu(wllist[i].watchlist_name, `wl_opts`, async (ctx1) => {
-                    await ctx1.editMessageText(
-                        `Watchlist <code>${wllist[i].watchlist_name}</code> chosen.\nWhat do you want to do with it?`
-                    );
+                  const chosenWLReplyMsg = fmt`Watchlist ${code}${wllist[i].watchlist_name}${code} chosen.\nWhat do you want to do with it?`;
+                  await ctx1.editMessageText(chosenWLReplyMsg.text, { entities: chosenWLReplyMsg.entities });
                     ctx1.session.menudata.wlid = wllist[i].watchlistid;
                 })
                 .submenu(wllist[i + 1].watchlist_name, `wl_opts`, async (ctx1) => {
-                    await ctx1.editMessageText(
-                        `Watchlist <code>${wllist[i].watchlist_name}</code> chosen.\nWhat do you want to do with it?`
-                    );
+                  const chosenWLReplyMsg = fmt`Watchlist ${code}${wllist[i].watchlist_name}${code} chosen.\nWhat do you want to do with it?`;
+                  await ctx1.editMessageText(chosenWLReplyMsg.text, { entities: chosenWLReplyMsg.entities });
                     ctx1.session.menudata.wlid = wllist[i + 1].watchlistid;
                 })
                 .row();
@@ -100,14 +97,15 @@ export function animeList() {
             for (const item of wl) {
                 range.submenu(item.jpname, "wl_alopts", async (ctx1) => {
                     ctx1.session.menudata.alid = item.alid;
-                    await ctx1.editMessageText(`Chosen watchlist: <b>${wlname}</b>\n\n` +
-                        `Chosen anime: \n<b>${item.jpname}</b>\n<i>(${item.enname})</i>\n\n` +
-                        `What do you wanna do with it?` +
-                        `<a href = "${(await db.anime.findUniqueOrThrow({
-                            where: { alid: item.alid },
-                            select: { imglink: true }
-                        })).imglink}">​</a>`
-                    );
+                  const editMessage = fmt`Chosen watchlist: ${b}${wlname}${b}\n
+                    Chosen anime: \n${b}${item.jpname}${b}\n${i}(${item.enname})${i}\n
+                    What do you wanna do with it?
+                    ${a(`${(await db.anime.findUniqueOrThrow({
+                      where: { alid: item.alid },
+                      select: { imglink: true }
+                    })).imglink}`)}​${a}`;
+
+                    await ctx1.editMessageText(editMessage.text, { entities: editMessage.entities });
                 }).row();
             }
             if (maxpg !== 1) {
@@ -128,7 +126,8 @@ export function animeList() {
             }
         }
         range.back("Go back", async (ctx1) => {
-            await ctx1.editMessageText(`Watchlist <code>${wlname}</code> chosen.\nWhat do you want to do with it?`);
+          const chosenWLReplyMsg = fmt`Watchlist ${code}${wlname}${code} chosen.\nWhat do you want to do with it?`;
+            await ctx1.editMessageText(chosenWLReplyMsg.text, { entities: chosenWLReplyMsg.entities });
             ctx1.session.menudata.l_page = undefined;
             ctx1.session.menudata.maxpg = undefined;
             ctx1.session.menudata.alid = undefined;
