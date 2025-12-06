@@ -1,5 +1,6 @@
 // Adding anime to subscriptions
 
+import { a, b, fmt } from "@grammyjs/parse-mode";
 import { db } from "../../..";
 import { searchAnime } from "../../../api/anilist_api";
 import { MyContext } from "../../bot";
@@ -76,9 +77,10 @@ export async function animeSearchStart(ctx: MyContext, command: "startwatching" 
         return;
     }
     if (keyboard.inline_keyboard.length == 0)
-        await ctx.api.editMessageText(ctx.from.id, msgid, msg);
-    await ctx.api.editMessageText(ctx.from.id, msgid, msg, {
-        reply_markup: keyboard
+        await ctx.api.editMessageText(ctx.from.id, msgid, msg.text, { entities: msg.entities });
+    await ctx.api.editMessageText(ctx.from.id, msgid, msg.text, {
+        reply_markup: keyboard,
+        entities: msg.entities
     });
     return;
 }
@@ -150,22 +152,22 @@ export async function animeSearchHandler(
 
     if (command == "addwl") command += `_${watchlistid}`;
     const keyboard = getPagination(currentpg, maxpg, command);
-    let msg = `<b>Search results for '${query}</b>'\n\n`;
+    let msg = fmt`${b}Search results for '${query}${b}'\n\n`;
     const dbidlist = await getStatusFromDB(command, userid, watchlistid);
     for (let i = 0; i < page.media.length; i++) {
-        msg += `<b>${page.media[i].title.romaji}</b>\n${
+        msg = msg.concat(fmt`${b}${page.media[i].title.romaji}${b}\n${
             (page.media[i].title.english === null ? page.media[i].title.userPreferred : page.media[i].title.english)
-        }\n`;
-        if (command == "startwatching" && userid !== undefined) {
-            // let old = await db.watchinganime.findUnique({
-            // 	where: { userid }
-            // });
-            // if (old.alid === undefined) old.alid = [];
-            if (dbidlist.includes(page.media[i].id))
-                msg += `<i>(Anime already marked as watching!)</i>\n\n`;
-            //else msg += `<i>Start Watching:</i> /startwatching_${pages.media[i].id}\n\n`;
-            else
-                msg += `<i>Start Watching: <a href="t.me/${username}?start=startwatching_${page.media[i].id}">Click here!</a></i>\n\n`;
+        }\n`);
+      if (command == "startwatching" && userid !== undefined) {
+        // let old = await db.watchinganime.findUnique({
+        // 	where: { userid }
+        // });
+        // if (old.alid === undefined) old.alid = [];
+        if (dbidlist.includes(page.media[i].id))
+          msg = msg.concat(fmt`${i}(Anime already marked as watching!)${i}\n\n`);
+        //else msg += `<i>Start Watching:</i> /startwatching_${pages.media[i].id}\n\n`;
+        else
+          msg = msg.concat(fmt`${i}Start Watching: ${a(`t.me/${username}?start=startwatching_${page.media[i].id}`)}Click here!${a}${i}\n\n`);
         } else if (command == "remindme" && userid !== undefined) {
             // let old: number[] = [];
             // let _ = await db.airingupdates.findMany({
@@ -175,10 +177,10 @@ export async function animeSearchHandler(
             //if (_ === null) old = [];
             //else old = _.map((o) => o.alid);
             if (dbidlist.includes(page.media[i].id))
-                msg += `<i>(Already sending airing updates for anime!)</i>\n\n`;
+                msg = msg.concat(fmt`${i}(Already sending airing updates for anime!)${i}\n\n`);
             //else msg += `<i>Send Airing Updates:</i> /remindme_${pages.media[i].id}\n\n`;
             else
-                msg += `<i>Send Airing Updates: <a href="t.me/${username}?start=remindme_${page.media[i].id}">Click here!</a></i>\n\n`;
+                msg = msg.concat(fmt`${i}Send Airing Updates: ${a(`t.me/${username}?start=remindme_${page.media[i].id}`)}Click here!${a}${i}\n\n`);
         } else if (command.startsWith("addwl") && watchlistid !== undefined) {
             // let old: number[] = [];
             // let _ = await db.watchlists.findUnique({
@@ -187,10 +189,10 @@ export async function animeSearchHandler(
             // });
             // old = _ === null ? [] : _.alid;
             if (dbidlist.includes(page.media[i].id))
-                msg += `<i>(Already present in watchlist!)</i>\n\n`;
+                msg = msg.concat(fmt`${i}(Already present in watchlist!)${i}\n\n`);
             else
-                msg += `<i>Add to watchlist: <a href = "t.me/${username}?start=wl_${page.media[i].id}">Click here!</a></i>\n\n`;
-        } else msg += "\n";
+                msg = msg.concat(fmt`${i}Add to watchlist: ${a(`t.me/${username}?start=wl_${page.media[i].id}`)}Click here!${a}${i}\n\n`);
+        } else msg = msg.concat(fmt`\n`);
     }
     return { msg, keyboard };
 }
@@ -219,5 +221,5 @@ export async function search_startWatch_remindMe_cb(ctx: MyContext) {
         return;
     }
     //console.log(`${msg}, ${JSON.stringify(keyboard)}`);
-    await ctx.editMessageText(msg, { reply_markup: keyboard });
+    await ctx.editMessageText(msg.text, { entities: msg.entities, reply_markup: keyboard });
 }

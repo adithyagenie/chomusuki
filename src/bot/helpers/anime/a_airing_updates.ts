@@ -1,7 +1,8 @@
+import { a, b, fmt, FormattedString, i } from "@grammyjs/parse-mode";
 import { db } from "../../..";
 import { addAiringFollow, checkAnimeTable, getUserWatchingAiring } from "../../../database/animeDB";
 import { MyContext } from "../../bot";
-import { getPagination, HTMLMessageToMessage } from "./a_misc_helpers";
+import { getPagination } from "./a_misc_helpers";
 
 /**
  ** Live updates for airing shit.
@@ -31,17 +32,19 @@ export async function remindMe(ctx: MyContext) {
         return;
     }
     const res = await addAiringFollow(alid, userid);
-    if (res == 0)
+    if (res == 0) {
+      const replyMessage = fmt`You will now recieve updates on ${b}${
+          (
+              await db.anime.findUnique({
+                  where: { alid },
+                  select: { jpname: true }
+              })
+          ).jpname
+      }.${b}`
         await ctx.reply(
-            `You will now recieve updates on <b>${
-                (
-                    await db.anime.findUnique({
-                        where: { alid },
-                        select: { jpname: true }
-                    })
-                ).jpname
-            }.</b>`
+          replyMessage.text, { entities: replyMessage.entities }
         );
+    }
     else await ctx.reply("Error encountered ;_;");
     return;
 }
@@ -54,8 +57,8 @@ export async function airingUpdatesList(ctx: MyContext) {
     const userid = ctx.session.userid;
     const { msg, keyboard } = await airingUpdatesListHelper(userid, 1, ctx.me.username);
     if (keyboard == undefined || keyboard.inline_keyboard[0].length == 1)
-        await ctx.reply(msg);
-    else await ctx.reply(msg, { reply_markup: keyboard });
+        await ctx.reply(msg.text, { entities: msg.entities });
+    else await ctx.reply(msg.text, { entities: msg.entities, reply_markup: keyboard });
 }
 
 /**
@@ -68,17 +71,15 @@ export async function airingUpdatesListHelper(userid: number, offset: number, us
         5,
         offset
     );
-    let msg: string;
+    let msg: FormattedString;
     if (amount == 0) {
-        msg = `<b>You have not subscribed to airing updates for any anime. </b>`;
+        msg = fmt`${b}You have not subscribed to airing updates for any anime.${b}`;
         return { msg: msg, keyboard: undefined };
-    } else msg = `<b>Displaying your anime subscriptions: </b>\n\n`;
-    for (let i = 0; i < alidlist.length; i++) {
-        msg += `${i + 1}. ${
-            animelist[i]
-        }\n<i>Stop reminding me: <a href="t.me/${username}?start=stopremindme_${
-            alidlist[i]
-        }">Click here!</a></i>\n\n`;
+    } else msg = fmt`${b}Displaying your anime subscriptions: ${b}\n\n`;
+    for (let idx = 0; idx < alidlist.length; idx++) {
+      let startUrl = `t.me/${username}?start=stopremindme_${alidlist[idx]}`;
+        msg = fmt`${msg}${idx + 1}. ${animelist[idx]}\n
+          ${i}Stop reminding me: ${a(startUrl)}Click here!${a}${i}\n\n`;
     }
     const keyboard = getPagination(offset, Math.ceil(amount / 5), "airingupd");
     return { msg, keyboard };
@@ -95,8 +96,8 @@ export async function airingUpdatesListCBQ(ctx: MyContext) {
         ctx.me.username
     );
     try {
-        if (ctx.msg.text.trim() !== HTMLMessageToMessage(msg).trim())
-            await ctx.editMessageText(msg, { reply_markup: keyboard });
+        if (ctx.msg.text.trim() !== msg.text.trim())
+            await ctx.editMessageText(msg.text, { entities: msg.entities, reply_markup: keyboard });
     } catch (e) {
         console.log(e);
     }
@@ -124,7 +125,8 @@ export async function stopAiringUpdates(ctx: MyContext) {
     let i = -1;
     if (userau !== null) i = userau.map((o) => o.alid).indexOf(remove);
     if (i === -1) {
-        await ctx.reply(`You are already not recieving the updates for <b>${name}</b>.`);
+        const replyMessage = fmt`You are already not recieving the updates for ${b}${name}${b}.`
+        await ctx.reply(replyMessage.text, { entities: replyMessage.entities });
         return;
     }
     userau[i].userid.splice(userau[i].userid.indexOf(ctx.session.userid), 1);
@@ -132,6 +134,7 @@ export async function stopAiringUpdates(ctx: MyContext) {
         where: { alid: remove },
         data: userau[i]
     });
-    await ctx.reply(`You will no longer recieve updates for <b>${name}</b>.`);
+  const replyMessage = fmt`You will no longer recieve updates for ${b}${name}${b}.`;
+    await ctx.reply(replyMessage.text, { entities: replyMessage.entities });
     return;
 }

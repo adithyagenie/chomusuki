@@ -1,3 +1,4 @@
+import { b, code, fmt } from "@grammyjs/parse-mode";
 import { db } from "../../index";
 import { MyContext, MyConversation } from "../bot";
 import { NextFunction } from "grammy";
@@ -15,8 +16,9 @@ export async function newUser(conversation: MyConversation, ctx: MyContext) {
         reply_markup: { force_reply: true }
     });
     const username = (await conversation.waitForReplyTo(msgid.message_id)).message?.text;
-    const msgid2 = (
-        await ctx.reply(`Your username will be set as <code>${username}</code>!`)
+  const usernameSetReplyMsg = fmt`Your username will be set as ${code}${username}${code}!`;
+  const msgid2 = (
+      await ctx.reply(usernameSetReplyMsg.text, { entities: usernameSetReplyMsg.entities })
     ).message_id;
     const res = await conversation.external(() =>
         db.users.create({
@@ -34,10 +36,12 @@ export async function newUser(conversation: MyConversation, ctx: MyContext) {
             data: { userid: res.userid, completed: [] }
         });
     });
+  const userCreatedReplyMsg = fmt`Your username has been set as ${code}${username}${code}!\n\nUser created!`;
     await ctx.api.editMessageText(
         ctx.from.id,
         msgid2,
-        `Your username has been set as <code>${username}</code>!\n\nUser created!`
+        userCreatedReplyMsg.text,
+        { entities: userCreatedReplyMsg.entities }
     );
     conversation.session.userid = res.userid;
     return;
@@ -62,11 +66,10 @@ export async function userMiddleware(ctx: MyContext, next: NextFunction) {
 }
 
 export async function deleteUser(conversation: MyConversation, ctx: MyContext) {
-    await ctx.reply(
-        `Deleting your account will remove all your data from this data. <b>This cannot be reversed.</b>\n
-If you are absolutely sure you want to delete - Please type in <code>Yes, I'm sure.</code>\n
-or cancel by typing <code>cancel</code>.`
-    );
+  const replyString = fmt`Deleting your account will remove all your data from this data. ${b}This cannot be reversed.${b}\n
+If you are absolutely sure you want to delete - Please type in ${code}Yes, I'm sure.${code}\n
+or cancel by typing ${code}cancel${code}.`
+  await ctx.reply(replyString.text, { entities: replyString.entities });
     while (1) {
         const msg = await conversation.waitFrom(ctx.from.id);
         if (msg.message?.text === "cancel") {
@@ -80,9 +83,8 @@ or cancel by typing <code>cancel</code>.`
                     }
                 })
             );
-            await ctx.reply(
-                `Account has been deleted! <code>${res.username}</code> is now dead...\n(っ˘̩╭╮˘̩)っ`
-            );
+          const deleteReplyMsg = fmt`Account has been deleted! ${code}${res.username}${code} is now dead...\n(っ˘̩╭╮˘̩)っ`;
+          await ctx.reply(deleteReplyMsg.text, { entities: deleteReplyMsg.entities });
             conversation.session = undefined;
             return;
         }

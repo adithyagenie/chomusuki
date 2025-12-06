@@ -20,6 +20,7 @@ import { getWlAlid, getWLName } from "./w_helpers";
 import { animeList, WLMainMenu } from "./w_list";
 import { deleteWL } from "./w_wlmgmt";
 import { animeStartWatch } from "../anime/a_watching";
+import { a, b, code, fmt, i } from "@grammyjs/parse-mode";
 
 
 /**
@@ -37,13 +38,15 @@ function WLOptsMenu() {
         .submenu("List all anime", "wl_allist", async (ctx1) => {
             ctx1.session.menudata.listmethod = "all";
             ctx1.session.menudata.l_page = 1;
-            await ctx1.editMessageText(`Displaying all anime from watchlist: <b>${await getWLName(ctx1)}</b>`);
+            const listAllAnimeReply = fmt`Displaying all anime from watchlist: ${b}${await getWLName(ctx1)}${b}`
+            await ctx1.editMessageText(listAllAnimeReply.text, { entities: listAllAnimeReply.entities });
         })
 
         .submenu("List to-watch anime", "wl_allist", async (ctx1) => {
             ctx1.session.menudata.listmethod = "towatch";
             ctx1.session.menudata.l_page = 1;
-            await ctx1.editMessageText(`Displaying to-watch anime from watchlist: <b>${await getWLName(ctx1)}</b>`);
+          const listToWatchAnimeReply = fmt`Displaying to-watch anime from watchlist: ${b}${await getWLName(ctx1)}${b}`;
+          await ctx1.editMessageText(listToWatchAnimeReply.text, { entities: listToWatchAnimeReply.entities } );
         })
         .row()
 
@@ -58,8 +61,10 @@ function WLOptsMenu() {
                 }[]>`SELECT array_length(alid, 1) as len FROM watchlists WHERE watchlistid = ${ctx1.session.menudata.wlid}`)[0].len);
                 if (itemlen === 0)
                     await ctx1.editMessageText(`Your watchlist is empty. Do you want to delete it?`);
-                else
-                    await ctx1.editMessageText(`You have ${itemlen} items in your watchlist <code>${await getWLName(ctx1)}</code>.\nDeleting will remove all the items as well.\n\nProceed?`);
+                else {
+                  const deleteConfirmMsg = fmt`You have ${itemlen} items in your watchlist ${code}${await getWLName(ctx1)}${code}.\nDeleting will remove all the items as well.\n\nProceed?`;
+                    await ctx1.editMessageText(deleteConfirmMsg.text, { entities: deleteConfirmMsg.entities } );
+                }
             }
         )
         .row()
@@ -92,15 +97,14 @@ function stopWatching() {
                 select: { jpname: true, enname: true }
             });
             ctx.menu.back();
-            await ctx.editMessageText(
-                `Chosen watchlist: <b>${await getWLName(ctx)}</b>\n\n` +
-                `Chosen anime: \n<b>${item.jpname}</b>\n<i>(${item.enname})</i>\n\n` +
-                `What do you wanna do with it?` +
-                `<a href = "${(await db.anime.findUniqueOrThrow({
-                    where: { alid },
-                    select: { imglink: true }
-                })).imglink}">​</a>`
-            );
+          const yesChoiceEditMessage = fmt`Chosen watchlist: ${b}${await getWLName(ctx)}${b}\n
+            Chosen anime: \n${b}${item.jpname}${b}\n${i}(${item.enname})${i}\n
+            What do you wanna do with it? ${a(`${(await db.anime.findUniqueOrThrow({
+            where: { alid },
+            select: { imglink: true }
+          })).imglink
+            }`)}​${a}`;
+          await ctx.editMessageText(yesChoiceEditMessage.text, { entities: yesChoiceEditMessage.entities });
         })
         .back("No.", async (ctx) => {
             const alid = ctx.session.menudata.alid;
@@ -108,15 +112,14 @@ function stopWatching() {
                 where: { alid },
                 select: { jpname: true, enname: true }
             });
-            await ctx.editMessageText(
-                `Chosen watchlist: <b>${await getWLName(ctx)}</b>\n\n` +
-                `Chosen anime: \n<b>${item.jpname}</b>\n<i>(${item.enname})</i>\n\n` +
-                `What do you wanna do with it?` +
-                `<a href = "${(await db.anime.findUniqueOrThrow({
-                    where: { alid },
-                    select: { imglink: true }
-                })).imglink}">​</a>`
-            );
+            const noChoiceEditMessage = fmt`Chosen watchlist: ${b}${await getWLName(ctx)}${b}n
+              Chosen anime: \n${b}${item.jpname}${b}\n${i}(${item.enname})${i}\n
+              What do you wanna do with it? ${a(`${(await db.anime.findUniqueOrThrow({
+              where: { alid },
+              select: { imglink: true }
+            })).imglink
+              }`)}​${a}`;
+            await ctx.editMessageText(noChoiceEditMessage.text, { entities: noChoiceEditMessage.entities });
         });
 }
 
@@ -208,8 +211,8 @@ function animeListOpts() {
                     return;
                 } else {
                     ctx1.menu.back();
-                    await ctx1.editMessageText(
-                        `Displaying anime from watchlist: <b>${await getWLName(ctx1)}</b>`);
+                    const removeEditMessage = fmt`Displaying anime from watchlist: ${b}${await getWLName(ctx1)}${b}`
+                    await ctx1.editMessageText(removeEditMessage.text, { entities: removeEditMessage.entities });
                     const yeet = await ctx1.reply(`${name} removed from watchlist.`);
                     selfyeet(ctx1.chat.id, yeet.message_id, 10000);
                     ctx1.session.menudata.l_page = 1;
@@ -218,8 +221,8 @@ function animeListOpts() {
             });
             range.back("Go back", async (ctx1) => {
                 ctx1.session.menudata.alid = undefined;
-                await ctx1.editMessageText(
-                    `Displaying anime from watchlist: <b>${await getWLName(ctx1)}</b>`);
+                const backEditMessage = fmt`Displaying anime from watchlist: ${b}${await getWLName(ctx1)}${b}`
+              await ctx1.editMessageText(backEditMessage.text, { entities: backEditMessage.entities });
             });
             return range;
         });
@@ -245,5 +248,3 @@ export function initWLMenu() {
         }
     );
 }
-
-

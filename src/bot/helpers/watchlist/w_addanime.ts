@@ -4,6 +4,7 @@ import { MyContext, MyConversation } from "../../bot";
 import { animeSearchHandler } from "../anime/a_search";
 import { getWLName } from "./w_helpers";
 import { selfyeet } from "../misc_handles";
+import { b, fmt } from "@grammyjs/parse-mode";
 
 
 /**
@@ -54,9 +55,8 @@ export async function addWL(convo: MyConversation, ctx: MyContext) {
                 } else if (result === "invalid") {
                     await ctx.reply("Anime not found.");
                 } else {
-                    const todel = await ctx.reply(
-                        `<b>${result}</b> has been added to ${wlname}.\nTo add another, simply send the anime name to search or /done to finish adding.`
-                    );
+                  const replyString = fmt`${b}${result}${b} has been added to ${wlname}.\nTo add another, simply send the anime name to search or /done to finish adding.`
+                    const todel = await ctx.reply(replyString.text, { entities: replyString.entities });
                     selfyeet(ctx.chat?.id, todel.message_id, 5000);
                 }
             } else {
@@ -98,7 +98,7 @@ async function searchCB(convo: MyConversation, ctx: MyContext) {
         return;
     }
     //console.log(`${msg}, ${JSON.stringify(keyboard)}`);
-    await ctx.editMessageText(msg, { reply_markup: keyboard });
+    await ctx.editMessageText(msg, { reply_markup: keyboard, entities: msg.entities });
 }
 
 async function startSearchWL(
@@ -120,9 +120,10 @@ async function startSearchWL(
         return;
     }
     if (keyboard.inline_keyboard.length == 0)
-        await ctx.api.editMessageText(ctx.from.id, msgid, msg);
-    await ctx.api.editMessageText(ctx.from.id, msgid, msg, {
-        reply_markup: keyboard
+        await ctx.api.editMessageText(ctx.from.id, msgid, msg.text, { entities: msg.entities });
+    await ctx.api.editMessageText(ctx.from.id, msgid, msg.text, {
+        reply_markup: keyboard,
+        entities: msg.entities
     });
     return msgid;
 }

@@ -7,6 +7,7 @@ import { getxdcc } from "../../../api/subsplease-xdcc";
 import { i_DlSync, i_NyaaResponse } from "../../../interfaces";
 import { makeEpKeyboard } from "./a_misc_helpers";
 import axios, { AxiosResponse } from "axios";
+import { b, code, fmt, FormattedString } from "@grammyjs/parse-mode";
 
 /**
  ** Gives all the downloads queued for the user.
@@ -40,20 +41,20 @@ export async function anime_dllist(ctx: MyContext) {
             }
         }
 
-        let msg = "<code>DOWNLOAD QUEUE:</code>\n\n";
-        const msglist: string[] = [];
+        let msg = fmt`${code}DOWNLOAD QUEUE:${code}\n\n`;
+        const msglist: FormattedString[] = [];
         for (let i = 0; i < resser.length; i++) {
-            const tmpmsg = `<b>${resser[i].anime}</b> - Episode ${resser[i].epnum.join(", ")}\n`;
-            if (msg.length + tmpmsg.length > 1024) {
+            const tmpmsg = fmt`${b}${resser[i].anime}${b} - Episode ${resser[i].epnum.join(", ")}\n`;
+            if (msg.text.length + tmpmsg.text.length > 1024) {
                 msglist.push(msg);
                 msg = tmpmsg;
-            } else msg += tmpmsg;
+            } else msg = fmt`${msg}${tmpmsg}`;
         }
         if (msglist.length > 0) {
             for (let i = 0; i < msglist.length; i++)
-                await bot.api.sendMessage(ctx.from.id, msglist[i]);
+                await bot.api.sendMessage(ctx.from.id, msglist[i].text, { entities: msglist[i].entities });
         } else
-            await bot.api.sendMessage(ctx.from.id, msg);
+            await bot.api.sendMessage(ctx.from.id, msg.text, { entities: msg.entities });
     }
 }
 

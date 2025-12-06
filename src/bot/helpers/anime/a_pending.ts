@@ -3,6 +3,7 @@ import axios from "axios";
 import { getSinglePending } from "../../../api/pending";
 import { bot, MyContext } from "../../bot";
 import { FastifyInstance } from "fastify";
+import { b, fmt, FormattedString, i } from "@grammyjs/parse-mode";
 
 
 export async function a_Pending(ctx: MyContext) {
@@ -39,38 +40,39 @@ async function animePendingBotHandle(chatid: number, userid: number, alid: numbe
         );
         return;
     }
-    let [msg, msgheader] = ["", ""];
-    msgheader += `<b>Anime: ${res.jpname}</b>\n<i>(${res.enname})\n`;
-    if (res.status == "RELEASING") msgheader += "Currently airing.</i>\n\n";
-    else if (res.status == "FINISHED") msgheader += "Finished airing.</i>\n\n";
-    else msgheader += "</i>\n\n";
-    msgheader += `<b>Pending:</b>\n`;
+    let [msg, msgheader] = [new FormattedString(""), new FormattedString("")];
+    msgheader = fmt`${b}Anime: ${res.jpname}${b}\n${i}(${res.enname})${i}\n`;
+    if (res.status == "RELEASING") msgheader = msgheader.concat(fmt`${i}Currently airing.${i}\n\n`);
+    else if (res.status == "FINISHED") msgheader = msgheader.concat(fmt`${i}Finished airing.${i}\n\n`);
+    msgheader = msgheader.concat(fmt`${b}Pending:${b}\n`);
     for (let j = 0; j < res.notwatched.length; j++) {
-        if (j < 30) msg += `🔹${res.jpname} - ${res.notwatched[j]}\n`;
+        if (j < 30) msg = msg.concat(fmt`🔹${res.jpname} - ${res.notwatched[j]}\n`);
         else {
-            msg += "<i>And many more...</i>";
+          msg = msg.concat(fmt`${i}And many more...${i}`);
             break;
         }
     }
-    if ((msg + msgheader).length > 1024 && res.shortname !== undefined) {
-        while (msg.includes(res.jpname)) msg = msg.replace(res.jpname, res.shortname);
+    if (msgheader.text.length + msg.text.length > 1024 && res.shortname !== undefined) {
+      msg = msg.replaceAll(fmt`${res.jpname}`, fmt`${res.shortname}`); // Please double check this logic later
     }
 
     //Better logic
-    if ((msg + msgheader).length > 1024) {
+    if (msgheader.text.length + msg.text.length > 1024) {
         console.log("Trying to trim");
-        const lines = msg.split("\n");
-        msg = lines[0] + "\n";
+        const lines = msg.split(fmt`\n`); // Please double check this logic later
+        msg = lines[0].concat(fmt`\n`);
         for (let j = 1; j < lines.length; j++) {
-            if ((msgheader + msg + lines[j]).length + 17 < 1024) msg += `${lines[j]}\n`;
+            if (msgheader.text.length + msg.text.length + lines[j].text.length + 17 < 1024) msg.concat(fmt`${lines[j]}\n`); // WTF is this 17
             else {
-                msg += "<i>And many more...</i>";
+              msg.concat(fmt`${i}And many more...${i}`);
                 break;
             }
         }
     }
+    const finalMsg = FormattedString.join([msgheader, msg]);
     await bot.api.sendPhoto(chatid, res.image, {
-        caption: msgheader + msg,
+        caption: finalMsg.text,
+        caption_entities: finalMsg.caption_entities,
         reply_markup: new InlineKeyboard()
             .text("Mark watched", "mark_watch")
             .text("Download", "download")
