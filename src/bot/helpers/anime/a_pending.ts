@@ -1,83 +1,95 @@
-import { InlineKeyboard } from "grammy";
-import axios from "axios";
-import { getSinglePending } from "../../../api/pending";
-import { bot, MyContext } from "../../bot";
-import { FastifyInstance } from "fastify";
-import { b, fmt, FormattedString, i } from "@grammyjs/parse-mode";
-
+import { InlineKeyboard } from 'grammy';
+import axios from 'axios';
+import { getSinglePending } from '../../../api/pending';
+import { bot, MyContext } from '../../bot';
+import { FastifyInstance } from 'fastify';
+import { b, fmt, FormattedString, i } from '@grammyjs/parse-mode';
 
 export async function a_Pending(ctx: MyContext) {
-    await ctx.deleteMessage();
-    const userid = ctx.session.userid;
-    try {
-        const res = await axios.get("http://localhost:4000/pending", {
-            params: {
-                chatid: ctx.from.id,
-                userid: userid,
-                alid: parseInt(ctx.match[1]),
-                is_bot: true
-            }
-        });
-        if (res.status == 200) {
-            return;
-        }
-        await ctx.reply("Failed.");
-    } catch (err) {
-        console.error(`Error calling /pending: ${err}`);
+  await ctx.deleteMessage();
+  const userid = ctx.session.userid;
+  try {
+    const res = await axios.get('http://localhost:4000/pending', {
+      params: {
+        chatid: ctx.from.id,
+        userid: userid,
+        alid: parseInt(ctx.match[1]),
+        is_bot: true,
+      },
+    });
+    if (res.status == 200) {
+      return;
     }
+    await ctx.reply('Failed.');
+  } catch (err) {
+    console.error(`Error calling /pending: ${err}`);
+  }
 }
 
 /**Replies to /pending. Responds to localhost call. */
-async function animePendingBotHandle(chatid: number, userid: number, alid: number) {
-    await bot.api.sendChatAction(chatid, "typing");
-    const res = await getSinglePending(userid, null, alid);
-    if (res === undefined) return undefined;
-    else if (res === null) return null;
-    if (res.notwatched.length === 0) {
-        await bot.api.sendMessage(
-            chatid,
-            "You are already up to date with all episodes of this anime!"
-        );
-        return;
+async function animePendingBotHandle(
+  chatid: number,
+  userid: number,
+  alid: number,
+) {
+  await bot.api.sendChatAction(chatid, 'typing');
+  const res = await getSinglePending(userid, null, alid);
+  if (res === undefined) return undefined;
+  else if (res === null) return null;
+  if (res.notwatched.length === 0) {
+    await bot.api.sendMessage(
+      chatid,
+      'You are already up to date with all episodes of this anime!',
+    );
+    return;
+  }
+  let [msg, msgheader] = [new FormattedString(''), new FormattedString('')];
+  msgheader = fmt`${b}Anime: ${res.jpname}${b}\n${i}(${res.enname})${i}\n`;
+  if (res.status == 'RELEASING')
+    msgheader = msgheader.concat(fmt`${i}Currently airing.${i}\n\n`);
+  else if (res.status == 'FINISHED')
+    msgheader = msgheader.concat(fmt`${i}Finished airing.${i}\n\n`);
+  msgheader = msgheader.concat(fmt`${b}Pending:${b}\n`);
+  for (let j = 0; j < res.notwatched.length; j++) {
+    if (j < 30) msg = msg.concat(fmt`🔹${res.jpname} - ${res.notwatched[j]}\n`);
+    else {
+      msg = msg.concat(fmt`${i}And many more...${i}`);
+      break;
     }
-    let [msg, msgheader] = [new FormattedString(""), new FormattedString("")];
-    msgheader = fmt`${b}Anime: ${res.jpname}${b}\n${i}(${res.enname})${i}\n`;
-    if (res.status == "RELEASING") msgheader = msgheader.concat(fmt`${i}Currently airing.${i}\n\n`);
-    else if (res.status == "FINISHED") msgheader = msgheader.concat(fmt`${i}Finished airing.${i}\n\n`);
-    msgheader = msgheader.concat(fmt`${b}Pending:${b}\n`);
-    for (let j = 0; j < res.notwatched.length; j++) {
-        if (j < 30) msg = msg.concat(fmt`🔹${res.jpname} - ${res.notwatched[j]}\n`);
-        else {
-          msg = msg.concat(fmt`${i}And many more...${i}`);
-            break;
-        }
-    }
-    if (msgheader.text.length + msg.text.length > 1024 && res.shortname !== undefined) {
-      msg = msg.replaceAll(fmt`${res.jpname}`, fmt`${res.shortname}`); // Please double check this logic later
-    }
+  }
+  if (
+    msgheader.text.length + msg.text.length > 1024 &&
+    res.shortname !== undefined
+  ) {
+    msg = msg.replaceAll(fmt`${res.jpname}`, fmt`${res.shortname}`); // Please double check this logic later
+  }
 
-    //Better logic
-    if (msgheader.text.length + msg.text.length > 1024) {
-        console.log("Trying to trim");
-        const lines = msg.split(fmt`\n`); // Please double check this logic later
-        msg = lines[0].concat(fmt`\n`);
-        for (let j = 1; j < lines.length; j++) {
-            if (msgheader.text.length + msg.text.length + lines[j].text.length + 17 < 1024) msg.concat(fmt`${lines[j]}\n`); // WTF is this 17
-            else {
-              msg.concat(fmt`${i}And many more...${i}`);
-                break;
-            }
-        }
+  //Better logic
+  if (msgheader.text.length + msg.text.length > 1024) {
+    console.log('Trying to trim');
+    const lines = msg.split(fmt`\n`); // Please double check this logic later
+    msg = lines[0].concat(fmt`\n`);
+    for (let j = 1; j < lines.length; j++) {
+      if (
+        msgheader.text.length + msg.text.length + lines[j].text.length + 17 <
+        1024
+      )
+        msg.concat(fmt`${lines[j]}\n`); // WTF is this 17
+      else {
+        msg.concat(fmt`${i}And many more...${i}`);
+        break;
+      }
     }
-    const finalMsg = FormattedString.join([msgheader, msg]);
-    await bot.api.sendPhoto(chatid, res.image, {
-        caption: finalMsg.text,
-        caption_entities: finalMsg.caption_entities,
-        reply_markup: new InlineKeyboard()
-            .text("Mark watched", "mark_watch")
-            .text("Download", "download")
-    });
-    return 0;
+  }
+  const finalMsg = FormattedString.join([msgheader, msg]);
+  await bot.api.sendPhoto(chatid, res.image, {
+    caption: finalMsg.text,
+    caption_entities: finalMsg.caption_entities,
+    reply_markup: new InlineKeyboard()
+      .text('Mark watched', 'mark_watch')
+      .text('Download', 'download'),
+  });
+  return 0;
 }
 
 // export async function animePending(chatid: number, userid: number) {
@@ -156,45 +168,47 @@ async function animePendingBotHandle(chatid: number, userid: number, alid: numbe
 // }
 
 export function pendingEndpoint(server: FastifyInstance) {
-    interface customreq {
-        chatid: number,
-        userid: number,
-        alid: number,
-        is_bot: boolean
-    }
+  interface customreq {
+    chatid: number;
+    userid: number;
+    alid: number;
+    is_bot: boolean;
+  }
 
-    server.get<{ Querystring: customreq }>("/pending", async (req, res) => {
-        if (req.query == undefined) return res.status(400);
-        try {
-            const chatid = parseInt(req.query.chatid.toString());
-            const userid = parseInt(req.query.userid.toString());
-            const alid = parseInt(req.query.alid.toString());
-            const is_bot = Boolean(req.query.is_bot.toString());
-            if (Number.isNaN(userid) || Number.isNaN(alid)) {
-                console.error("ERROR: /pending: Incorrect URL params");
-                await res.status(400).send({ status: 400, error: "Incorrect URL parameters" });
-                return;
-            }
+  server.get<{ Querystring: customreq }>('/pending', async (req, res) => {
+    if (req.query == undefined) return res.status(400);
+    try {
+      const chatid = parseInt(req.query.chatid.toString());
+      const userid = parseInt(req.query.userid.toString());
+      const alid = parseInt(req.query.alid.toString());
+      const is_bot = Boolean(req.query.is_bot.toString());
+      if (Number.isNaN(userid) || Number.isNaN(alid)) {
+        console.error('ERROR: /pending: Incorrect URL params');
+        await res
+          .status(400)
+          .send({ status: 400, error: 'Incorrect URL parameters' });
+        return;
+      }
 
-            //await animePending(chatid, userid);
-            if (!is_bot) {
-                const res2 = await getSinglePending(userid, null, alid);
-                if (res2 === undefined) {
-                    await res.status(400).send([]);
-                    return;
-                } else if (res2 === null) {
-                    return ("UserID is not currently watching specified anime.");
-                }
-                await res.send(res2);
-                return;
-            }
-            if (is_bot && chatid === undefined) return null;
-            const res2 = await animePendingBotHandle(chatid, userid, alid);
-            if (res2) await res.send({ status: 200 });
-        } catch (error) {
-            console.error(`ERROR: /pending: ${error}`);
-            await res.status(400).send({ status: 400, error: error });
-            return;
+      //await animePending(chatid, userid);
+      if (!is_bot) {
+        const res2 = await getSinglePending(userid, null, alid);
+        if (res2 === undefined) {
+          await res.status(400).send([]);
+          return;
+        } else if (res2 === null) {
+          return 'UserID is not currently watching specified anime.';
         }
-    });
+        await res.send(res2);
+        return;
+      }
+      if (is_bot && chatid === undefined) return null;
+      const res2 = await animePendingBotHandle(chatid, userid, alid);
+      if (res2) await res.send({ status: 200 });
+    } catch (error) {
+      console.error(`ERROR: /pending: ${error}`);
+      await res.status(400).send({ status: 400, error: error });
+      return;
+    }
+  });
 }

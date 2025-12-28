@@ -1,10 +1,11 @@
 node_modules/
 out/
 .env
-.eslintrc
 .vscode
 *.json
 !package.json
 !package-lock.json
 !tsconfig.json
+!.eslintrc.json
 *.log
+docs/

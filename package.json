@@ -30,6 +30,7 @@
     "node-schedule": "2.1.1"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.2",
     "@grammyjs/types": "3.22.2",
     "@types/fs-extra": "11.0.4",
     "@types/node-fetch": "2.6.13",
@@ -37,8 +38,11 @@
     "@typescript-eslint/eslint-plugin": "8.48.1",
     "@typescript-eslint/parser": "8.48.1",
     "eslint": "9.39.1",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "3.7.4",
     "prisma": "^6.18.0",
     "tsx": "^4.21.0",
-    "typescript": "5.9.3"
+    "typescript": "5.9.3",
+    "typescript-eslint": "^8.50.1"
   }
 }
