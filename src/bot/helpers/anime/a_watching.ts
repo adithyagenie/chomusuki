@@ -1,7 +1,7 @@
 import { InlineKeyboard } from "grammy";
 import { db } from "../../..";
 import { addWatching, checkAnimeTable, getUserWatchingAiring } from "../../../database/animeDB";
-import { MyContext, MyConversation } from "../../bot";
+import { MyContext, MyConversation, MyConversationContext } from "../../bot";
 import { getPagination } from "./a_misc_helpers";
 import { selfyeet } from "../misc_handles";
 import { a, b, fmt, FormattedString } from "@grammyjs/parse-mode";
@@ -21,7 +21,7 @@ export async function watching_pending_list(ctx: MyContext) {
     }
     if (res.keyboard == undefined || res.keyboard.inline_keyboard.length == 0)
         await ctx.reply(res.msg.text, { entities: res.msg.entities });
-    else await ctx.reply(res.msg.text, { entites: res.msg.entities, reply_markup: res.keyboard });
+    else await ctx.reply(res.msg.text, { entities: res.msg.entities, reply_markup: res.keyboard });
 }
 
 /**
@@ -137,7 +137,8 @@ export async function animeStartWatch(ctx: MyContext, menu = false) {
  ** Remove an anime from watching list of user.
  ** Called with /stopwatching_alid.
  */
-export async function stopWatching(conversation: MyConversation, ctx: MyContext) {
+export async function stopWatching(conversation: MyConversation, ctx: MyConversationContext) {
+  const userid = await conversation.external((ctx2) => ctx2.session.userid);
     await ctx.deleteMessage();
     const match = parseInt(ctx.match[1]);
     if (Number.isNaN(match[1])) {
@@ -147,7 +148,7 @@ export async function stopWatching(conversation: MyConversation, ctx: MyContext)
     const _ = (
         await conversation.external(() =>
             db.watchinganime.findUnique({
-                where: { userid: conversation.session.userid },
+                where: { userid: userid },
                 select: { alid: true }
             })
         )
@@ -180,13 +181,13 @@ export async function stopWatching(conversation: MyConversation, ctx: MyContext)
                 1
             );
             await db.watchinganime.update({
-                where: { userid: conversation.session.userid },
+                where: { userid: userid },
                 data: { alid: _, userid: undefined }
             });
             await db.watchedepanime.delete({
                 where: {
                     userid_alid: {
-                        userid: conversation.session.userid,
+                        userid: userid,
                         alid: match
                     }
                 }

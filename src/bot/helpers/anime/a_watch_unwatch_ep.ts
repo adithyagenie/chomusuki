@@ -2,20 +2,20 @@
 
 import { InlineKeyboard, Keyboard } from "grammy";
 import { getDecimal, markWatchedunWatched } from "../../../database/animeDB";
-import { MyContext, MyConversation } from "../../bot";
+import { MyContext, MyConversation, MyConversationContext } from "../../bot";
 import { Prisma, watchedepanime } from "@prisma/client";
 import { getPending, getSinglePending } from "../../../api/pending";
 import { db } from "../../..";
-import { getUpdaterAnimeIndex, makeEpKeyboard, messageToHTMLMessage } from "./a_misc_helpers";
+import { getUpdaterAnimeIndex, makeEpKeyboard } from "./a_misc_helpers";
 import aniep from "aniep";
-import { code, fmt, i } from "@grammyjs/parse-mode";
+import { code, fmt, FormattedString, i } from "@grammyjs/parse-mode";
 
 export async function anime_unwatch(ctx: MyContext) {
     await ctx.conversation.enter("unwatchhelper");
 }
 
-export async function unwatchhelper(conversation: MyConversation, ctx: MyContext) {
-    const userid = ctx.session.userid;
+export async function unwatchhelper(conversation: MyConversation, ctx: MyConversationContext) {
+  const userid = await conversation.external((ctx2) => ctx2.session.userid);
     const updateobj = await conversation.external(() => getPending(userid));
     const keyboard = new Keyboard().resized().persistent().oneTime();
     const animelist = [];
@@ -151,10 +151,10 @@ export async function callback_mkwatchep(ctx: MyContext) {
         else newkeyboard.add(bruh).add(bruh2).row();
     }
     //newkeyboard.text("Go back", "back");
-    const oldformatmsg = messageToHTMLMessage(ctx.msg.caption, ctx.msg.caption_entities);
-    const newMsgArray = oldformatmsg.split("\n");
+  const oldformatmsg = new FormattedString(ctx.msg.caption, ctx.msg.caption_entities);
+    const newMsgArray = oldformatmsg.split(fmt`\n`);
     for (let j = 0; j < newMsgArray.length; j++) {
-        if (aniep(newMsgArray[j])) {
+        if (aniep(newMsgArray[j].text)) {
             newMsgArray.splice(j, 1);
             break;
         }
@@ -179,14 +179,15 @@ const consecutiveRanges = (a: number[]) => {
     return list;
 };
 
-export async function markWatchedRange(conversation: MyConversation, ctx: MyContext) {
+export async function markWatchedRange(conversation: MyConversation, ctx: MyConversationContext) {
+  const userid = await conversation.external((ctx2) => ctx2.session.userid);
     const genkeyboard = new InlineKeyboard();
     const watching = await conversation.external(
         () =>
             db.$queryRaw<{
                 jpname: string;
                 alid: number
-            }[]>`SELECT a.jpname, a.alid FROM anime a, watchinganime w, unnest(w.alid) s WHERE (a.alid IN (s)) AND (w.userid = ${conversation.session.userid});`
+            }[]>`SELECT a.jpname, a.alid FROM anime a, watchinganime w, unnest(w.alid) s WHERE (a.alid IN (s)) AND (w.userid = ${userid});`
     );
     if (watching === null) return;
     await conversation.external(() => {
@@ -208,7 +209,7 @@ export async function markWatchedRange(conversation: MyConversation, ctx: MyCont
     await ctx.api.deleteMessage(ctx.from.id, msgid);
     const aniname = watching.find((o) => o.alid == alid).jpname;
     const data = await conversation.external(() =>
-        getSinglePending(conversation.session.userid, null, alid)
+        getSinglePending(userid, null, alid)
     );
     if (data.notwatched.length == 0) {
         await ctx.reply(`You have already marked all the episodes of ${aniname} as watched!`);
@@ -218,7 +219,7 @@ export async function markWatchedRange(conversation: MyConversation, ctx: MyCont
       ${i}Possible ranges: ${consecutiveRanges(data.notwatched).toString()}.
       Please give it in the form of ${code}start-end${code}${i}`
     await ctx.reply(
-
+      replyMessage.text, { entities: replyMessage.entities }
     );
     while (true) {
         const range = (await conversation.waitForHears(/^((\d+)|((\d+)-(\d+)))$/)).match;
@@ -244,13 +245,13 @@ export async function markWatchedRange(conversation: MyConversation, ctx: MyCont
         await conversation.external(async () => {
             let id = (
                 await db.watchedepanime.findUnique({
-                    where: { userid_alid: { userid: conversation.session.userid, alid: alid } },
+                    where: { userid_alid: { userid: userid, alid: alid } },
                     select: { ep: true }
                 })
             ).ep;
             id = id.concat(...(getDecimal(arr) as Prisma.Decimal[]));
             await db.watchedepanime.update({
-                where: { userid_alid: { userid: conversation.session.userid, alid: alid } },
+                where: { userid_alid: { userid: userid, alid: alid } },
                 data: { ep: id }
             });
         });

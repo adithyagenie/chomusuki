@@ -24,11 +24,10 @@ interface SessionData {
     };
 }
 
-export type MyContext =
-    Context
-    & ConversationFlavor
-    & SessionFlavor<SessionData>
-export type MyConversation = Conversation<MyContext>;
+export type MyContext = ConversationFlavor<Context> & SessionFlavor<SessionData>;
+
+export type MyConversationContext = Context;
+export type MyConversation = Conversation<MyContext, MyConversationContext>;
 
 export const bot = new Bot<MyContext>(`${process.env.BOT_TOKEN}`);
 
@@ -36,7 +35,6 @@ export function botinit() {
     //const throttler = apiThrottler();
     //bot.api.config.use(throttler);
     const storage = new RedisAdapter<SessionData>({ instance: redis, ttl: 24 * 60 * 60 });
-    // noinspection JSUnusedGlobalSymbols
     bot.use(
         session({
             type: "multi",
@@ -60,10 +58,6 @@ export function botinit() {
                     listmethod: undefined
                 })
             },
-            conversation: {
-                getSessionKey: (ctx) => `${ctx.chat?.id}_c`,
-                storage: storage
-            }
         })
     );
     bot.use(

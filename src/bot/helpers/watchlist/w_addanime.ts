@@ -1,6 +1,6 @@
 import { db } from "../../..";
 import { addToWatchlist } from "../../../database/animeDB";
-import { MyContext, MyConversation } from "../../bot";
+import { MyContext, MyConversation, MyConversationContext } from "../../bot";
 import { animeSearchHandler } from "../anime/a_search";
 import { getWLName } from "./w_helpers";
 import { selfyeet } from "../misc_handles";
@@ -12,9 +12,10 @@ import { b, fmt } from "@grammyjs/parse-mode";
  * @param convo - Conversation
  * @param ctx - Context
  */
-export async function addWL(convo: MyConversation, ctx: MyContext) {
+export async function addWL(convo: MyConversation, ctx: MyConversationContext) {
+  const watchlistid = await convo.external((ctx2) => ctx2.session.menudata.wlid);
     const item = await convo.external(() =>
-        db.watchlists.count({ where: { watchlistid: convo.session.menudata.wlid } })
+        db.watchlists.count({ where: { watchlistid: watchlistid } })
     );
     if (item === 0) {
         await ctx.reply("Watchlist missing.");
@@ -42,7 +43,7 @@ export async function addWL(convo: MyConversation, ctx: MyContext) {
                 await name.deleteMessage();
                 const result = await convo.external(() =>
                     addToWatchlist(
-                        convo.session.menudata.wlid,
+                      watchlistid,
                         parseInt(name.message.text.match(/\/start wl_(\d+)/)[1])
                     )
                 );
@@ -65,7 +66,7 @@ export async function addWL(convo: MyConversation, ctx: MyContext) {
                         await ctx.api.deleteMessage(ctx.chat?.id, msgid);
                     } catch {}
                 }
-                msgid = await startSearchWL(convo, ctx, name.message.text, convo.session.menudata.wlid);
+                msgid = await startSearchWL(convo, ctx, name.message.text, watchlistid);
             }
         }
     }
@@ -76,7 +77,8 @@ export async function addWL(convo: MyConversation, ctx: MyContext) {
  * @param convo Conversation object
  * @param ctx Context object
  */
-async function searchCB(convo: MyConversation, ctx: MyContext) {
+async function searchCB(convo: MyConversation, ctx: MyConversationContext) {
+  const userid = await convo.external((ctx2) => ctx2.session.userid);
     await ctx.answerCallbackQuery("Searching!");
     if (ctx.match[3] === "_current") return;
     const movepg = parseInt(ctx.match[2]);
@@ -90,7 +92,7 @@ async function searchCB(convo: MyConversation, ctx: MyContext) {
         "addwl",
         movepg,
         ctx.me.username,
-        convo.session.userid,
+        userid,
         wlid
     );
     if (msg == undefined || keyboard == undefined) {
@@ -98,22 +100,23 @@ async function searchCB(convo: MyConversation, ctx: MyContext) {
         return;
     }
     //console.log(`${msg}, ${JSON.stringify(keyboard)}`);
-    await ctx.editMessageText(msg, { reply_markup: keyboard, entities: msg.entities });
+    await ctx.editMessageText(msg.text, { reply_markup: keyboard, entities: msg.entities });
 }
 
 async function startSearchWL(
     convo: MyConversation,
-    ctx: MyContext,
+    ctx: MyConversationContext,
     name: string,
     wlid: number
 ) {
+  const userid = await convo.external((ctx2) => ctx2.session.userid);
     if (name === "") {
         await ctx.reply("Please provide a search query!");
         return 1;
     }
     const msgid = (await ctx.reply("Searching...")).message_id;
     const { msg, keyboard } = await convo.external(() =>
-        animeSearchHandler(name, "addwl", 1, ctx.me.username, convo.session.userid, wlid)
+        animeSearchHandler(name, "addwl", 1, ctx.me.username, userid, wlid)
     );
     if (msg == undefined || keyboard == undefined) {
         await ctx.api.editMessageText(ctx.from.id, msgid, "Unable to find any results.");

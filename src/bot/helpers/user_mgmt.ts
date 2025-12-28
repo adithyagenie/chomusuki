@@ -1,6 +1,6 @@
 import { b, code, fmt } from "@grammyjs/parse-mode";
 import { db } from "../../index";
-import { MyContext, MyConversation } from "../bot";
+import { MyContext, MyConversation, MyConversationContext } from "../bot";
 import { NextFunction } from "grammy";
 
 export async function registerUser(ctx: MyContext) {
@@ -11,7 +11,7 @@ export async function registerUser(ctx: MyContext) {
     await ctx.conversation.enter("newUser");
 }
 
-export async function newUser(conversation: MyConversation, ctx: MyContext) {
+export async function newUser(conversation: MyConversation, ctx: MyConversationContext) {
     const msgid = await ctx.reply("What do you want your username to be?", {
         reply_markup: { force_reply: true }
     });
@@ -43,7 +43,7 @@ export async function newUser(conversation: MyConversation, ctx: MyContext) {
         userCreatedReplyMsg.text,
         { entities: userCreatedReplyMsg.entities }
     );
-    conversation.session.userid = res.userid;
+    conversation.external((ctx2) => ctx2.session.userid = res.userid);
     return;
 }
 
@@ -65,7 +65,7 @@ export async function userMiddleware(ctx: MyContext, next: NextFunction) {
     }
 }
 
-export async function deleteUser(conversation: MyConversation, ctx: MyContext) {
+export async function deleteUser(conversation: MyConversation, ctx: MyConversationContext) {
   const replyString = fmt`Deleting your account will remove all your data from this data. ${b}This cannot be reversed.${b}\n
 If you are absolutely sure you want to delete - Please type in ${code}Yes, I'm sure.${code}\n
 or cancel by typing ${code}cancel${code}.`
@@ -76,16 +76,18 @@ or cancel by typing ${code}cancel${code}.`
             await ctx.reply("Cancelling deletion...");
             return;
         } else if (msg.message?.text === "Yes, I'm sure.") {
-            const res = await conversation.external(() =>
-                db.users.delete({
+            const res = await conversation.external((ctx2) => {
+                const userid = ctx2.session.userid;
+                const res = db.users.delete({
                     where: {
-                        userid_chatid: { userid: ctx.session.userid, chatid: ctx.from.id }
+                        userid_chatid: { userid: userid, chatid: ctx.from.id }
                     }
-                })
-            );
+                });
+                return res;
+            });
           const deleteReplyMsg = fmt`Account has been deleted! ${code}${res.username}${code} is now dead...\n(っ˘̩╭╮˘̩)っ`;
           await ctx.reply(deleteReplyMsg.text, { entities: deleteReplyMsg.entities });
-            conversation.session = undefined;
+            conversation.external((ctx2) => ctx2.session = undefined);
             return;
         }
     }

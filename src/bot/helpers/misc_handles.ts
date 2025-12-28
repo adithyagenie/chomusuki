@@ -20,13 +20,13 @@ export async function back_handle(ctx: MyContext) {
 
 // Handles cancel calls
 export async function cancel_handle(ctx: MyContext) {
-    const active = await ctx.conversation.active();
+    const active = ctx.conversation.active();
     if (Object.keys(active).length === 0) {
         await ctx.reply("No running operations.");
         return;
     }
     console.log(`Terminating convo ${JSON.stringify(active)} for ${ctx.from.id}`);
-    await ctx.conversation.exit();
+    await ctx.conversation.exitAll();
     await ctx.reply("Cancelling operation...", {
         reply_markup: { remove_keyboard: true }
     });
@@ -102,8 +102,7 @@ export async function botErrorHandle(err: BotError<MyContext>) {
     if (err.error instanceof TypeError && err.stack.includes("_replayApi")) {
         console.error(`Encountered error: ${err.error} at context \n${JSON.stringify(err.ctx.msg)}\nStack trace: ${err.stack}`);
         console.log(`Found conversation error. Deleting conversation session data for ${err.ctx.chat.id}`);
-        await err.ctx.conversation.exit();
-        await redis.del(`${err.ctx.chat.id}_c`);
+        await err.ctx.conversation.exitAll();
         await err.ctx.reply("Error occured and the current operation has been cancelled." +
             " Please retry.");
         return;

@@ -2,17 +2,35 @@ import { MyContext, MyConversation } from "../../bot";
 import { db } from "../../../index";
 
 export async function getWLName(c: MyContext | MyConversation) {
-    if (c.session.menudata.wlname !== undefined) return c.session.menudata.wlname;
+  let wlid: number, wlname: string;
+  if ("session" in c) {
+    // it is MyContext
+    wlid = c.session.menudata.wlid;
+    wlname = c.session.menudata.wlname;
+  } else {
+    // MyConversation type
+    wlid = await c.external((ctx) => ctx.session.menudata.wlid);
+    wlname = await c.external((ctx) => ctx.session.menudata.wlname);
+  }
+    if (wlname !== undefined) return wlname;
     else {
         try {
-            if (c.session.menudata.wlid === undefined)
+            if (wlid === undefined)
                 return undefined;
 
             const wlname = (await db.watchlists.findUniqueOrThrow({
-                where: { watchlistid: c.session.menudata.wlid },
+                where: { watchlistid: wlid },
                 select: { watchlist_name: true }
             })).watchlist_name;
-            c.session.menudata.wlname = wlname;
+
+            if ("session" in c) {
+              c.session.menudata.wlname = wlname;
+            }
+            else {
+              await c.external((ctx) => {
+                ctx.session.menudata.wlname = wlname;
+              });
+            }
             return wlname;
         } catch (e) {
             console.error(e);
