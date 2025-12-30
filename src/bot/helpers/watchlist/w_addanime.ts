@@ -1,6 +1,6 @@
 import { db } from '../../..';
 import { addToWatchlist } from '../../../database/animeDB';
-import { MyContext, MyConversation, MyConversationContext } from '../../bot';
+import { MyConversation, MyConversationContext } from '../../bot';
 import { animeSearchHandler } from '../anime/a_search';
 import { getWLName } from './w_helpers';
 import { selfyeet } from '../misc_handles';
@@ -25,7 +25,7 @@ export async function addWL(convo: MyConversation, ctx: MyConversationContext) {
   const wlname = await getWLName(convo);
   await ctx.reply('Send the name of anime or /done to stop adding.');
   let msgid = 0;
-  while (1) {
+  while (true) {
     const name = await convo.waitUntil(
       (ctx1) =>
         ctx1.hasCallbackQuery(/^addwl_(\d+)_(\d+)(_current)?/) ||
@@ -39,7 +39,9 @@ export async function addWL(convo: MyConversation, ctx: MyConversationContext) {
         try {
           if (msgid !== 0 && msgid !== undefined)
             await ctx.api.deleteMessage(ctx.chat?.id, msgid);
-        } catch {}
+        } catch {
+          console.log(`unable to delete message ${msgid}`);
+        }
         return;
       } else if (name.message.text.match(/\/start wl_(\d+)/) !== null) {
         convo.log(`Adding ${name.message.text}`);
@@ -71,7 +73,9 @@ export async function addWL(convo: MyConversation, ctx: MyConversationContext) {
         if (msgid !== undefined && msgid !== 0) {
           try {
             await ctx.api.deleteMessage(ctx.chat?.id, msgid);
-          } catch {}
+          } catch {
+            console.log(`unable to delete message ${msgid}`);
+          }
         }
         msgid = await startSearchWL(convo, ctx, name.message.text, watchlistid);
       }

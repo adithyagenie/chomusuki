@@ -1,4 +1,4 @@
-import { i_ProcessedObjV2, MessageEntity } from '../../../interfaces';
+import { i_ProcessedObjV2 } from '../../../interfaces';
 import { InlineKeyboard } from 'grammy';
 import { getSinglePending } from '../../../api/pending';
 

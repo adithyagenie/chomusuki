@@ -8,7 +8,6 @@ import { PrismaClient } from '@prisma/client';
 import { initCron, terminateCron } from './api/refreshAiring';
 import { FastifyInstance } from 'fastify';
 import { startserver } from './api/server';
-import IORedis from 'ioredis';
 import Redis from 'ioredis';
 
 config();

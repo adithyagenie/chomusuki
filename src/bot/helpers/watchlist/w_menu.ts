@@ -197,7 +197,9 @@ function animeListOpts() {
         await animeStartWatch(ctx1, true);
         try {
           ctx1.menu.update();
-        } catch {}
+        } catch {
+          console.log('unable to update menu after starting watch');
+        }
       });
     else
       range.submenu('Stop watching', 'wl_stopwatch', async (ctx1) => {
@@ -215,14 +217,16 @@ function animeListOpts() {
         );
         try {
           ctx1.menu.update();
-        } catch {}
+        } catch {
+          console.log(`unable to update menu after marking done`);
+        }
       });
     } else {
       range.text('Mark as not watched', async (ctx1) => {
         const result = await markNotDone(ctx.session.userid, alid);
         if (result === 'missing') {
           await ctx1.reply('Outdated menu.');
-          await ctx1.menu.update();
+          ctx1.menu.update();
           return;
         }
         if (result === 1) {
@@ -235,7 +239,9 @@ function animeListOpts() {
           selfyeet(ctx1.chat.id, yeet.message_id, 10000);
           try {
             ctx1.menu.update();
-          } catch {}
+          } catch {
+            console.log(`unable to update menu after marking not done`);
+          }
           return;
         }
       });

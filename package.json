@@ -6,7 +6,12 @@
   "scripts": {
     "build": "tsc",
     "start": "node ./out/index.js",
-    "dev": "tsx watch src/index.ts --env NODE_ENV=development"
+    "dev": "tsx watch src/index.ts --env NODE_ENV=development",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write \"src/**/*.ts\"",
+    "format:check": "prettier --check \"src/**/*.ts\"",
+    "fix": "npm run format && npm run lint:fix"
   },
   "author": "adithyagenie",
   "license": "ISC",

@@ -7,7 +7,6 @@ import { markWatchedRange, unwatchhelper } from './anime/a_watch_unwatch_ep';
 import { stopWatching } from './anime/a_watching';
 import { addWL } from './watchlist/w_addanime';
 import { createWL, renameWL } from './watchlist/w_wlmgmt';
-import { redis } from '../../index';
 
 // going back in a menu
 export async function back_handle(ctx: MyContext) {
@@ -107,7 +106,7 @@ export function selfyeet(chatid: number, mid: number, time: number) {
   setTimeout(async () => {
     try {
       await bot.api.deleteMessage(chatid, mid);
-    } catch (e) {
+    } catch {
       return;
     }
   }, time);

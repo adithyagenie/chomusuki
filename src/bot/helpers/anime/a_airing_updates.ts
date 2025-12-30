@@ -90,7 +90,7 @@ export async function airingUpdatesListHelper(
     return { msg: msg, keyboard: undefined };
   } else msg = fmt`${b}Displaying your anime subscriptions: ${b}\n\n`;
   for (let idx = 0; idx < alidlist.length; idx++) {
-    let startUrl = `t.me/${username}?start=stopremindme_${alidlist[idx]}`;
+    const startUrl = `t.me/${username}?start=stopremindme_${alidlist[idx]}`;
     msg = fmt`${msg}${idx + 1}. ${animelist[idx]}\n
           ${i}Stop reminding me: ${a(startUrl)}Click here!${a}${i}\n\n`;
   }
