@@ -24,16 +24,16 @@ import {
 import { limit } from '@grammyjs/ratelimiter';
 
 interface SessionData {
-  userid: number;
-  config: { pause_airing_updates: boolean };
-  menudata: {
-    activemenuopt: number;
-    wlid: number;
-    wlname: string;
-    alid: number;
-    l_page: number;
-    maxpg: number;
-    listmethod: 'all' | 'towatch' | undefined;
+  userid?: number;
+  config?: { pause_airing_updates?: boolean };
+  menudata?: {
+    activemenuopt?: number;
+    wlid?: number;
+    wlname?: string;
+    alid?: number;
+    l_page?: number;
+    maxpg?: number;
+    listmethod?: 'all' | 'towatch';
   };
 }
 

@@ -15,12 +15,12 @@ export async function createWL(
   ctx: MyConversationContext,
 ) {
   const userid = await conversation.external((ctx2) => ctx2.session.userid);
+  conversation.waitForCommand('cancel').then(async () => {
+    await ctx.reply('Alright, cancelling.');
+    conversation.halt();
+  });
   await ctx.reply("What is your new watchlist's name?");
   const name = await conversation.form.text();
-  if (name === '/cancel') {
-    await ctx.reply('Alright, cancelling.');
-    return;
-  }
   const res = await newWatchlist(name, userid);
   if (res === 1) {
     await ctx.reply('Error creating watchlist ;_;');
@@ -66,8 +66,8 @@ export async function renameWL(
   const wlid = await convo.external((ctx2) => ctx2.session.menudata.wlid);
   const wlname = await getWLName(convo);
 
-  convo.waitForCommand('cream').then(async () => {
-    await ctx.reply('CREAMING RAPIDLY.....');
+  convo.waitForCommand('cancel').then(async () => {
+    await ctx.reply('Alright, cancelling renaming.');
     await convo.halt();
   });
 
