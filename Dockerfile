@@ -1,11 +1,27 @@
-FROM node:16.19.0-alpine
+FROM public.ecr.aws/docker/library/node:24-alpine AS base
+
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+ENV HUSKY=0
+RUN corepack enable
+
+FROM base AS builder
 
 WORKDIR /app
-COPY package*.json .
-RUN npm install
-ADD ./src ./src
-ADD tsconfig.json .
-RUN npm run build
-RUN rm -rf src
-RUN rm ./package.json ./package-lock.json ./tsconfig.json
-CMD ["node", "out/index.js"]
+ADD package.json .
+ADD pnpm-lock.yaml .
+ADD pnpm-workspace.yaml .
+ADD prisma ./prisma
+RUN pnpm install --frozen-lockfile
+
+COPY . .
+RUN pnpm run build
+
+FROM base
+WORKDIR /app
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/package.json ./package.json
+
+EXPOSE 8000
+CMD [ "pnpm", "start" ]

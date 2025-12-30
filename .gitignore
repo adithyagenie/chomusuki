@@ -1,5 +1,5 @@
 node_modules/
-out/
+dist/
 .env
 .vscode
 *.json
@@ -9,3 +9,4 @@ out/
 !.eslintrc.json
 *.log
 docs/
+log.txt
