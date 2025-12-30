@@ -5,7 +5,7 @@ import anilist, {
 } from 'anilist-node';
 import { addReqCache, fetchReqCache } from '../database/redis';
 
-const al = new anilist(process.env.ANILIST_TOKEN);
+const al = new anilist();
 
 export async function imageGet(id: number) {
   let url: string;
@@ -43,7 +43,7 @@ export async function searchAnime(
     if (cached !== undefined) {
       return cached;
     }
-    let filter: MediaFilterTypes = null;
+    let filter: MediaFilterTypes = {};
     if (releasingonly == true)
       filter = { status_in: ['RELEASING', 'NOT_YET_RELEASED'] };
     const res: MediaSearchEntry = await al.searchEntry.anime(

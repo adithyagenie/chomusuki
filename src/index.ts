@@ -13,7 +13,6 @@ import Redis from 'ioredis';
 config();
 if (
   process.env.BOT_TOKEN === undefined ||
-  process.env.ANILIST_TOKEN === undefined ||
   process.env.AUTHORISED_CHAT === undefined ||
   process.env.DATABASE_URL === undefined ||
   (process.env.RUN_METHOD !== 'WEBHOOK' &&
@@ -58,7 +57,7 @@ class RedisClient extends Redis {
     super(redisUrl);
   }
 }
-export const redis = new RedisClient(process.env.REDIS_URL);
+export const redis = new RedisClient(process.env.REDIS_URL || '');
 redis.on('error', (err) => console.error(`REDIS ERROR: ${err}`));
 
 async function spinup() {

@@ -7,7 +7,7 @@ import { pendingEndpoint } from '../bot/helpers/anime/a_pending';
 import { botErrorHandle } from '../bot/helpers/misc_handles';
 
 export async function startserver() {
-  const port = parseInt(process.env.PORT) || 4000;
+  const port = parseInt(process.env.PORT || '4000') || 4000;
   const server = fastify({ logger: false });
   if (process.env.RUN_METHOD === 'WEBHOOK') {
     server.post(`/${process.env.BOT_TOKEN}`, webhookCallback(bot, 'fastify'));

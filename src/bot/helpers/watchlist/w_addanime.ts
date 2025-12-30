@@ -13,8 +13,12 @@ import { b, fmt } from '@grammyjs/parse-mode';
  */
 export async function addWL(convo: MyConversation, ctx: MyConversationContext) {
   const watchlistid = await convo.external(
-    (ctx2) => ctx2.session.menudata.wlid,
+    (ctx2) => ctx2.session.menudata?.wlid,
   );
+  if (watchlistid === undefined) {
+    await ctx.reply('Watchlist not selected.');
+    return;
+  }
   const item = await convo.external(() =>
     db.watchlists.count({ where: { watchlistid: watchlistid } }),
   );
@@ -37,24 +41,27 @@ export async function addWL(convo: MyConversation, ctx: MyConversationContext) {
       if (name.hasCommand('done')) {
         await ctx.reply('Alright wrapping up.');
         try {
-          if (msgid !== 0 && msgid !== undefined)
-            await ctx.api.deleteMessage(ctx.chat?.id, msgid);
+          if (msgid !== 0 && msgid !== undefined && ctx.chat?.id !== undefined)
+            await ctx.api.deleteMessage(ctx.chat.id, msgid);
         } catch {
           console.log(`unable to delete message ${msgid}`);
         }
         return;
-      } else if (name.message.text.match(/\/start wl_(\d+)/) !== null) {
+      } else if (
+        name.message?.text !== undefined &&
+        name.message.text.match(/\/start wl_(\d+)/) !== null
+      ) {
         convo.log(`Adding ${name.message.text}`);
         await name.deleteMessage();
+        const matchResult = name.message.text.match(/\/start wl_(\d+)/);
+        if (matchResult === null) continue;
         const result = await convo.external(() =>
-          addToWatchlist(
-            watchlistid,
-            parseInt(name.message.text.match(/\/start wl_(\d+)/)[1]),
-          ),
+          addToWatchlist(watchlistid, parseInt(matchResult[1])),
         );
         if (result === 'present') {
           const todel = await ctx.reply('Anime already added to watchlist.');
-          selfyeet(ctx.chat?.id, todel.message_id, 5000);
+          if (ctx.chat?.id !== undefined)
+            selfyeet(ctx.chat.id, todel.message_id, 5000);
         } else if (result === 'err') {
           await ctx.reply(
             `Error adding to watchlist. Try again after some time.`,
@@ -63,21 +70,31 @@ export async function addWL(convo: MyConversation, ctx: MyConversationContext) {
         } else if (result === 'invalid') {
           await ctx.reply('Anime not found.');
         } else {
-          const replyString = fmt`${b}${result}${b} has been added to ${wlname}.\nTo add another, simply send the anime name to search or /done to finish adding.`;
+          const replyString = fmt`${b}${result ?? ''}${b} has been added to ${wlname ?? ''}.\nTo add another, simply send the anime name to search or /done to finish adding.`;
           const todel = await ctx.reply(replyString.text, {
             entities: replyString.entities,
           });
-          selfyeet(ctx.chat?.id, todel.message_id, 5000);
+          if (ctx.chat?.id !== undefined)
+            selfyeet(ctx.chat.id, todel.message_id, 5000);
         }
       } else {
-        if (msgid !== undefined && msgid !== 0) {
+        if (msgid !== undefined && msgid !== 0 && ctx.chat?.id !== undefined) {
           try {
-            await ctx.api.deleteMessage(ctx.chat?.id, msgid);
+            await ctx.api.deleteMessage(ctx.chat.id, msgid);
           } catch {
             console.log(`unable to delete message ${msgid}`);
           }
         }
-        msgid = await startSearchWL(convo, ctx, name.message.text, watchlistid);
+        const messageText = name.message?.text;
+        if (messageText !== undefined) {
+          const result = await startSearchWL(
+            convo,
+            ctx,
+            messageText,
+            watchlistid,
+          );
+          if (result !== undefined) msgid = result;
+        }
       }
     }
   }
@@ -91,9 +108,11 @@ export async function addWL(convo: MyConversation, ctx: MyConversationContext) {
 async function searchCB(convo: MyConversation, ctx: MyConversationContext) {
   const userid = await convo.external((ctx2) => ctx2.session.userid);
   await ctx.answerCallbackQuery('Searching!');
-  if (ctx.match[3] === '_current') return;
-  const movepg = parseInt(ctx.match[2]);
-  const wlid = parseInt(ctx.match[1]);
+  if (ctx.match?.[3] === '_current') return;
+  const movepg = parseInt(ctx.match?.[2] || '');
+  const wlid = parseInt(ctx.match?.[1] || '');
+  if (Number.isNaN(movepg) || Number.isNaN(wlid)) return;
+  if (ctx.msg?.text === undefined) return;
   const query = [
     ...ctx.msg.text.split('\n')[0].matchAll(/^Search results for '(.+)'$/gi),
   ].map((o) => o[1])[0];
@@ -122,24 +141,27 @@ async function startSearchWL(
   ctx: MyConversationContext,
   name: string,
   wlid: number,
-) {
+): Promise<number | undefined> {
   const userid = await convo.external((ctx2) => ctx2.session.userid);
   if (name === '') {
     await ctx.reply('Please provide a search query!');
-    return 1;
+    return undefined;
   }
   const msgid = (await ctx.reply('Searching...')).message_id;
   const { msg, keyboard } = await convo.external(() =>
     animeSearchHandler(name, 'addwl', 1, ctx.me.username, userid, wlid),
   );
   if (msg == undefined || keyboard == undefined) {
-    await ctx.api.editMessageText(
-      ctx.from.id,
-      msgid,
-      'Unable to find any results.',
-    );
-    return;
+    if (ctx.from?.id !== undefined) {
+      await ctx.api.editMessageText(
+        ctx.from.id,
+        msgid,
+        'Unable to find any results.',
+      );
+    }
+    return undefined;
   }
+  if (ctx.from?.id === undefined) return;
   if (keyboard.inline_keyboard.length == 0)
     await ctx.api.editMessageText(ctx.from.id, msgid, msg.text, {
       entities: msg.entities,

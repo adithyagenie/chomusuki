@@ -2,33 +2,37 @@ import { MyContext, MyConversation } from '../../bot';
 import { db } from '../../../index';
 
 export async function getWLName(c: MyContext | MyConversation) {
-  let wlid: number, wlname: string;
+  let wlid: number | undefined, wlname: string | undefined;
   if ('session' in c) {
     // it is MyContext
+    if (c.session.menudata === undefined) return undefined;
     wlid = c.session.menudata.wlid;
     wlname = c.session.menudata.wlname;
   } else {
     // MyConversation type
-    wlid = await c.external((ctx) => ctx.session.menudata.wlid);
-    wlname = await c.external((ctx) => ctx.session.menudata.wlname);
+    wlid = await c.external((ctx) => ctx.session.menudata?.wlid);
+    wlname = await c.external((ctx) => ctx.session.menudata?.wlname);
   }
   if (wlname !== undefined) return wlname;
   else {
     try {
       if (wlid === undefined) return undefined;
 
-      const wlname = (
-        await db.watchlists.findUniqueOrThrow({
-          where: { watchlistid: wlid },
-          select: { watchlist_name: true },
-        })
-      ).watchlist_name;
+      const wlname =
+        (
+          await db.watchlists.findUniqueOrThrow({
+            where: { watchlistid: wlid },
+            select: { watchlist_name: true },
+          })
+        ).watchlist_name ?? undefined;
 
       if ('session' in c) {
-        c.session.menudata.wlname = wlname;
+        if (c.session.menudata !== undefined)
+          c.session.menudata.wlname = wlname;
       } else {
         await c.external((ctx) => {
-          ctx.session.menudata.wlname = wlname;
+          if (ctx.session.menudata !== undefined)
+            ctx.session.menudata.wlname = wlname;
         });
       }
       return wlname;
@@ -46,6 +50,7 @@ export async function getWLName(c: MyContext | MyConversation) {
  * @param a - Set to true if you want anime id, else false.
  */
 export async function getWlAlid(ctx: MyContext, w: boolean, a: boolean) {
+  if (ctx.session.menudata === undefined) return 'back';
   if (w && !a) {
     if (ctx.session.menudata.wlid === undefined) return 'back';
     return { wlid: ctx.session.menudata.wlid, alid: undefined };

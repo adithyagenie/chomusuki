@@ -21,11 +21,15 @@ export async function getPending(userid: number) {
     let watched = watchedlist.find((o) => o.alid == alidlist.alid[i]);
     if (watched === undefined) watched = { alid: alid, ep: [] };
     const animeentry = animelist.find((o) => o.alid == alidlist.alid[i]);
-    reqQueue.push(
-      getPendingInAnime(getNumber(watched.ep) as number[], animeentry),
-    );
+    if (animeentry) {
+      reqQueue.push(
+        getPendingInAnime(getNumber(watched.ep) as number[], animeentry),
+      );
+    }
   }
-  const res: i_ProcessedObjV2[] = await Promise.all(reqQueue);
+  const res: i_ProcessedObjV2[] = (await Promise.all(reqQueue)).filter(
+    (r): r is i_ProcessedObjV2 => r !== undefined,
+  );
   console.log(`----------RES TOOK :${new Date().getTime() - t} ms----------`);
   //writeJSON("./returnobj3.json", res);
   return res;
@@ -41,7 +45,7 @@ export async function getSinglePending(
     if (alid == undefined) {
       const _ = await db.anime.findMany({
         where: {
-          jpname: animename.trim(),
+          jpname: animename?.trim(),
         },
         take: 1,
       });
@@ -51,13 +55,14 @@ export async function getSinglePending(
       }
       animeentry = _[0];
     } else {
-      animeentry = await db.anime.findUnique({
+      const temp = await db.anime.findUnique({
         where: { alid },
       });
-      if (animeentry === null) {
+      if (temp === null) {
         console.error(`No anime found: ${alid}`);
         return undefined;
       }
+      animeentry = temp;
     }
     const watched = await db.watchedepanime.findUnique({
       where: {
@@ -112,15 +117,15 @@ async function getPendingInAnime(watchedep: number[], animeentry: anime) {
     enname: animeentry.enname,
     shortname: shortname,
     watched: watchedep,
-    notwatched: [],
+    notwatched: [] as number[],
     image: animeentry.fileid,
     status: status,
   };
   resobj.notwatched = Array.from(
-    { length: animeentry.last_ep },
+    { length: animeentry.last_ep || 0 },
     (_, i) => i + 1,
   )
-    .concat(getNumber(animeentry.ep_extras))
+    .concat(getNumber(animeentry.ep_extras) as number[])
     .sort((a, b) => (a > b ? 1 : -1))
     .filter((o) => !resobj.watched.includes(o)); // gets all notwatched ep
   return resobj;

@@ -15,20 +15,26 @@ export async function newUser(
   conversation: MyConversation,
   ctx: MyConversationContext,
 ) {
+  if (ctx.from?.id === undefined) return;
   const msgid = await ctx.reply('What do you want your username to be?', {
     reply_markup: { force_reply: true },
   });
   const username = (await conversation.waitForReplyTo(msgid.message_id)).message
     ?.text;
+  if (username === undefined) {
+    await ctx.reply('Invalid username.');
+    return;
+  }
   const usernameSetReplyMsg = fmt`Your username will be set as ${code}${username}${code}!`;
   const msgid2 = (
     await ctx.reply(usernameSetReplyMsg.text, {
       entities: usernameSetReplyMsg.entities,
     })
   ).message_id;
+  const chatid = ctx.from.id;
   const res = await conversation.external(() =>
     db.users.create({
-      data: { chatid: ctx.from.id, userid: undefined, username: username },
+      data: { chatid: chatid, userid: undefined, username: username },
     }),
   );
   await conversation.external(async () => {
@@ -51,6 +57,7 @@ export async function newUser(
 }
 
 export async function userMiddleware(ctx: MyContext, next: NextFunction) {
+  if (ctx.from?.id === undefined) return;
   const userid = await db.users.findUnique({
     where: { chatid: ctx.from.id },
     select: { userid: true },
@@ -72,6 +79,7 @@ export async function deleteUser(
   conversation: MyConversation,
   ctx: MyConversationContext,
 ) {
+  if (ctx.from?.id === undefined) return;
   const replyString = fmt`Deleting your account will remove all your data from this data. ${b}This cannot be reversed.${b}\n
 If you are absolutely sure you want to delete - Please type in ${code}Yes, I'm sure.${code}\n
 or cancel by typing ${code}cancel${code}.`;
@@ -82,16 +90,22 @@ or cancel by typing ${code}cancel${code}.`;
       await ctx.reply('Cancelling deletion...');
       return;
     } else if (msg.message?.text === "Yes, I'm sure.") {
+      const chatid = ctx.from.id;
       const res = await conversation.external((ctx2) => {
         const userid = ctx2.session.userid;
+        if (userid === undefined) return null;
         const res = db.users.delete({
           where: {
-            userid_chatid: { userid: userid, chatid: ctx.from.id },
+            userid_chatid: { userid: userid, chatid: chatid },
           },
         });
         return res;
       });
-      const deleteReplyMsg = fmt`Account has been deleted! ${code}${res.username}${code} is now dead...\n(っ˘̩╭╮˘̩)っ`;
+      if (res === null) {
+        await ctx.reply('Error deleting account.');
+        return;
+      }
+      const deleteReplyMsg = fmt`Account has been deleted! ${code}${res.username ?? 'User'}${code} is now dead...\n(っ˘̩╭╮˘̩)っ`;
       await ctx.reply(deleteReplyMsg.text, {
         entities: deleteReplyMsg.entities,
       });

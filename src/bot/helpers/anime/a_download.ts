@@ -22,17 +22,20 @@ export async function anime_dllist(ctx: MyContext) {
       select: { anime: true, epnum: true },
     })
   ).map((o) => {
-    return { anime: o.anime, epnum: getNumber(o.epnum) as number };
+    if (o.epnum === null) return { anime: o.anime ?? '', epnum: 0 };
+    return { anime: o.anime ?? '', epnum: getNumber(o.epnum) as number };
   });
   if (pendingdl.length == 0) {
     await ctx.reply('No pending downloads!');
   } else {
     const resser: { anime: string; epnum: number[] }[] = [];
     for (let i = 0; i < pendingdl.length; i++) {
-      const index = resser.findIndex((o) => o.anime == pendingdl[i].anime);
+      const index = resser.findIndex(
+        (o) => o.anime == (pendingdl[i].anime ?? ''),
+      );
       if (index == -1)
         resser.push({
-          anime: pendingdl[i].anime,
+          anime: pendingdl[i].anime ?? '',
           epnum: [pendingdl[i].epnum],
         });
       else {
@@ -51,14 +54,20 @@ export async function anime_dllist(ctx: MyContext) {
       } else msg = fmt`${msg}${tmpmsg}`;
     }
     if (msglist.length > 0) {
-      for (let i = 0; i < msglist.length; i++)
-        await bot.api.sendMessage(ctx.from.id, msglist[i].text, {
-          entities: msglist[i].entities,
+      for (let i = 0; i < msglist.length; i++) {
+        if (ctx.from?.id !== undefined) {
+          await bot.api.sendMessage(ctx.from.id, msglist[i].text, {
+            entities: msglist[i].entities,
+          });
+        }
+      }
+    } else {
+      if (ctx.from?.id !== undefined) {
+        await bot.api.sendMessage(ctx.from.id, msg.text, {
+          entities: msg.entities,
         });
-    } else
-      await bot.api.sendMessage(ctx.from.id, msg.text, {
-        entities: msg.entities,
-      });
+      }
+    }
   }
 }
 
@@ -66,7 +75,9 @@ export async function anime_dllist(ctx: MyContext) {
 export async function dl_cbq(ctx: MyContext) {
   await ctx.answerCallbackQuery();
   const userid = ctx.session.userid;
-  const keyboard = await makeEpKeyboard(ctx.msg.caption, 'dlep', userid);
+  const caption = ctx.msg?.caption;
+  if (caption === undefined || userid === undefined) return;
+  const keyboard = await makeEpKeyboard(caption, 'dlep', userid);
   await ctx.editMessageReplyMarkup({ reply_markup: keyboard });
 }
 
@@ -74,37 +85,51 @@ export async function dl_cbq(ctx: MyContext) {
 export async function dlep_cbq(ctx: MyContext) {
   await ctx.answerCallbackQuery('Download request recieved.');
   const userid = ctx.session.userid;
-  const alid = parseInt(ctx.match[1]);
-  const epnum = parseInt(ctx.match[2]);
+  if (userid === undefined) return;
+  const alid = parseInt(ctx.match?.[1] || '');
+  const epnum = parseInt(ctx.match?.[2] || '');
+  if (Number.isNaN(alid) || Number.isNaN(epnum)) return;
   const pull1 = await db.anime.findFirst({
     where: { alid },
     select: { optnames: true },
   });
   if (pull1 === null) throw new Error(`Anime not found: ${alid}`);
-  const updateobj = await getSinglePending(userid, null, alid);
+  const updateobj = await getSinglePending(userid, undefined, alid);
+  if (updateobj === null || updateobj === undefined) {
+    await ctx.reply('Error fetching anime data.');
+    return;
+  }
   const pendingdl: i_DlSync[] = (
     await db.syncupd.findMany({
       where: { userid },
     })
-  ).map((o) => {
-    const i = getNumber(o.epnum) as number;
-    return Object.assign(o, { epnum: i });
-  });
+  )
+    .filter((o) => o.epnum !== null && o.torrentdata !== null)
+    .map((o) => {
+      const i = getNumber(o.epnum!) as number;
+      return Object.assign(o, {
+        epnum: i,
+        torrentdata: o.torrentdata ?? undefined,
+      });
+    });
   let flag = false;
   for (let i = 0; i < pendingdl.length; i++) {
-    if (pendingdl[i].anime == updateobj.jpname && pendingdl[i].epnum == epnum) {
+    if (
+      pendingdl[i].anime == (updateobj?.jpname ?? '') &&
+      pendingdl[i].epnum == epnum
+    ) {
       flag = true;
       break;
     }
   }
   if (flag == true) {
     await ctx.reply(
-      `Episode ${epnum} of ${updateobj.jpname} already queued for download! Use /dllist to view your pending downloads.`,
+      `Episode ${epnum} of ${updateobj?.jpname ?? ''} already queued for download! Use /dllist to view your pending downloads.`,
     );
     return;
   }
   try {
-    let query = `"${updateobj.jpname}"|"${updateobj.enname}"`;
+    let query = `"${updateobj?.jpname ?? ''}"| "${updateobj?.enname ?? ''}"`;
     if (pull1.optnames !== null)
       pull1.optnames.forEach((o) => (query += `|"${o}"`));
     query += ` 1080p "- ${String(epnum).padStart(2, '0')}"`;
@@ -126,7 +151,7 @@ export async function dlep_cbq(ctx: MyContext) {
       );
       if (res.status === 400 || res.data.length == 0) {
         await ctx.reply(
-          `Unable to fetch downloads for ${updateobj.jpname}. Please contact @adithyagenie.`,
+          `Unable to fetch downloads for ${updateobj?.jpname ?? ''}. Please contact @adithyagenie.`,
         );
         return;
       }
@@ -135,9 +160,9 @@ export async function dlep_cbq(ctx: MyContext) {
       o.title = o.title.toLowerCase();
       return (
         aniep(o.title) == epnum &&
-        (o.title.includes(updateobj.jpname.toLowerCase()) ||
-          o.title.includes(updateobj.enname.toLowerCase()) ||
-          pull1.optnames
+        (o.title.includes((updateobj?.jpname ?? '').toLowerCase()) ||
+          o.title.includes((updateobj?.enname ?? '').toLowerCase()) ||
+          (pull1.optnames ?? [])
             .map((p) => p.toLowerCase())
             .some((q) => o.title.includes(q)))
       );
@@ -154,9 +179,9 @@ export async function dlep_cbq(ctx: MyContext) {
         `startdl triggered @ ${xdcclink.botname}: ${xdcclink.packnum}`,
       );
       const sync_toupd: i_DlSync = {
-        userid: userid,
+        userid: userid!,
         synctype: 'dl',
-        anime: updateobj.jpname,
+        anime: updateobj?.jpname ?? '',
         epnum: epnum,
         dltype: 'xdcc',
         xdccdata: [xdcclink.botname, xdcclink.packnum.toFixed()],
@@ -164,7 +189,7 @@ export async function dlep_cbq(ctx: MyContext) {
       const returncode = await newDL(sync_toupd);
       if (returncode === 0) {
         await ctx.reply(
-          `Episode ${epnum} of ${updateobj.jpname} queued for download!`,
+          `Episode ${epnum} of ${updateobj?.jpname ?? ''} queued for download!`,
         );
       } else await ctx.reply('Sending DL failed.');
       return;
@@ -172,9 +197,9 @@ export async function dlep_cbq(ctx: MyContext) {
       torrentlink = res.data[0].file;
       console.log(`torrentdl triggered ${torrentlink}`);
       const sync_toupd: i_DlSync = {
-        userid: userid,
+        userid: userid!,
         synctype: 'dl',
-        anime: updateobj.jpname,
+        anime: updateobj?.jpname ?? '',
         epnum: epnum,
         dltype: 'torrent',
         torrentdata: torrentlink,

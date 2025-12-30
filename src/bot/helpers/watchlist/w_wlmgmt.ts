@@ -15,6 +15,7 @@ export async function createWL(
   ctx: MyConversationContext,
 ) {
   const userid = await conversation.external((ctx2) => ctx2.session.userid);
+  if (userid === undefined) return;
   conversation.waitForCommand('cancel').then(async () => {
     await ctx.reply('Alright, cancelling.');
     conversation.halt();
@@ -36,12 +37,16 @@ export async function createWL(
 export function deleteWL() {
   return new Menu<MyContext>('wl_delete')
     .text('Yes, go ahead.', async (ctx1) => {
-      const res = await deleteWatchlist(ctx1.session.menudata.wlid);
+      if (ctx1.session.menudata === undefined) return;
+      const wlid = ctx1.session.menudata.wlid;
+      if (wlid === undefined) return;
+      const res = await deleteWatchlist(wlid);
       if (res === 0) {
         const yeet = await ctx1.reply(
-          `Deleted watchlist ${ctx1.session.menudata.wlname}.`,
+          `Deleted watchlist ${ctx1.session.menudata.wlname ?? ''}.`,
         );
-        selfyeet(ctx1.chat.id, yeet.message_id, 10000);
+        if (ctx1.chat?.id !== undefined)
+          selfyeet(ctx1.chat.id, yeet.message_id, 10000);
         ctx1.menu.nav('wl_main');
         await ctx1.editMessageText('Choose the watchlist from the menu below:');
       } else if (res === 1) {
@@ -50,9 +55,8 @@ export function deleteWL() {
       }
     })
     .back('Nope, get me outta here.', async (ctx1) => {
-      const cancelDeleteReplyMsg = fmt`Watchlist ${code}${await getWLName(
-        ctx1,
-      )}${code} chosen.\nWhat do you want to do with it?`;
+      const wlname = await getWLName(ctx1);
+      const cancelDeleteReplyMsg = fmt`Watchlist ${code}${wlname ?? ''}${code} chosen.\nWhat do you want to do with it?`;
       await ctx1.editMessageText(cancelDeleteReplyMsg.text, {
         entities: cancelDeleteReplyMsg.entities,
       });
@@ -63,7 +67,8 @@ export async function renameWL(
   convo: MyConversation,
   ctx: MyConversationContext,
 ) {
-  const wlid = await convo.external((ctx2) => ctx2.session.menudata.wlid);
+  const wlid = await convo.external((ctx2) => ctx2.session.menudata?.wlid);
+  if (wlid === undefined) return;
   const wlname = await getWLName(convo);
 
   convo.waitForCommand('cancel').then(async () => {
@@ -71,14 +76,18 @@ export async function renameWL(
     await convo.halt();
   });
 
-  const newNameReqMsg = fmt`Enter the new name for watchlist ${code}${wlname}${code}.\n(Or /cancel to cancel renaming.)`;
+  const newNameReqMsg = fmt`Enter the new name for watchlist ${code}${wlname ?? ''}${code}.\n(Or /cancel to cancel renaming.)`;
   await ctx.reply(newNameReqMsg.text, { entities: newNameReqMsg.entities });
   const newname = await convo.waitFor(':text');
+  if (newname.msg?.text === undefined) return;
   const renameSuccessMsg = fmt`Alright, setting ${code}${newname.msg.text}${code} as the new name.`;
   await ctx.reply(renameSuccessMsg.text, {
     entities: renameSuccessMsg.entities,
   });
-  await convo.external(() => renameWatchlist(wlid, newname.msg.text));
-  convo.external((ctx2) => (ctx2.session.menudata.wlname = undefined));
+  await convo.external(() => renameWatchlist(wlid, newname.msg.text!));
+  convo.external((ctx2) => {
+    if (ctx2.session.menudata !== undefined)
+      ctx2.session.menudata.wlname = undefined;
+  });
   return;
 }

@@ -8,12 +8,13 @@ import { b, fmt, FormattedString, i } from '@grammyjs/parse-mode';
 export async function a_Pending(ctx: MyContext) {
   await ctx.deleteMessage();
   const userid = ctx.session.userid;
+  if (userid === undefined || ctx.from?.id === undefined) return;
   try {
     const res = await axios.get('http://localhost:4000/pending', {
       params: {
         chatid: ctx.from.id,
         userid: userid,
-        alid: parseInt(ctx.match[1]),
+        alid: parseInt(ctx.match?.[1] || ''),
         is_bot: true,
       },
     });
@@ -33,7 +34,7 @@ async function animePendingBotHandle(
   alid: number,
 ) {
   await bot.api.sendChatAction(chatid, 'typing');
-  const res = await getSinglePending(userid, null, alid);
+  const res = await getSinglePending(userid, undefined, alid);
   if (res === undefined) return undefined;
   else if (res === null) return null;
   if (res.notwatched.length === 0) {
@@ -82,6 +83,12 @@ async function animePendingBotHandle(
     }
   }
   const finalMsg = FormattedString.join([msgheader, msg]);
+  if (res.image === null) {
+    await bot.api.sendMessage(chatid, finalMsg.text, {
+      entities: finalMsg.entities,
+    });
+    return 0;
+  }
   await bot.api.sendPhoto(chatid, res.image, {
     caption: finalMsg.text,
     caption_entities: finalMsg.caption_entities,
@@ -192,7 +199,7 @@ export function pendingEndpoint(server: FastifyInstance) {
 
       //await animePending(chatid, userid);
       if (!is_bot) {
-        const res2 = await getSinglePending(userid, null, alid);
+        const res2 = await getSinglePending(userid, undefined, alid);
         if (res2 === undefined) {
           await res.status(400).send([]);
           return;

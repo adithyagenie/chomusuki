@@ -18,13 +18,13 @@ export interface SPSearch {
 }
 
 export async function getxdcc(name: string) {
-  let packnum: number;
-  let botnum: number;
+  let packnum: number | undefined;
+  let botnum: number | undefined;
   let returnobj: SPSearch = {
     packnum: 0,
     botname: '',
   };
-  const botnames = {
+  const botnames: Record<number, string> = {
     989: 'CR-ARUTHA|NEW',
     696: 'CR-HOLLAND|NEW',
     21: 'Ginpachi-Sensei',

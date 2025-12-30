@@ -8,12 +8,17 @@ import { MyContext } from '../bot';
 async function getConfig(ctx: MyContext) {
   try {
     if (ctx.session.config !== undefined) return ctx.session.config;
+    if (ctx.session.userid === undefined) return undefined;
     const data = await db.config.findUnique({
       where: { userid: ctx.session.userid },
       select: { pause_airing_updates: true },
     });
-    ctx.session.config = data;
-    return data;
+    if (data !== null) {
+      ctx.session.config = {
+        pause_airing_updates: data.pause_airing_updates ?? undefined,
+      };
+    }
+    return ctx.session.config;
   } catch (err) {
     console.error(err);
     return undefined;
@@ -21,15 +26,18 @@ async function getConfig(ctx: MyContext) {
 }
 
 export async function anime_config(ctx: MyContext) {
+  if (ctx.msg?.text === undefined) return;
   const argarray = ctx.msg.text.split(' ');
   argarray.splice(0, 1);
   console.log(argarray);
   const userid = ctx.session.userid;
+  if (userid === undefined) return;
   const oldconfig = await getConfig(ctx);
+  if (oldconfig === undefined) return;
 
   const newconfig: config = {
     userid: userid,
-    pause_airing_updates: oldconfig.pause_airing_updates,
+    pause_airing_updates: oldconfig.pause_airing_updates ?? null,
   };
   if (argarray.length > 0) {
     if (argarray[0] == 'pause_airing_updates') {

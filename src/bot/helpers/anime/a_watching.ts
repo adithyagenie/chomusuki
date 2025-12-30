@@ -16,11 +16,14 @@ import { a, b, fmt, FormattedString } from '@grammyjs/parse-mode';
  */
 export async function watching_pending_list(ctx: MyContext) {
   const userid = ctx.session.userid;
-  let res: { msg: FormattedString; keyboard: InlineKeyboard } = undefined;
-  if (ctx.match[1] != 'pending' && ctx.match[1] != 'watching') return;
+  if (userid === undefined) return;
+  let res:
+    | { msg: FormattedString; keyboard: InlineKeyboard | undefined }
+    | undefined = undefined;
+  if (ctx.match?.[1] != 'pending' && ctx.match?.[1] != 'watching') return;
   res = await watchingListHelper(userid, 1, ctx.me.username, ctx.match[1]);
-  if (res == undefined) {
-    await ctx.reply(`Error fetching ${ctx.match[1]} list.`);
+  if (res == undefined || res.keyboard === undefined) {
+    await ctx.reply(`Error fetching ${ctx.match?.[1]} list.`);
     return;
   }
   if (res.keyboard == undefined || res.keyboard.inline_keyboard.length == 0)
@@ -41,12 +44,17 @@ async function watchingListHelper(
   username: string,
   list: 'watching' | 'pending',
 ) {
-  const { alidlist, animelist, amount } = await getUserWatchingAiring(
+  const result = await getUserWatchingAiring(
     'watchinganime',
     userid,
     10,
     offset,
   );
+  if (result === undefined) {
+    const msg = fmt`${b}Error fetching list.${b}`;
+    return { msg: msg, keyboard: undefined };
+  }
+  const { alidlist, animelist, amount } = result;
   let msg = new FormattedString('');
   if (amount == 0) {
     msg = fmt`${b}You are currently not watching any anime. Add some with /startwatching to get started.${b}`;
@@ -71,10 +79,11 @@ async function watchingListHelper(
 /**The callback from pages of watching. */
 export async function watchingListCBQ(ctx: MyContext) {
   await ctx.answerCallbackQuery('Fetching!');
-  const movepg = parseInt(ctx.match[2]);
-  const list = ctx.match[1];
-  if (ctx.match[3] == '_current') return;
+  const movepg = parseInt(ctx.match?.[2] || '');
+  const list = ctx.match?.[1];
+  if (ctx.match?.[3] == '_current') return;
   if (list != 'watching' && list != 'pending') return;
+  if (ctx.session.userid === undefined) return;
   const { msg, keyboard } = await watchingListHelper(
     ctx.session.userid,
     movepg,
@@ -82,7 +91,7 @@ export async function watchingListCBQ(ctx: MyContext) {
     list,
   );
   try {
-    if (ctx.msg.text.trim() !== msg.text.trim())
+    if (ctx.msg?.text?.trim() !== msg.text.trim())
       await ctx.editMessageText(msg.text, {
         entities: msg.entities,
         reply_markup: keyboard,
@@ -100,27 +109,28 @@ export async function animeStartWatch(ctx: MyContext, menu = false) {
   let alid: number;
   if (menu === false) {
     await ctx.deleteMessage();
-    alid = parseInt(ctx.match[1]);
-  } else alid = ctx.session.menudata.alid;
+    alid = parseInt(ctx.match?.[1] || '');
+  } else alid = ctx.session.menudata?.alid || 0;
   if (alid == undefined || Number.isNaN(alid)) {
     await ctx.reply('Invalid.');
     return;
   }
   const userid = ctx.session.userid;
+  if (userid === undefined) return;
   if (menu === false) {
-    const old = (
-      await db.watchinganime.findUnique({
-        where: { userid },
-      })
-    ).alid;
+    const watchingData = await db.watchinganime.findUnique({
+      where: { userid },
+    });
+    if (watchingData === null) return;
+    const old = watchingData.alid;
     if (old.includes(alid)) {
+      const animeData = await db.anime.findUnique({
+        where: { alid },
+        select: { jpname: true },
+      });
+      if (animeData === null) return;
       const replyString = fmt`You have already marked ${b}${
-        (
-          await db.anime.findUnique({
-            where: { alid },
-            select: { jpname: true },
-          })
-        ).jpname
+        animeData.jpname
       }${b} as watching.`;
       await ctx.reply(replyString.text, { entities: replyString.entities });
       return;
@@ -136,9 +146,9 @@ export async function animeStartWatch(ctx: MyContext, menu = false) {
     return;
   }
   await addWatching(userid, alid);
-  if (menu)
+  if (menu && ctx.chat?.id !== undefined)
     selfyeet(
-      ctx.chat?.id,
+      ctx.chat.id,
       (await ctx.reply(`Marked ${res.pull.jpname} as watching!`)).message_id,
       5000,
     );
@@ -160,20 +170,21 @@ export async function stopWatching(
   ctx: MyConversationContext,
 ) {
   const userid = await conversation.external((ctx2) => ctx2.session.userid);
+  if (userid === undefined) return;
   await ctx.deleteMessage();
-  const match = parseInt(ctx.match[1]);
-  if (Number.isNaN(match[1])) {
+  const match = parseInt(ctx.match?.[1] || '');
+  if (Number.isNaN(match)) {
     await ctx.reply('Invalid command.');
     return;
   }
-  const _ = (
-    await conversation.external(() =>
-      db.watchinganime.findUnique({
-        where: { userid: userid },
-        select: { alid: true },
-      }),
-    )
-  ).alid;
+  const watchingRes = await conversation.external(() =>
+    db.watchinganime.findUnique({
+      where: { userid: userid },
+      select: { alid: true },
+    }),
+  );
+  if (watchingRes === null) return;
+  const _ = watchingRes.alid;
   const aniname = await conversation.external(() =>
     db.anime.findUnique({
       where: { alid: match },
@@ -207,7 +218,7 @@ export async function stopWatching(
       );
       await db.watchinganime.update({
         where: { userid: userid },
-        data: { alid: _, userid: undefined },
+        data: { alid: _, userid: userid },
       });
       await db.watchedepanime.delete({
         where: {
@@ -218,13 +229,17 @@ export async function stopWatching(
         },
       });
     });
-    await ctx.api.deleteMessage(ctx.from.id, msgid);
+    if (ctx.from?.id !== undefined) {
+      await ctx.api.deleteMessage(ctx.from.id, msgid);
+    }
     await ctx.reply(
       `${aniname.jpname} has been removed from your watching list.`,
     );
     return;
   } else if (cbq.callbackQuery.data == 'n') {
-    await ctx.api.deleteMessage(ctx.from.id, msgid);
+    if (ctx.from?.id !== undefined) {
+      await ctx.api.deleteMessage(ctx.from.id, msgid);
+    }
     await ctx.reply(`Alright cancelling deletion.`);
   }
 }

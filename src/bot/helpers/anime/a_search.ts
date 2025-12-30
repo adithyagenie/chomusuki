@@ -67,6 +67,7 @@ export async function animeSearchStart(
     await ctx.reply('Please provide a search query!');
     return;
   }
+  if (ctx.from?.id === undefined) return;
   const msgid = (await ctx.reply('Searching...')).message_id;
   const { msg, keyboard } = await animeSearchHandler(
     query,
@@ -99,12 +100,11 @@ export async function animeSearchStart(
 async function getStatusFromDB(table: string, userid?: number, wlid?: number) {
   let alid: number[] = [];
   if (table == 'startwatching') {
-    alid = (
-      await db.watchinganime.findUnique({
-        where: { userid },
-        select: { alid: true },
-      })
-    ).alid;
+    const res = await db.watchinganime.findUnique({
+      where: { userid },
+      select: { alid: true },
+    });
+    if (res !== null) alid = res.alid;
   } else if (table == 'remindme') {
     const rec = await db.airingupdates.findMany({
       where: { userid: { has: userid } },
@@ -136,7 +136,7 @@ export async function animeSearchHandler(
   let command = cmd;
   // const page = await searchAnime(query, currentpg, command == "remindme");
   // if (page === undefined) return { msg: undefined, keyboard: undefined };
-  const searchArray: Promise<MediaSearchEntry>[] = [];
+  const searchArray: Promise<MediaSearchEntry | undefined>[] = [];
   for (let i = currentpg; i <= 5; i++)
     searchArray.push(searchAnime(query, i, command === 'remindme'));
   const t = await Promise.all(searchArray);
@@ -148,6 +148,9 @@ export async function animeSearchHandler(
     };
   const maxpg = Math.max(...pages.map((o) => o.pageInfo.currentPage));
   const page = pages.find((o) => o.pageInfo.currentPage === currentpg);
+  if (page === undefined) {
+    return { msg: undefined, keyboard: undefined };
+  }
   // if (currentpg != 1 && currentpg != 2)
   //     maxpg = pages.pageInfo.lastPage > 5 ? 5 : pages.pageInfo.lastPage;
   // else if (currentpg == 1 || currentpg == 2) {
@@ -225,10 +228,11 @@ export async function animeSearchHandler(
  Migrate the callbackquery and make this a function later.*/
 export async function search_startWatch_remindMe_cb(ctx: MyContext) {
   await ctx.answerCallbackQuery('Searching!');
-  const command = ctx.match[1];
-  if (ctx.match[3] === '_current') return;
+  const command = ctx.match?.[1];
+  if (ctx.match?.[3] === '_current') return;
   if (command !== 'startwatching' && command !== 'remindme') return;
-  const movepg = parseInt(ctx.match[2]);
+  const movepg = parseInt(ctx.match?.[2] || '');
+  if (ctx.msg?.text === undefined) return;
   const query = [
     ...ctx.msg.text.split('\n')[0].matchAll(/^Search results for '(.+)'$/gi),
   ].map((o) => o[1])[0];

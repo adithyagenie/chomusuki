@@ -56,15 +56,19 @@ export function botinit() {
     session({
       type: 'multi',
       userid: {
-        storage: new MemorySessionStorage(60 * 60 * 1000),
-        initial: () => undefined,
+        storage: new MemorySessionStorage<number | undefined>(60 * 60 * 1000),
+        initial: (): number | undefined => undefined,
       },
       config: {
-        storage: new MemorySessionStorage(60 * 60 * 1000),
-        initial: () => ({ pause_airing_updates: undefined }),
+        storage: new MemorySessionStorage<
+          { pause_airing_updates?: boolean } | undefined
+        >(60 * 60 * 1000),
+        initial: (): { pause_airing_updates?: boolean } | undefined => ({
+          pause_airing_updates: undefined,
+        }),
       },
       menudata: {
-        storage: storage,
+        storage: storage as any,
         initial: () => ({
           activemenuopt: undefined,
           wlid: undefined,

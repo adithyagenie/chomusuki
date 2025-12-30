@@ -7,6 +7,7 @@ import { bot } from '../bot/bot';
 
 export async function addAnimeNames(obj: Prisma.anime) {
   try {
+    console.log(obj);
     const insertres = await db.anime.upsert({
       where: { alid: obj.alid },
       update: obj,
@@ -313,10 +314,13 @@ export async function getWatchlistAnime(
   amount?: number,
   paginate = true,
   needmaxpg = true,
-  towatch = { towatch: false, userid: undefined },
+  towatch: { towatch: boolean; userid?: number } = {
+    towatch: false,
+    userid: undefined,
+  },
 ) {
-  let maxpg: number;
-  if (needmaxpg === true)
+  let maxpg: number | undefined;
+  if (needmaxpg === true && currentpg !== undefined && amount !== undefined)
     if (towatch.towatch === true)
       maxpg = Math.ceil(
         Number(
@@ -351,7 +355,7 @@ export async function getWatchlistAnime(
     enname: string;
     alid: number;
   }[];
-  if (towatch.towatch) {
+  if (towatch.towatch && currentpg !== undefined && amount !== undefined) {
     if (paginate)
       wl = await db.$queryRaw`SELECT a.jpname, a.enname, a.alid \
                                     FROM watchlists w, completedanime c, anime a, unnest(w.alid) u \
@@ -363,7 +367,7 @@ export async function getWatchlistAnime(
                                     FROM watchlists w, completedanime c, anime a, unnest(w.alid) u \
                                     WHERE (c.userid = ${towatch.userid}) AND (NOT (u) = any(c.completed)) AND ((a.alid) in (u))`;
   } else {
-    if (paginate)
+    if (paginate && currentpg !== undefined && amount !== undefined)
       wl = await db.$queryRaw`SELECT a.jpname, a.enname, a.alid \
                                     FROM anime a, watchlists w, unnest(w.alid) s \
                                     WHERE (a.alid IN (s)) AND (w.watchlistid = ${wlid}) \
@@ -418,6 +422,7 @@ export function getNumber(
   } catch (e) {
     console.error(e);
   }
+  return Array.isArray(data) ? [] : 0;
 }
 
 export function getDecimal(
@@ -425,6 +430,7 @@ export function getDecimal(
 ): Prisma.Prisma.Decimal | Prisma.Prisma.Decimal[] {
   if (Array.isArray(data)) return data.map((o) => new Prisma.Prisma.Decimal(o));
   else if (typeof data == 'number') return new Prisma.Prisma.Decimal(data);
+  return new Prisma.Prisma.Decimal(0);
 }
 
 /** Adds anime details to anime table if not existing.*/
@@ -432,10 +438,10 @@ export async function checkAnimeTable(alid: number, updatedata = false) {
   let pull: {
     alid: number;
     jpname: string;
-    status: string;
-    next_ep_num: Prisma.Prisma.Decimal;
-    next_ep_air: number;
-  } = null;
+    status: string | null;
+    next_ep_num: Prisma.Prisma.Decimal | null;
+    next_ep_air: number | null;
+  } | null = null;
   if (updatedata === false)
     pull = await db.anime.findUnique({
       where: { alid },
@@ -454,8 +460,8 @@ export async function checkAnimeTable(alid: number, updatedata = false) {
       return 'invalid';
     }
     const release = res.status === 'RELEASING';
-    let imglink: string = undefined,
-      fileid: string = undefined;
+    let imglink: string | undefined = undefined,
+      fileid: string | undefined = undefined;
     if (updatedata !== true) {
       imglink = await imageGet(res.id);
       fileid = (await bot.api.sendPhoto(-1001869285732, imglink)).photo[0]
@@ -465,20 +471,20 @@ export async function checkAnimeTable(alid: number, updatedata = false) {
       alid: res.id,
       jpname: res.title.romaji,
       enname: res.title.english === null ? res.title.romaji : res.title.english,
-      optnames: undefined,
-      excludenames: undefined,
-      status: res.status,
-      next_ep_num: undefined,
-      next_ep_air: undefined,
-      last_ep: undefined,
-      ep_extras: undefined,
-      imglink: imglink,
-      fileid: fileid,
+      optnames: [],
+      excludenames: [],
+      status: res.status || 'FINISHED',
+      next_ep_num: null,
+      next_ep_air: null,
+      last_ep: null,
+      ep_extras: [],
+      imglink: imglink ?? null,
+      fileid: fileid ?? null,
     };
     if (release) {
-      obj.next_ep_air = res.nextAiringEpisode['airingAt'];
+      obj.next_ep_air = (res.nextAiringEpisode as any)['airingAt'];
       obj.next_ep_num = getDecimal(
-        res.nextAiringEpisode['episode'],
+        (res.nextAiringEpisode as any)['episode'],
       ) as Prisma.Prisma.Decimal;
     }
     if (obj.status === 'RELEASING' || obj.status === 'FINISHED') {
@@ -508,7 +514,13 @@ export async function checkAnimeTable(alid: number, updatedata = false) {
     }
     const add = await addAnimeNames(obj);
     if (add == 1) return 'err';
-    pull = obj;
+    pull = {
+      alid: obj.alid,
+      jpname: obj.jpname,
+      status: obj.status ?? '',
+      next_ep_num: obj.next_ep_num ?? new Prisma.Prisma.Decimal(0),
+      next_ep_air: obj.next_ep_air ?? 0,
+    };
   }
   airing = pull.status === 'RELEASING';
 

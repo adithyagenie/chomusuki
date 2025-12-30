@@ -18,8 +18,12 @@ async function cronn(
   if (next_ep_air * 1000 < Date.now()) {
     console.error('Time to schedule in past.');
     const res2 = await checkAnimeTable(alid, true);
+    console.log(res2);
     if (res2 == 'err' || res2 == 'invalid')
       throw new Error('Unable to fetch anime table.');
+    if (res2.pull.next_ep_air === null || res2.pull.next_ep_num === null) {
+      throw new Error('Missing next episode information.');
+    }
     await cronn(
       alid,
       res2.pull.jpname,
@@ -50,6 +54,8 @@ async function airhandle(alid: number, aniname: string, next_ep_num: number) {
     select: { fileid: true },
   });
   if (sususers === null) throw new Error('Unable to find airing ppl');
+  if (imglink === null || imglink.fileid === null)
+    throw new Error('Unable to find image');
   const chatid = await db.users.findMany({
     where: { userid: { in: sususers.userid } },
     select: { chatid: true },
@@ -72,16 +78,18 @@ async function airhandle(alid: number, aniname: string, next_ep_num: number) {
     async function (alid: number) {
       console.log(`Refreshing cron for ${alid}...`);
       const res = await checkAnimeTable(alid, true);
-      if (res === 'invalid' || res === 'err')
+      if (res === 'err' || res === 'invalid')
         throw new Error("Can't fetch anime details.");
       if (res.airing === true) {
         res.pull.next_ep_air = Math.floor(Date.now() / 1000) + 25;
-        await cronn(
-          alid,
-          res.pull.jpname,
-          res.pull.next_ep_air,
-          getNumber(res.pull.next_ep_num) as number,
-        );
+        if (res.pull.next_ep_num !== null) {
+          await cronn(
+            alid,
+            res.pull.jpname,
+            res.pull.next_ep_air,
+            getNumber(res.pull.next_ep_num) as number,
+          );
+        }
       }
     }.bind(null, alid),
   );
@@ -104,7 +112,9 @@ async function reInitCron() {
       oldtasks[i].cancel();
   });
   for (const o of data) {
-    await cronn(o.alid, o.jpname, o.next_ep_air, o.next_ep_num.toNumber());
+    if (o.next_ep_air !== null && o.next_ep_num !== null) {
+      await cronn(o.alid, o.jpname, o.next_ep_air, o.next_ep_num.toNumber());
+    }
   }
 }
 

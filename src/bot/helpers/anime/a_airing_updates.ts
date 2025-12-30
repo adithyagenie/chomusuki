@@ -14,7 +14,8 @@ import { getPagination } from './a_misc_helpers';
 export async function remindMe(ctx: MyContext) {
   await ctx.deleteMessage();
   const userid = ctx.session.userid;
-  const alid = parseInt(ctx.match[1]);
+  if (userid === undefined) return;
+  const alid = parseInt(ctx.match?.[1] || '');
   if (alid == undefined || Number.isNaN(alid)) {
     await ctx.reply('Invalid.');
     return;
@@ -37,13 +38,16 @@ export async function remindMe(ctx: MyContext) {
   }
   const res = await addAiringFollow(alid, userid);
   if (res == 0) {
+    const animeData = await db.anime.findUnique({
+      where: { alid },
+      select: { jpname: true },
+    });
+    if (animeData === null) {
+      await ctx.reply('Error encountered ;_;');
+      return;
+    }
     const replyMessage = fmt`You will now recieve updates on ${b}${
-      (
-        await db.anime.findUnique({
-          where: { alid },
-          select: { jpname: true },
-        })
-      ).jpname
+      animeData.jpname
     }.${b}`;
     await ctx.reply(replyMessage.text, { entities: replyMessage.entities });
   } else await ctx.reply('Error encountered ;_;');
@@ -56,6 +60,7 @@ export async function remindMe(ctx: MyContext) {
  */
 export async function airingUpdatesList(ctx: MyContext) {
   const userid = ctx.session.userid;
+  if (userid === undefined) return;
   const { msg, keyboard } = await airingUpdatesListHelper(
     userid,
     1,
@@ -78,12 +83,17 @@ export async function airingUpdatesListHelper(
   offset: number,
   username: string,
 ) {
-  const { alidlist, animelist, amount } = await getUserWatchingAiring(
+  const result = await getUserWatchingAiring(
     'airingupdates',
     userid,
     5,
     offset,
   );
+  if (result === undefined) {
+    const msg = fmt`${b}Error fetching airing updates.${b}`;
+    return { msg: msg, keyboard: undefined };
+  }
+  const { alidlist, animelist, amount } = result;
   let msg: FormattedString;
   if (amount == 0) {
     msg = fmt`${b}You have not subscribed to airing updates for any anime.${b}`;
@@ -101,15 +111,16 @@ export async function airingUpdatesListHelper(
 /**The callback from pages of /airingupdates. CBQ: airingupd_*/
 export async function airingUpdatesListCBQ(ctx: MyContext) {
   await ctx.answerCallbackQuery('Fetching!');
-  const movepg = parseInt(ctx.match[1]);
-  if (ctx.match[2] == '_current') return;
+  const movepg = parseInt(ctx.match?.[1] || '');
+  if (ctx.match?.[2] == '_current') return;
+  if (ctx.session.userid === undefined) return;
   const { msg, keyboard } = await airingUpdatesListHelper(
     ctx.session.userid,
     movepg,
     ctx.me.username,
   );
   try {
-    if (ctx.msg.text.trim() !== msg.text.trim())
+    if (ctx.msg?.text?.trim() !== msg.text.trim())
       await ctx.editMessageText(msg.text, {
         entities: msg.entities,
         reply_markup: keyboard,
@@ -125,7 +136,11 @@ export async function airingUpdatesListCBQ(ctx: MyContext) {
  */
 export async function stopAiringUpdates(ctx: MyContext) {
   await ctx.deleteMessage();
-  const remove = parseInt(ctx.match[1] as string);
+  const remove = parseInt((ctx.match?.[1] as string) || '');
+  if (Number.isNaN(remove)) {
+    await ctx.reply('Invalid anime provided.');
+    return;
+  }
   const anideets = await db.anime.findUnique({
     where: { alid: remove },
     select: { jpname: true, status: true },
@@ -142,13 +157,16 @@ export async function stopAiringUpdates(ctx: MyContext) {
     where: { userid: { has: ctx.session.userid } },
   });
   let i = -1;
-  if (userau !== null) i = userau.map((o) => o.alid).indexOf(remove);
+  if (userau !== null && ctx.session.userid !== undefined)
+    i = userau.map((o) => o.alid).indexOf(remove);
   if (i === -1) {
     const replyMessage = fmt`You are already not recieving the updates for ${b}${name}${b}.`;
     await ctx.reply(replyMessage.text, { entities: replyMessage.entities });
     return;
   }
-  userau[i].userid.splice(userau[i].userid.indexOf(ctx.session.userid), 1);
+  if (ctx.session.userid !== undefined) {
+    userau[i].userid.splice(userau[i].userid.indexOf(ctx.session.userid), 1);
+  }
   await db.airingupdates.update({
     where: { alid: remove },
     data: userau[i],

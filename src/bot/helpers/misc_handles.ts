@@ -24,7 +24,9 @@ export async function cancel_handle(ctx: MyContext) {
     await ctx.reply('No running operations.');
     return;
   }
-  console.log(`Terminating convo ${JSON.stringify(active)} for ${ctx.from.id}`);
+  console.log(
+    `Terminating convo ${JSON.stringify(active)} for ${ctx.from?.id}`,
+  );
   await ctx.conversation.exitAll();
   await ctx.reply('Cancelling operation...', {
     reply_markup: { remove_keyboard: true },
@@ -33,7 +35,12 @@ export async function cancel_handle(ctx: MyContext) {
 
 // sends log file
 export async function log_command(ctx: MyContext) {
-  if (ctx.from.id != parseInt(process.env.AUTHORISED_CHAT)) {
+  const authorisedChat = process.env.AUTHORISED_CHAT;
+  if (authorisedChat === undefined || ctx.from?.id === undefined) {
+    await ctx.reply('Logs available for admin only! (｡•́︿•̀｡)');
+    return;
+  }
+  if (ctx.from.id != parseInt(authorisedChat)) {
     await ctx.reply('Logs available for admin only! (｡•́︿•̀｡)');
     return;
   }
@@ -113,12 +120,12 @@ export function selfyeet(chatid: number, mid: number, time: number) {
 }
 
 export async function botErrorHandle(err: BotError<MyContext>) {
-  if (err.error instanceof TypeError && err.stack.includes('_replayApi')) {
+  if (err.error instanceof TypeError && err.stack?.includes('_replayApi')) {
     console.error(
       `Encountered error: ${err.error} at context \n${JSON.stringify(err.ctx.msg)}\nStack trace: ${err.stack}`,
     );
     console.log(
-      `Found conversation error. Deleting conversation session data for ${err.ctx.chat.id}`,
+      `Found conversation error. Deleting conversation session data for ${err.ctx.chat?.id}`,
     );
     await err.ctx.conversation.exitAll();
     await err.ctx.reply(

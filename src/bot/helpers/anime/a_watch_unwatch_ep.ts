@@ -19,7 +19,9 @@ export async function unwatchhelper(
   ctx: MyConversationContext,
 ) {
   const userid = await conversation.external((ctx2) => ctx2.session.userid);
+  if (userid === undefined) return;
   const updateobj = await conversation.external(() => getPending(userid));
+  if (updateobj === undefined) return;
   const keyboard = new Keyboard().resized().persistent().oneTime();
   const animelist = [];
   for (let i = 0; i < updateobj.length; i++) {
@@ -29,16 +31,17 @@ export async function unwatchhelper(
   await ctx.reply('Select the anime: (/cancel to cancel)', {
     reply_markup: keyboard,
   });
-  const animename = (
-    await conversation.waitForHears(/Anime: (.+)/)
-  ).message.text
-    .slice(7)
-    .trim();
-  const alid = updateobj.find((o) => o.jpname == animename).alid;
+  const response = await conversation.waitForHears(/Anime: (.+)/);
+  const animename = response.message?.text?.slice(7).trim();
+  if (animename === undefined) return;
+  const foundAnime = updateobj.find((o) => o.jpname == animename);
+  if (foundAnime === undefined) return;
+  const alid = foundAnime.alid;
   const eplist: number[] = [];
   const animeindex = await getUpdaterAnimeIndex(animename, updateobj);
-  for (let j = 0; j < updateobj[animeindex].watched.length; j++)
-    eplist.push(updateobj[animeindex].watched[j]);
+  if (animeindex === undefined) return;
+  for (let j = 0; j < updateobj[animeindex]!.watched.length; j++)
+    eplist.push(updateobj[animeindex]!.watched[j]);
 
   while (true) {
     const newkey = new Keyboard().persistent().resized();
@@ -50,7 +53,8 @@ export async function unwatchhelper(
       await conversation.waitForHears(
         /(^Unwatch episode: ([0-9]+)$)|(^Finish marking$)/,
       )
-    ).message.text;
+    ).message?.text;
+    if (buttonpress === undefined) continue;
     if (buttonpress == 'Finish marking') {
       await ctx.reply('Alright finishing up!');
       break;
@@ -84,27 +88,31 @@ export async function unwatchhelper(
 export async function callback_mkwatch(ctx: MyContext) {
   await ctx.answerCallbackQuery('Processing');
   const userid = ctx.session.userid;
-  const keyboard = await makeEpKeyboard(ctx.msg.caption, 'mkwtch', userid);
+  const caption = ctx.msg?.caption;
+  if (caption === undefined || userid === undefined) return;
+  const keyboard = await makeEpKeyboard(caption, 'mkwtch', userid);
   await ctx.editMessageReplyMarkup({ reply_markup: keyboard });
 }
 
 export async function callback_mkwatchep(ctx: MyContext) {
   await ctx.answerCallbackQuery(`Processing...`);
   const userid = ctx.session.userid;
-  const alid = parseInt(ctx.match[1]);
-  const epnum = parseInt(ctx.match[2]);
+  if (userid === undefined) return;
+  const alid = parseInt(ctx.match?.[1] || '');
+  const epnum = parseInt(ctx.match?.[2] || '');
+  if (Number.isNaN(alid) || Number.isNaN(epnum)) return;
 
-  const ep = (
-    await db.watchedepanime.findUnique({
-      where: {
-        userid_alid: {
-          userid,
-          alid,
-        },
+  const watchedData = await db.watchedepanime.findUnique({
+    where: {
+      userid_alid: {
+        userid,
+        alid,
       },
-      select: { ep: true },
-    })
-  ).ep;
+    },
+    select: { ep: true },
+  });
+  if (watchedData === null) return;
+  const ep = watchedData.ep;
   ep.push(getDecimal(epnum) as Prisma.Decimal);
 
   const res = await markWatchedunWatched({ userid, alid, ep });
@@ -112,15 +120,13 @@ export async function callback_mkwatchep(ctx: MyContext) {
     await ctx.reply('Failed to add to watched.');
     return;
   }
+  const animeData = await db.anime.findUnique({
+    where: { alid },
+    select: { jpname: true },
+  });
+  if (animeData === null) return;
   await ctx.reply(
-    `Episode: ${epnum} of ${
-      (
-        await db.anime.findUnique({
-          where: { alid },
-          select: { jpname: true },
-        })
-      ).jpname
-    } has been marked as watched!`,
+    `Episode: ${epnum} of ${animeData.jpname} has been marked as watched!`,
   );
 
   // let oldwatch: { epnum: number; epname: string }[] = [];
@@ -151,10 +157,13 @@ export async function callback_mkwatchep(ctx: MyContext) {
   const newkeyboard = new InlineKeyboard();
   //newkeyboard = newkeyboard.map((o1) => o1.filter((o) => !(o.text == `Episode ${epnum}`)));
   /**TEST THIS PLEASEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE */
+  if (ctx.msg?.reply_markup === undefined) return;
   let tt: {
     text: string;
     callback_data: string;
-  }[] = [].concat(...ctx.msg.reply_markup.inline_keyboard);
+  }[] = ([] as { text: string; callback_data: string }[]).concat(
+    ...(ctx.msg.reply_markup.inline_keyboard as any),
+  );
   tt = tt.filter((o) => !(o.text == `Episode ${epnum}`));
   for (let i = 0; i < tt.length; i += 2) {
     const bruh: { text: string; callback_data: string } = tt[i];
@@ -163,6 +172,9 @@ export async function callback_mkwatchep(ctx: MyContext) {
     else newkeyboard.add(bruh).add(bruh2).row();
   }
   //newkeyboard.text("Go back", "back");
+  if (ctx.msg?.caption === undefined || ctx.msg?.caption_entities === undefined)
+    return;
+  if (ctx.from?.id === undefined || ctx.msg?.message_id === undefined) return;
   const oldformatmsg = new FormattedString(
     ctx.msg.caption,
     ctx.msg.caption_entities,
@@ -199,6 +211,7 @@ export async function markWatchedRange(
   ctx: MyConversationContext,
 ) {
   const userid = await conversation.external((ctx2) => ctx2.session.userid);
+  if (userid === undefined) return;
   const genkeyboard = new InlineKeyboard();
   const watching = await conversation.external(
     () =>
@@ -229,13 +242,17 @@ export async function markWatchedRange(
   ).message_id;
   const _ = await conversation.waitForCallbackQuery(/mkwr_(.+)/);
   await _.answerCallbackQuery('Processing...');
-  const alid = parseInt(_.match[1]);
+  const alid = parseInt(_.match?.[1] || '');
   if (Number.isNaN(alid)) return;
+  if (ctx.from?.id === undefined) return;
   await ctx.api.deleteMessage(ctx.from.id, msgid);
-  const aniname = watching.find((o) => o.alid == alid).jpname;
+  const foundAnime = watching.find((o) => o.alid == alid);
+  if (foundAnime === undefined) return;
+  const aniname = foundAnime.jpname;
   const data = await conversation.external(() =>
-    getSinglePending(userid, null, alid),
+    getSinglePending(userid, undefined, alid),
   );
+  if (data === null || data === undefined) return;
   if (data.notwatched.length == 0) {
     await ctx.reply(
       `You have already marked all the episodes of ${aniname} as watched!`,
@@ -247,16 +264,20 @@ export async function markWatchedRange(
       Please give it in the form of ${code}start-end${code}${i}`;
   await ctx.reply(replyMessage.text, { entities: replyMessage.entities });
   while (true) {
-    const range = (await conversation.waitForHears(/^((\d+)|((\d+)-(\d+)))$/))
-      .match;
-    if (range[0] == null) {
+    const rangeMatch = (
+      await conversation.waitForHears(/^((\d+)|((\d+)-(\d+)))$/)
+    ).match;
+    if (rangeMatch === undefined || rangeMatch[0] == null) {
       const invalidRangeMsg = fmt`Invalid range specified. Please give it in the form of ${code}start-end${code}`;
       await ctx.reply(invalidRangeMsg.text, {
         entities: invalidRangeMsg.entities,
       });
       continue;
     }
-    const [start, end] = [parseInt(range[1]), parseInt(range[2])];
+    const [start, end] = [
+      parseInt(rangeMatch[2] || rangeMatch[4] || ''),
+      parseInt(rangeMatch[5] || rangeMatch[2] || ''),
+    ];
     if (Number.isNaN(start) || Number.isNaN(end)) {
       await ctx.reply('Please specify numbers in range :/');
       continue;
@@ -271,12 +292,12 @@ export async function markWatchedRange(
       continue;
     }
     await conversation.external(async () => {
-      let id = (
-        await db.watchedepanime.findUnique({
-          where: { userid_alid: { userid: userid, alid: alid } },
-          select: { ep: true },
-        })
-      ).ep;
+      const watchedData = await db.watchedepanime.findUnique({
+        where: { userid_alid: { userid: userid, alid: alid } },
+        select: { ep: true },
+      });
+      if (watchedData === null) return;
+      let id = watchedData.ep;
       id = id.concat(...(getDecimal(arr) as Prisma.Decimal[]));
       await db.watchedepanime.update({
         where: { userid_alid: { userid: userid, alid: alid } },
