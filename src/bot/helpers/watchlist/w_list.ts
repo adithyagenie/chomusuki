@@ -140,10 +140,14 @@ export function animeList() {
               where: { alid: item.alid },
               select: { imglink: true },
             });
-            const editMessage = fmt`Chosen watchlist: ${b}${wlname ?? ''}${b}\n
-                    Chosen anime: \n${b}${item.jpname}${b}\n${i}(${item.enname})${i}\n
-                    What do you wanna do with it?
-                    ${a(`${animeData.imglink ?? ''}`)}​${a}`;
+            const editMessage = animeData.imglink
+              ? fmt`Chosen watchlist: ${b}${wlname ?? ''}${b}\n
+Chosen anime: \n${b}${item.jpname}${b}\n${i}(${item.enname})${i}\n
+What do you wanna do with it?
+${a(animeData.imglink)}​${a}`
+              : fmt`Chosen watchlist: ${b}${wlname ?? ''}${b}\n
+Chosen anime: \n${b}${item.jpname}${b}\n${i}(${item.enname})${i}\n
+What do you wanna do with it?`;
 
             await ctx1.editMessageText(editMessage.text, {
               entities: editMessage.entities,

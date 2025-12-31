@@ -8,7 +8,7 @@ import {
 import { MyContext, MyConversation, MyConversationContext } from '../../bot';
 import { getPagination } from './a_misc_helpers';
 import { selfyeet } from '../misc_handles';
-import { a, b, fmt, FormattedString } from '@grammyjs/parse-mode';
+import { a, b, fmt, FormattedString, i } from '@grammyjs/parse-mode';
 
 /**
  ** Sends the first page of the list of anime the user is currently watching.
@@ -60,15 +60,15 @@ async function watchingListHelper(
     msg = fmt`${b}You are currently not watching any anime. Add some with /startwatching to get started.${b}`;
     return { msg: msg, keyboard: undefined };
   } else msg = fmt`${b}Displaying your currently watching list: ${b}\n\n`;
-  for (let i = 0; i < alidlist.length; i++) {
-    msg = msg.concat(fmt`${i + 1}. ${b}${animelist[i]}${b}\n`);
+  for (let idx = 0; idx < alidlist.length; idx++) {
+    msg = msg.concat(fmt`${idx + 1}. ${b}${animelist[idx]}${b}\n`);
     if (list === 'watching') {
       msg = msg.concat(
-        fmt`${i}Remove from watching list: ${a(`t.me/${username}?start=stopwatching_${alidlist[i]}`)}Click here!${a}${i}\n\n`,
+        fmt`${i}Remove from watching list: ${a(`t.me/${username}?start=stopwatching_${alidlist[idx]}`)}Click here!${a}${i}\n\n`,
       );
     } else if (list === 'pending') {
       msg = msg.concat(
-        fmt`${i}Get episode status: ${a(`t.me/${username}?start=pending_${alidlist[i]}`)}Click here!${a}${i}\n\n`,
+        fmt`${i}Get episode status: ${a(`t.me/${username}?start=pending_${alidlist[idx]}`)}Click here!${a}${i}\n\n`,
       );
     }
   }

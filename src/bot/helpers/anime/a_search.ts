@@ -1,11 +1,13 @@
 // Adding anime to subscriptions
 
-import { a, b, fmt } from '@grammyjs/parse-mode';
+import { a, b, fmt, FormattedString, i } from '@grammyjs/parse-mode';
 import { db } from '../../..';
 import { searchAnime } from '../../../api/anilist_api';
 import { MyContext } from '../../bot';
 import { getPagination } from './a_misc_helpers';
 import { MediaSearchEntry } from 'anilist-node';
+import { InlineKeyboard } from 'grammy';
+import type { MessageEntity } from '@grammyjs/types';
 
 // export async function anime_add(ctx: MyContext) {
 // 	if (ctx.chat.id != authchat) {
@@ -69,7 +71,7 @@ export async function animeSearchStart(
   }
   if (ctx.from?.id === undefined) return;
   const msgid = (await ctx.reply('Searching...')).message_id;
-  const { msg, keyboard } = await animeSearchHandler(
+  const { msgText, msgEntities, keyboard } = await animeSearchHandler(
     query,
     command,
     1,
@@ -78,7 +80,7 @@ export async function animeSearchStart(
       ? ctx.session.userid
       : undefined,
   );
-  if (msg == undefined || keyboard == undefined) {
+  if (msgText == undefined || keyboard == undefined) {
     await ctx.api.editMessageText(
       ctx.from.id,
       msgid,
@@ -87,12 +89,12 @@ export async function animeSearchStart(
     return;
   }
   if (keyboard.inline_keyboard.length == 0)
-    await ctx.api.editMessageText(ctx.from.id, msgid, msg.text, {
-      entities: msg.entities,
+    await ctx.api.editMessageText(ctx.from.id, msgid, msgText, {
+      entities: msgEntities,
     });
-  await ctx.api.editMessageText(ctx.from.id, msgid, msg.text, {
+  await ctx.api.editMessageText(ctx.from.id, msgid, msgText, {
     reply_markup: keyboard,
-    entities: msg.entities,
+    entities: msgEntities,
   });
   return;
 }
@@ -132,7 +134,11 @@ export async function animeSearchHandler(
   username: string,
   userid?: number,
   watchlistid?: number,
-) {
+): Promise<{
+  msgText?: string | undefined;
+  msgEntities?: MessageEntity[] | undefined;
+  keyboard?: InlineKeyboard | undefined;
+}> {
   let command = cmd;
   // const page = await searchAnime(query, currentpg, command == "remindme");
   // if (page === undefined) return { msg: undefined, keyboard: undefined };
@@ -143,13 +149,14 @@ export async function animeSearchHandler(
   const pages = t.filter((o) => o !== undefined);
   if (pages.find((o) => o.pageInfo.currentPage === currentpg) === undefined)
     return {
-      msg: undefined,
+      msgText: undefined,
+      msgEntities: undefined,
       keyboard: undefined,
     };
   const maxpg = Math.max(...pages.map((o) => o.pageInfo.currentPage));
   const page = pages.find((o) => o.pageInfo.currentPage === currentpg);
   if (page === undefined) {
-    return { msg: undefined, keyboard: undefined };
+    return { msgText: undefined, msgEntities: undefined, keyboard: undefined };
   }
   // if (currentpg != 1 && currentpg != 2)
   //     maxpg = pages.pageInfo.lastPage > 5 ? 5 : pages.pageInfo.lastPage;
@@ -169,12 +176,12 @@ export async function animeSearchHandler(
   const keyboard = getPagination(currentpg, maxpg, command);
   let msg = fmt`${b}Search results for '${query}${b}'\n\n`;
   const dbidlist = await getStatusFromDB(command, userid, watchlistid);
-  for (let i = 0; i < page.media.length; i++) {
+  for (let idx = 0; idx < page.media.length; idx++) {
     msg = msg.concat(
-      fmt`${b}${page.media[i].title.romaji}${b}\n${
-        page.media[i].title.english === null
-          ? page.media[i].title.userPreferred
-          : page.media[i].title.english
+      fmt`${b}${page.media[idx].title.romaji}${b}\n${
+        page.media[idx].title.english === null
+          ? page.media[idx].title.userPreferred
+          : page.media[idx].title.english
       }\n`,
     );
     if (command == 'startwatching' && userid !== undefined) {
@@ -182,12 +189,12 @@ export async function animeSearchHandler(
       // 	where: { userid }
       // });
       // if (old.alid === undefined) old.alid = [];
-      if (dbidlist.includes(page.media[i].id))
+      if (dbidlist.includes(page.media[idx].id))
         msg = msg.concat(fmt`${i}(Anime already marked as watching!)${i}\n\n`);
       //else msg += `<i>Start Watching:</i> /startwatching_${pages.media[i].id}\n\n`;
       else
         msg = msg.concat(
-          fmt`${i}Start Watching: ${a(`t.me/${username}?start=startwatching_${page.media[i].id}`)}Click here!${a}${i}\n\n`,
+          fmt`${i}Start Watching: ${a(`t.me/${username}?start=startwatching_${page.media[idx].id}`)}Click here!${a}${i}\n\n`,
         );
     } else if (command == 'remindme' && userid !== undefined) {
       // let old: number[] = [];
@@ -197,14 +204,14 @@ export async function animeSearchHandler(
       // });
       //if (_ === null) old = [];
       //else old = _.map((o) => o.alid);
-      if (dbidlist.includes(page.media[i].id))
+      if (dbidlist.includes(page.media[idx].id))
         msg = msg.concat(
           fmt`${i}(Already sending airing updates for anime!)${i}\n\n`,
         );
       //else msg += `<i>Send Airing Updates:</i> /remindme_${pages.media[i].id}\n\n`;
       else
         msg = msg.concat(
-          fmt`${i}Send Airing Updates: ${a(`t.me/${username}?start=remindme_${page.media[i].id}`)}Click here!${a}${i}\n\n`,
+          fmt`${i}Send Airing Updates: ${a(`t.me/${username}?start=remindme_${page.media[idx].id}`)}Click here!${a}${i}\n\n`,
         );
     } else if (command.startsWith('addwl') && watchlistid !== undefined) {
       // let old: number[] = [];
@@ -213,15 +220,15 @@ export async function animeSearchHandler(
       // 	select: { alid: true }
       // });
       // old = _ === null ? [] : _.alid;
-      if (dbidlist.includes(page.media[i].id))
+      if (dbidlist.includes(page.media[idx].id))
         msg = msg.concat(fmt`${i}(Already present in watchlist!)${i}\n\n`);
       else
         msg = msg.concat(
-          fmt`${i}Add to watchlist: ${a(`t.me/${username}?start=wl_${page.media[i].id}`)}Click here!${a}${i}\n\n`,
+          fmt`${i}Add to watchlist: ${a(`t.me/${username}?start=wl_${page.media[idx].id}`)}Click here!${a}${i}\n\n`,
         );
     } else msg = msg.concat(fmt`\n`);
   }
-  return { msg, keyboard };
+  return { msgText: msg.text, msgEntities: msg.entities, keyboard };
 }
 
 /**This function helps manage page scrolling for search results.
@@ -237,20 +244,20 @@ export async function search_startWatch_remindMe_cb(ctx: MyContext) {
     ...ctx.msg.text.split('\n')[0].matchAll(/^Search results for '(.+)'$/gi),
   ].map((o) => o[1])[0];
   //console.log(`${command}, ${movepg}, ${query}`);
-  const { msg, keyboard } = await animeSearchHandler(
+  const { msgText, msgEntities, keyboard } = await animeSearchHandler(
     query,
     command,
     movepg,
     ctx.me.username,
     ctx.session.userid,
   );
-  if (msg == undefined || keyboard == undefined) {
+  if (msgText == undefined || keyboard == undefined) {
     await ctx.reply('Unable to find any results.');
     return;
   }
-  //console.log(`${msg}, ${JSON.stringify(keyboard)}`);
-  await ctx.editMessageText(msg.text, {
-    entities: msg.entities,
+  //console.log(`${msgText}, ${JSON.stringify(keyboard)}`);
+  await ctx.editMessageText(msgText, {
+    entities: msgEntities,
     reply_markup: keyboard,
   });
 }

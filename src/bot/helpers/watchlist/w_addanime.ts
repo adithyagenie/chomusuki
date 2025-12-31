@@ -117,7 +117,7 @@ async function searchCB(convo: MyConversation, ctx: MyConversationContext) {
     ...ctx.msg.text.split('\n')[0].matchAll(/^Search results for '(.+)'$/gi),
   ].map((o) => o[1])[0];
   //console.log(`${command}, ${movepg}, ${query}`);
-  const { msg, keyboard } = await animeSearchHandler(
+  const { msgText, msgEntities, keyboard } = await animeSearchHandler(
     query,
     'addwl',
     movepg,
@@ -125,14 +125,14 @@ async function searchCB(convo: MyConversation, ctx: MyConversationContext) {
     userid,
     wlid,
   );
-  if (msg == undefined || keyboard == undefined) {
+  if (msgText == undefined || keyboard == undefined) {
     await ctx.reply('Unable to find any results.');
     return;
   }
-  //console.log(`${msg}, ${JSON.stringify(keyboard)}`);
-  await ctx.editMessageText(msg.text, {
+  //console.log(`${msgText}, ${JSON.stringify(keyboard)}`);
+  await ctx.editMessageText(msgText, {
     reply_markup: keyboard,
-    entities: msg.entities,
+    entities: msgEntities,
   });
 }
 
@@ -148,10 +148,12 @@ async function startSearchWL(
     return undefined;
   }
   const msgid = (await ctx.reply('Searching...')).message_id;
-  const { msg, keyboard } = await convo.external(() =>
-    animeSearchHandler(name, 'addwl', 1, ctx.me.username, userid, wlid),
+
+  const { msgText, msgEntities, keyboard } = await convo.external(
+    async () =>
+      await animeSearchHandler(name, 'addwl', 1, ctx.me.username, userid, wlid),
   );
-  if (msg == undefined || keyboard == undefined) {
+  if (msgText == undefined || keyboard == undefined) {
     if (ctx.from?.id !== undefined) {
       await ctx.api.editMessageText(
         ctx.from.id,
@@ -163,12 +165,12 @@ async function startSearchWL(
   }
   if (ctx.from?.id === undefined) return;
   if (keyboard.inline_keyboard.length == 0)
-    await ctx.api.editMessageText(ctx.from.id, msgid, msg.text, {
-      entities: msg.entities,
+    await ctx.api.editMessageText(ctx.from.id, msgid, msgText, {
+      entities: msgEntities,
     });
-  await ctx.api.editMessageText(ctx.from.id, msgid, msg.text, {
+  await ctx.api.editMessageText(ctx.from.id, msgid, msgText, {
     reply_markup: keyboard,
-    entities: msg.entities,
+    entities: msgEntities,
   });
   return msgid;
 }

@@ -138,9 +138,13 @@ function stopWatching() {
       });
       ctx.menu.back();
       const wlname = await getWLName(ctx);
-      const yesChoiceEditMessage = fmt`Chosen watchlist: ${b}${wlname ?? ''}${b}\n
+      const yesChoiceEditMessage = item.imglink
+        ? fmt`Chosen watchlist: ${b}${wlname ?? ''}${b}\n
             Chosen anime: \n${b}${item.jpname}${b}\n${i}(${item.enname})${i}\n
-            What do you wanna do with it? ${a(`${item.imglink ?? ''}`)}​${a}`;
+            What do you wanna do with it? ${a(item.imglink)}​${a}`
+        : fmt`Chosen watchlist: ${b}${wlname ?? ''}${b}\n
+            Chosen anime: \n${b}${item.jpname}${b}\n${i}(${item.enname})${i}\n
+            What do you wanna do with it?`;
       await ctx.editMessageText(yesChoiceEditMessage.text, {
         entities: yesChoiceEditMessage.entities,
       });
@@ -154,9 +158,13 @@ function stopWatching() {
         select: { jpname: true, enname: true, imglink: true },
       });
       const wlname = await getWLName(ctx);
-      const noChoiceEditMessage = fmt`Chosen watchlist: ${b}${wlname ?? ''}${b}\n
+      const noChoiceEditMessage = item.imglink
+        ? fmt`Chosen watchlist: ${b}${wlname ?? ''}${b}\n
               Chosen anime: \n${b}${item.jpname}${b}\n${i}(${item.enname})${i}\n
-              What do you wanna do with it? ${a(`${item.imglink ?? ''}`)}​${a}`;
+              What do you wanna do with it? ${a(item.imglink)}​${a}`
+        : fmt`Chosen watchlist: ${b}${wlname ?? ''}${b}\n
+              Chosen anime: \n${b}${item.jpname}${b}\n${i}(${item.enname})${i}\n
+              What do you wanna do with it?`;
       await ctx.editMessageText(noChoiceEditMessage.text, {
         entities: noChoiceEditMessage.entities,
       });
