@@ -35,9 +35,10 @@ export function WLMainMenu() {
             wllist.slice(-1)[0].watchlist_name ?? '',
             `wl_opts`,
             async (ctx1) => {
-              const chosenWLReplyMsg = fmt`Watchlist ${code}${
-                wllist.slice(-1)[0].watchlist_name ?? ''
-              }${code} chosen.\nWhat do you want to do with it?`;
+              const chosenWLReplyMsg =
+                fmt`Watchlist ${code}${wllist.slice(-1)[0].watchlist_name ?? ''}${code} chosen.\n`.concat(
+                  fmt`What do you want to do with it?`,
+                );
               await ctx1.editMessageText(chosenWLReplyMsg.text, {
                 entities: chosenWLReplyMsg.entities,
               });

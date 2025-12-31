@@ -46,9 +46,7 @@ export async function remindMe(ctx: MyContext) {
       await ctx.reply('Error encountered ;_;');
       return;
     }
-    const replyMessage = fmt`You will now recieve updates on ${b}${
-      animeData.jpname
-    }.${b}`;
+    const replyMessage = fmt`You will now recieve updates on ${b}${animeData.jpname}.${b}`;
     await ctx.reply(replyMessage.text, { entities: replyMessage.entities });
   } else await ctx.reply('Error encountered ;_;');
   return;
@@ -102,7 +100,7 @@ export async function airingUpdatesListHelper(
   for (let idx = 0; idx < alidlist.length; idx++) {
     const startUrl = `t.me/${username}?start=stopremindme_${alidlist[idx]}`;
     msg = fmt`${msg}${idx + 1}. ${animelist[idx]}\n
-          ${i}Stop reminding me: ${a(startUrl)}Click here!${a}${i}\n\n`;
+  ${i}Stop reminding me: ${a(startUrl)}Click here!${a}${i}\n\n`;
   }
   const keyboard = getPagination(offset, Math.ceil(amount / 5), 'airingupd');
   return { msg, keyboard };
